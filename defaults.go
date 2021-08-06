@@ -137,6 +137,7 @@ var html_defaults = map[string]bool {
 	"var": true,
 	"video": true,
 	"wbr": true,
+	"main": true,
 }
 
 // new project

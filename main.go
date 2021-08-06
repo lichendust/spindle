@@ -35,7 +35,6 @@ func main() {
 
 	if args[0] == "new" {
 		make_blank_project()
-		fmt.Println(new_project_message)
 		return
 	}
 
