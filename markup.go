@@ -269,6 +269,16 @@ func markup_parser(input string) *markup {
 					text:        []string{program_text},
 				})
 				continue
+
+			case "html":
+				html := extract_code_block(input)
+				input = input[len(html)+1:] // +1 trailing brace
+				html = clean_html(html)
+				data_list = append(data_list, &markup_object{
+					object_type: RAW_TEXT,
+					text:        []string{html},
+				})
+				continue
 			}
 
 			// block with userland ident
