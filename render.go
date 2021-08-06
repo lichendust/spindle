@@ -426,11 +426,11 @@ func execute_chunk(vars map[string]string, name string) string {
 
 	chunk_markup := markup_parser(raw)
 
+	chunk_markup.vars = merge_maps(chunk_markup.vars, vars)
+	chunk_markup.pos  = -1
+
 	assign_plate(chunk_markup)
 	process_vars(chunk_markup)
-
-	chunk_markup.vars = merge_maps(vars, chunk_markup.vars)
-	chunk_markup.pos  = -1
 
 	return data_render(chunk_markup, chunk_markup.vars)
 }
