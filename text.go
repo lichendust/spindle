@@ -127,8 +127,7 @@ func make_element_id(source string) string {
 func unix_args(input string) []string {
 	input = strings.TrimSpace(input)
 
-	last_quote := 'x'
-	is_quote   := false
+	is_quote := false
 
 	args := make([]string, 0, 4)
 
@@ -139,25 +138,22 @@ func unix_args(input string) []string {
 
 		if is_quote {
 			for i, c := range input {
-				if last_quote == c {
-					last_quote = 'x'
+				if c == '`' {
 					is_quote = false
-
 					args = append(args, input[:i])
-
-					input = input[i:]
-					continue
+					input = input[i + 1:]
+					break
 				}
 			}
+			continue
 		}
 
 		input = consume_whitespace(input)
 
 		prefix := rune(input[0])
 
-		if prefix == '"' || prefix == '\'' {
+		if prefix == '`' {
 			is_quote = true
-			last_quote = prefix
 			input = input[1:]
 			continue
 		}
