@@ -311,10 +311,9 @@ func data_render(markup *markup, vars map[string]string) string {
 
 		case IMAGE:
 			temp := vars[get_id(obj, "img")]
-			path := obj.text[0]
 
-			path = safe_join_image_prefix(markup, path)
-			buffer.WriteString(sprint(temp, path))
+			obj.text[0] = safe_join_image_prefix(markup, obj.text[0])
+			buffer.WriteString(sprint(temp, obj.text...))
 
 		case DIVIDER:
 			buffer.WriteString(vars["hr"])
