@@ -65,6 +65,23 @@ func count_rune(input string, r rune) int {
 	return count
 }
 
+func has_double_newline(input string) bool {
+	last_rune := 'x'
+	for _, c := range input {
+		if c == '\n' && last_rune == '\n' {
+			return true
+		}
+		if c >= utf8.RuneSelf && !unicode.IsSpace(c) {
+			break
+		}
+		if ascii_space[c] == 0 {
+			break
+		}
+		last_rune = c
+	}
+	return false
+}
+
 func sprint(source string, v ...string) string {
 	if len(v) == 1 {
 		return strings.ReplaceAll(source, `%s`, v[0])

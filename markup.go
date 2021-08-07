@@ -34,6 +34,7 @@ const (
 	FUNCTION_INLINE
 	IMPORT
 	CHUNK
+	WHITESPACE
 	BLOCK_CODE
 	BLOCK_END
 	BLOCK
@@ -163,6 +164,14 @@ func markup_parser(input string) *markup {
 			}
 
 			data_list = append(data_list, obj)
+
+			// whitespace check
+			if has_double_newline(input) {
+				data_list = append(data_list, &markup_object {
+					object_type: WHITESPACE,
+				})
+			}
+
 			continue
 		}
 
@@ -227,9 +236,10 @@ func markup_parser(input string) *markup {
 					object_type: BLOCK_IF,
 				}
 
+
 				if args[0] == '!' {
 					x.text = []string{args[1:]}
-					x.offset++
+					x.offset = 1
 				} else {
 					x.text = []string{args}
 				}

@@ -148,6 +148,9 @@ func data_render(markup *markup, vars map[string]string) string {
 		obj := markup.data[markup.pos]
 
 		switch obj.object_type {
+		case WHITESPACE:
+			continue
+
 		case BLOCK_END:
 			return buffer.String()
 
