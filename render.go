@@ -171,7 +171,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			_, eval := vars[obj.text[0]]
 
 			// is inverse
-			if (obj.object_type == 1) {
+			if (obj.offset == 1) {
 				eval = !eval
 			}
 

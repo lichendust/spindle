@@ -211,7 +211,7 @@ func markup_parser(input string) *markup {
 			args := strings.TrimSpace(line[len(ident) : len(line)-1])
 			args_valid := false
 
-			if args != "" && len(extract_ident(args)) == len(args) {
+			if args != "" && len(extract_arbitrary_word(args)) == len(args) {
 				args_valid = true
 			}
 
