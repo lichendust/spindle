@@ -77,6 +77,12 @@ func make_url_from_path(input string) string {
 		input = input[:len(input) - 6]
 	}
 
+	input = filepath.ToSlash(input)
+
+	if len(input) > 1 && input[0] == '/' {
+		input = input[1:]
+	}
+
 	return input
 }
 
