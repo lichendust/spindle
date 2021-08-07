@@ -10,9 +10,9 @@ import (
 // reminder to replace it with something
 // faster
 
-var italics = regexp.MustCompile(`_([^><]+?)_`)
 var strike  = regexp.MustCompile(`~([^><]+?)~`)
-var bold    = regexp.MustCompile(`\*([^><]+?)\*`)
+var italics = regexp.MustCompile(`\*([^><]+?)\*`)
+var bold    = regexp.MustCompile(`\*\*([^><]+?)\*\*`)
 var link    = regexp.MustCompile(`\[([^><]+?)\]\((.+?)\)`)
 var inline  = regexp.MustCompile(`c\.(.+?){(.+?)}`)
 
