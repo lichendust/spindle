@@ -157,7 +157,7 @@ func data_render(markup *markup, vars map[string]string) string {
 		case BLOCK:
 			name := obj.text[0]
 
-			child_text := data_render(markup, vars)
+			child_text := data_render(markup, merge_maps(obj.vars, vars))
 			temp, ok   := vars[name]
 
 			if ok {
@@ -179,7 +179,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 			if eval {
-				buffer.WriteString(data_render(markup, vars))
+				buffer.WriteString(data_render(markup, merge_maps(obj.vars, vars)))
 			} else {
 				skip_block(markup)
 			}
@@ -198,7 +198,7 @@ func data_render(markup *markup, vars map[string]string) string {
 				if eval {
 					skip_block(markup)
 				} else {
-					buffer.WriteString(data_render(markup, vars))
+					buffer.WriteString(data_render(markup, merge_maps(obj.vars, vars)))
 				}
 			}
 

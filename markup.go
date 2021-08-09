@@ -19,6 +19,7 @@ type markup_object struct {
 	object_type uint8
 	offset      uint8
 	text        []string
+	vars        map[string]string
 }
 
 const (
@@ -98,7 +99,24 @@ func markup_parser(input string) *markup {
 	input = strings.TrimSpace(input)
 
 	data_list := make([]*markup_object, 0, 64)
-	vars_map := make(map[string]string, 16)
+
+	vars_stack := make([]map[string]string, 0, 3)
+	vars_stack = append(vars_stack, make(map[string]string, 16))
+
+	active_map := vars_stack[0]
+
+	pop := func() {
+		if len(vars_stack) == 1 {
+			active_map = vars_stack[0]
+		}
+		vars_stack = vars_stack[:len(vars_stack) - 1]
+		active_map = vars_stack[len(vars_stack) - 1]
+	}
+
+	push := func() {
+		vars_stack = append(vars_stack, make(map[string]string, 16))
+		active_map = vars_stack[len(vars_stack) - 1]
+	}
 
 	for {
 		input = consume_whitespace(input)
@@ -127,6 +145,7 @@ func markup_parser(input string) *markup {
 
 		switch the_rune {
 		case '}': // we're closing a block
+			pop()
 			input = input[1:]
 			data_list = append(data_list, &markup_object{
 				object_type: BLOCK_END,
@@ -207,7 +226,7 @@ func markup_parser(input string) *markup {
 				panic("bad variable in page")
 			}
 
-			vars_map[ident] = data
+			active_map[ident] = data
 			input = var_test
 			continue
 		}
@@ -226,31 +245,33 @@ func markup_parser(input string) *markup {
 
 			input = input[len(line):]
 
+			push()
+
+			the_token := &markup_object {
+				vars: active_map,
+			}
+
 			switch ident {
 			case "if":
 				if !args_valid {
 					panic("unknown guff in 'if' statement")
 				}
 
-				x := &markup_object{
-					object_type: BLOCK_IF,
-				}
-
+				the_token.object_type = BLOCK_IF
 
 				if args[0] == '!' {
-					x.text = []string{args[1:]}
-					x.offset = 1
+					the_token.text = []string{args[1:]}
+					the_token.offset = 1
 				} else {
-					x.text = []string{args}
+					the_token.text = []string{args}
 				}
 
-				data_list = append(data_list, x)
+				data_list = append(data_list, the_token)
 				continue
 
 			case "else":
-				data_list = append(data_list, &markup_object{
-					object_type: BLOCK_ELSE,
-				})
+				the_token.object_type = BLOCK_ELSE
+				data_list = append(data_list, the_token)
 				continue
 
 			case "code":
@@ -265,37 +286,39 @@ func markup_parser(input string) *markup {
 					x = append(x, args)
 				}
 
-				data_list = append(data_list, &markup_object{
-					object_type: BLOCK_CODE,
-					text:        x,
-				})
+				the_token.object_type = BLOCK_CODE
+				the_token.text = x
+
+				data_list = append(data_list, the_token)
 				continue
 
 			case "function":
 				program_text := extract_code_block(input)
 				input = input[len(program_text)+1:] // +1 trailing brace
-				data_list = append(data_list, &markup_object{
-					object_type: FUNCTION_INLINE,
-					text:        []string{program_text},
-				})
+
+				the_token.object_type = FUNCTION_INLINE
+				the_token.text = []string{program_text}
+
+				data_list = append(data_list, the_token)
 				continue
 
 			case "html":
 				html := extract_code_block(input)
 				input = input[len(html)+1:] // +1 trailing brace
 				html = clean_html(html)
-				data_list = append(data_list, &markup_object{
-					object_type: RAW_TEXT,
-					text:        []string{html},
-				})
+
+				the_token.object_type = RAW_TEXT
+				the_token.text = []string{html}
+
+				data_list = append(data_list, the_token)
 				continue
 			}
 
 			// block with userland ident
-			data_list = append(data_list, &markup_object{
-				object_type: BLOCK,
-				text:        []string{ident},
-			})
+			the_token.object_type = BLOCK
+			the_token.text = []string{ident}
+
+			data_list = append(data_list, the_token)
 			continue
 		}
 
@@ -309,7 +332,7 @@ func markup_parser(input string) *markup {
 
 	return &markup{
 		data: data_list,
-		vars: vars_map,
+		vars: vars_stack[0],
 	}
 }
 
