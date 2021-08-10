@@ -25,9 +25,7 @@ func build_project(args []string) {
 	}
 
 	// currently non-thread safe
-	for _, pointer_file := range files {
-		file := *pointer_file
-
+	for _, file := range files {
 		if file.file_type == MARKUP {
 			page_obj, _ := load_page(file.source, true)
 			make_file(file.output, markup_render(page_obj))
@@ -42,6 +40,9 @@ func build_project(args []string) {
 		file := *pointer_file
 
 		switch file.file_type {
+		case MARKUP:
+			continue
+
 		case STATIC_JS, STATIC_CSS:
 			go func() {
 				wg.Add(1)
