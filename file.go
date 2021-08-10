@@ -10,9 +10,20 @@ import (
 	"path/filepath"
 )
 
+const (
+	MARKUP uint8 = iota
+	STATIC
+	STATIC_CSS
+	STATIC_HTML
+	STATIC_JS
+	IMAGE_PNG
+	IMAGE_JPG
+)
+
 type file struct {
-	path    string
-	draft   bool
+	source string
+	output string
+	file_type uint8
 }
 
 func is_draft(input string) bool {
@@ -23,7 +34,7 @@ func is_draft(input string) bool {
 	x := len(input) - 1
 
 	for i, c := range input {
-		if c == '/' && i < x {
+		if (c == '/' || c == '\\') && i < x {
 			if input[i + 1] == '_' {
 				return true
 			}
@@ -183,7 +194,7 @@ func directory_has_changes(root_path string, last_run time.Time) bool {
 	return has_changes
 }
 
-func get_files(root_path string, reject_drafts bool) ([]*file, []*file) {
+func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*file) {
 	files   := make([]*file, 0, 32)
 	folders := make([]*file, 0, 16)
 
@@ -192,12 +203,17 @@ func get_files(root_path string, reject_drafts bool) ([]*file, []*file) {
 			return nil
 		}
 
-		path = filepath.ToSlash(path)
-
 		name := info.Name()
 		fchr := name[0]
 
 		draft := is_draft(path)
+		ext := filepath.Ext(name)
+
+		out_path := ""
+
+		if len(path) >= 7 {
+			out_path = filepath.Join(public_dir, path[7:])
+		}
 
 		if info.IsDir() {
 			if path == root_path {
@@ -208,7 +224,7 @@ func get_files(root_path string, reject_drafts bool) ([]*file, []*file) {
 				return filepath.SkipDir
 			}
 
-			folders = append(folders, &file {path, draft})
+			folders = append(folders, &file {path, out_path, 0})
 			return nil
 		}
 
@@ -216,7 +232,25 @@ func get_files(root_path string, reject_drafts bool) ([]*file, []*file) {
 			return nil
 		}
 
-		files = append(files, &file {path, draft})
+		file_type := STATIC
+
+		switch ext {
+		case ".jpg", ".jpeg":
+			file_type = IMAGE_JPG
+		case ".png":
+			file_type = IMAGE_PNG
+		case ".js":
+			file_type = STATIC_JS
+		case ".css":
+			file_type = STATIC_CSS
+		case ".html":
+			file_type = STATIC_HTML
+		case ".x":
+			file_type = MARKUP
+			out_path  = out_path[:len(out_path) - 2] + ".html"
+		}
+
+		files = append(files, &file {path, out_path, file_type})
 		return nil
 	})
 

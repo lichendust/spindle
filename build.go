@@ -1,52 +1,74 @@
 package main
 
 import (
+	"sync"
 	"sort"
 	"strings"
 	"path/filepath"
 )
 
 func build_project(args []string) {
-	files, folders := get_files("source", true)
-
 	public_dir := "public"
 
 	if len(args) > 0 {
 		public_dir = args[0]
 	}
 
-	make_directory(public_dir)
-
 	init_minify() // for copy_mini
 
+	files, folders := get_files("source", public_dir, true)
+
+	make_directory(public_dir)
+
 	for _, folder := range folders {
-		make_directory(filepath.Join(public_dir, folder.path[7:]))
+		make_directory(folder.output)
 	}
 
-	for _, file := range files {
-		out_path := filepath.Join(public_dir, file.path[7:])
+	// currently non-thread safe
+	for _, pointer_file := range files {
+		file := *pointer_file
 
-		switch filepath.Ext(file.path) {
-		case ".x":
-			page_obj, _ := load_page(file.path, true)
-
-			out_text := markup_render(page_obj)
-			out_path = sprint("%s.html", out_path[:len(out_path) - len(filepath.Ext(out_path))])
-
-			make_file(out_path, out_text)
-
-		case ".js":
-			copy_mini(file.path, out_path, "text/js")
-
-		case ".css":
-			copy_mini(file.path, out_path, "text/css")
-
-		default:
-			copy_file(file.path, out_path)
+		if file.file_type == MARKUP {
+			page_obj, _ := load_page(file.source, true)
+			make_file(file.output, markup_render(page_obj))
 		}
 	}
 
 	sitemap(files, public_dir)
+
+	var wg sync.WaitGroup
+
+	for _, pointer_file := range files {
+		file := *pointer_file
+
+		switch file.file_type {
+		case STATIC_JS, STATIC_CSS:
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+
+				copy_mini(&file)
+			}()
+
+		case IMAGE_JPG, IMAGE_PNG:
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+
+				image_handler(&file, 1920, 1920)
+			}()
+
+		default:
+			go func() {
+				wg.Add(1)
+				defer wg.Done()
+
+				copy_file(file.source, file.output)
+			}()
+		}
+	}
+
+	wg.Wait()
 
 	console_handler.flush()
 }
@@ -63,7 +85,8 @@ func load_page(path string, no_drafts bool) (*markup, bool) {
 	page_obj.no_drafts = no_drafts
 
 	assign_plate(page_obj)
-	process_vars(page_obj)
+
+	page_obj.vars = process_vars(page_obj, page_obj.vars)
 
 	page_obj.vars["page_path"] = make_url_from_path(path[6:])
 
@@ -73,28 +96,20 @@ func load_page(path string, no_drafts bool) (*markup, bool) {
 func make_url_from_path(input string) string {
 	input = input[:len(input) - len(filepath.Ext(input))]
 
-	if strings.HasSuffix(input, "/index") {
-		input = input[:len(input) - 6]
+	if strings.HasSuffix(input, "index") {
+		input = input[:len(input) - 5]
 	}
 
-	input = filepath.ToSlash(input)
-
-	if len(input) > 1 && input[0] == '/' {
-		input = input[1:]
-	}
-
-	return input
+	return filepath.ToSlash(filepath.Clean(input))
 }
 
 func sitemap(files []*file, public_dir string) {
 	ordered := make([]string, len(files) + 24)
 
 	for _, file := range files {
-		ext := filepath.Ext(file.path)
-
-		switch ext {
-		case ".x", ".html":
-			path := make_url_from_path(file.path[6:])
+		switch file.file_type {
+		case MARKUP, STATIC_HTML:
+			path := make_url_from_path(file.source[6:])
 			ordered = append(ordered, sprint(sitemap_entry, join_url(config.vars["domain"], path)))
 		default:
 			continue

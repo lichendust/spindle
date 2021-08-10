@@ -157,18 +157,19 @@ func data_render(markup *markup, vars map[string]string) string {
 		case BLOCK:
 			name := obj.text[0]
 
-			child_text := data_render(markup, merge_maps(obj.vars, vars))
-			temp, ok   := vars[name]
+			new_vars := process_vars(markup, merge_maps(obj.vars, vars))
+			new_text := data_render(markup, new_vars)
+			temp, ok := vars[name]
 
 			if ok {
-				child_text = sprint(temp, child_text)
+				new_text = sprint(temp, new_text)
 			} else if ok := html_defaults[name]; ok {
-				child_text = sprint("<%s>%s</%s>", name, child_text, name)
+				new_text = sprint("<%s>%s</%s>", name, new_text, name)
 			} else {
-				child_text = sprint("<div class='%s'>%s</div>", name, child_text)
+				new_text = sprint("<div class='%s'>%s</div>", name, new_text)
 			}
 
-			buffer.WriteString(child_text)
+			buffer.WriteString(complex_key_mapper(new_text, new_vars))
 
 		case BLOCK_IF:
 			_, eval := vars[obj.text[0]]
@@ -179,7 +180,9 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 			if eval {
-				buffer.WriteString(data_render(markup, merge_maps(obj.vars, vars)))
+				new_vars := process_vars(markup, merge_maps(obj.vars, vars))
+				new_text := data_render(markup, new_vars)
+				buffer.WriteString(complex_key_mapper(new_text, new_vars))
 			} else {
 				skip_block(markup)
 			}
@@ -198,7 +201,9 @@ func data_render(markup *markup, vars map[string]string) string {
 				if eval {
 					skip_block(markup)
 				} else {
-					buffer.WriteString(data_render(markup, merge_maps(obj.vars, vars)))
+					new_vars := merge_maps(obj.vars, vars)
+					new_text := data_render(markup, new_vars)
+					buffer.WriteString(complex_key_mapper(new_text, new_vars))
 				}
 			}
 
@@ -315,7 +320,13 @@ func data_render(markup *markup, vars map[string]string) string {
 		case IMAGE:
 			temp := vars[get_id(obj, "img")]
 
-			obj.text[0] = safe_join_image_prefix(markup, obj.text[0])
+			image_path := safe_join_image_prefix(markup, obj.text[0])
+
+			if !markup.no_drafts {
+				image_path = strip_image_size(image_path)
+			}
+
+			obj.text[0] = image_path
 			buffer.WriteString(sprint(temp, obj.text...))
 
 		case DIVIDER:
@@ -432,7 +443,7 @@ func execute_chunk(vars map[string]string, name string) string {
 	chunk_markup.pos  = -1
 
 	assign_plate(chunk_markup)
-	process_vars(chunk_markup)
+	chunk_markup.vars = process_vars(chunk_markup, chunk_markup.vars)
 
 	return data_render(chunk_markup, chunk_markup.vars)
 }

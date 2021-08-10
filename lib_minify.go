@@ -17,8 +17,8 @@ func init_minify() {
 	minifier.AddFunc("text/js", js.Minify)
 }
 
-func copy_mini(src, dst, mode string) {
-	source, err := os.Open(src)
+func copy_mini(the_file *file) {
+	source, err := os.Open(the_file.source)
 
 	if err != nil {
 		panic(err) // @error
@@ -26,10 +26,17 @@ func copy_mini(src, dst, mode string) {
 
 	defer source.Close()
 
-	output, err := os.Create(dst)
+	output, err := os.Create(the_file.output)
 
 	if err != nil {
 		panic(err) // @error
+	}
+
+	mode := ""
+
+	switch the_file.file_type {
+	case STATIC_JS:  mode = "text/js"
+	case STATIC_CSS: mode = "text/css"
 	}
 
 	defer output.Close()

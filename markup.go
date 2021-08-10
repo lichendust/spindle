@@ -5,6 +5,7 @@ import (
 	"path"
 	"strings"
 	"unicode/utf8"
+	"path/filepath"
 )
 
 type markup struct {
@@ -408,22 +409,37 @@ func safe_join_image_prefix(markup* markup, image_path string) string {
 	if image_prefix, ok := markup.vars["image_prefix"]; ok {
 		image_path = join_image_prefix(image_prefix, image_path)
 	}
-
 	if markup.no_drafts && is_draft(image_path) {
 		fmt.Printf("image: %q is draft\n", image_path) // @warning
 	}
-
 	return image_path
 }
 
-func process_vars(some_page *markup) {
-	image_prefix, ok := some_page.vars["image_prefix"]
+func strip_image_size(input string) string {
+	n := strings.IndexRune(input, '@')
 
-	for key, value := range some_page.vars {
+	if n < 0 {
+		return input
+	}
+
+	ext := filepath.Ext(input)
+	input = input[:n]
+	return input + ext
+}
+
+func process_vars(some_page *markup, vars map[string]string) map[string]string {
+	image_prefix, ok := vars["image_prefix"]
+
+	for key, value := range vars {
 		if strings.Contains(key, "image") {
 			if ok {
 				value = join_image_prefix(image_prefix, value)
-				some_page.vars[key] = value
+
+				if !some_page.no_drafts {
+					value = strip_image_size(value)
+				}
+
+				vars[key] = value
 			}
 
 			if some_page.no_drafts && is_draft(value) {
@@ -431,4 +447,6 @@ func process_vars(some_page *markup) {
 			}
 		}
 	}
+
+	return vars
 }
