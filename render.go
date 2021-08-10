@@ -55,7 +55,7 @@ func head_render(markup *markup, buffer *strings.Builder) {
 	clean_list := make([]string, 0, len(markup.vars))
 
 	for key, _ := range markup.vars {
-		if strings.HasPrefix(key, "meta") {
+		if strings.HasPrefix(key, "meta.") {
 			clean_list = append(clean_list, key)
 		}
 	}
@@ -65,9 +65,16 @@ func head_render(markup *markup, buffer *strings.Builder) {
 	for _, key := range clean_list {
 		value := markup.vars[key]
 
+		key = key[5:]
+
 		switch key {
+		case "viewport":
+			buffer.WriteString(sprint(meta_viewport, value))
+			continue
+
 		case "image":
 			value = join_url(domain, value)
+
 		case "description":
 			buffer.WriteString(sprint(meta_description, value))
 

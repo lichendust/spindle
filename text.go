@@ -86,11 +86,9 @@ func sprint(source string, v ...string) string {
 	if len(v) == 1 {
 		return strings.ReplaceAll(source, `%s`, v[0])
 	}
-
 	for _, x := range v {
 		source = strings.Replace(source, `%s`, x, 1)
 	}
-
 	return source
 }
 
