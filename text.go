@@ -259,6 +259,10 @@ func complex_key_mapper(source string, vars map[string]string) string {
 
 			sub_text, ok := vars[the_var]
 
+			if ok && sub_text == "0" {
+				continue
+			}
+
 			if len(var_text) == 0 {
 				if ok {
 					buffer.WriteString(simple_key_mapper(sub_text, vars))

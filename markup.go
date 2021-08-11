@@ -227,6 +227,10 @@ func markup_parser(input string) *markup {
 				panic("bad variable in page")
 			}
 
+			if data == "false" {
+				data = "0"
+			}
+
 			active_map[ident] = data
 			input = var_test
 			continue

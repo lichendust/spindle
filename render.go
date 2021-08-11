@@ -179,7 +179,9 @@ func data_render(markup *markup, vars map[string]string) string {
 			buffer.WriteString(complex_key_mapper(new_text, new_vars))
 
 		case BLOCK_IF:
-			_, eval := vars[obj.text[0]]
+			text, eval := vars[obj.text[0]]
+
+			eval = eval && text != "0"
 
 			// is inverse
 			if (obj.offset == 1) {
