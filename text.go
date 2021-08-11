@@ -29,7 +29,7 @@ func consume_whitespace(input string) string {
 
 func extract_ident(input string) string {
 	for i, c := range input {
-		if !(unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_' || c == '.') {
+		if !(unicode.IsLetter(c) || unicode.IsNumber(c) || c == '_' || c == '.' || c == '-') {
 			return input[:i]
 		}
 	}
