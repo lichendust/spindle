@@ -208,7 +208,7 @@ func markup_parser(input string) *markup {
 				for i, c := range var_test[1:] {
 					if c == '`' {
 						data = var_test[1:i+1]
-						var_test = var_test[i+1:]
+						var_test = var_test[i+2:]
 						break
 					}
 				}
