@@ -346,8 +346,9 @@ func data_render(markup *markup, vars map[string]string) string {
 
 		case HEADING:
 			temp := vars[fmt.Sprintf("h%d", obj.offset)] // this is an exception to get_id
+			id   := make_element_id(obj.text[0])
 			text := complex_key_mapper(obj.text[0], vars)
-			buffer.WriteString(sprint(temp, make_element_id(text), text))
+			buffer.WriteString(sprint(temp, id, text))
 
 		case PARAGRAPH:
 			buffer.WriteString(sprint(vars["paragraph"], complex_key_mapper(obj.text[0], vars)))
