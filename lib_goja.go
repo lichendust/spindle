@@ -1,6 +1,9 @@
 package main
 
-import "github.com/dop251/goja"
+import (
+	"time"
+	"github.com/dop251/goja"
+)
 
 const script_wrapper = `function _() {%s};_()`
 
@@ -12,6 +15,10 @@ func new_script_vm() *goja.Runtime {
 	// builtins
 	vm.Set("print", console_handler.print)
 	vm.Set("sprint", sprint)
+
+	vm.Set("time", func() int64 {
+		return time.Now().Unix()
+	})
 
 	return vm
 }
