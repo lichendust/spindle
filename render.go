@@ -46,7 +46,7 @@ func head_render(markup *markup, buffer *strings.Builder) {
 	domain := markup.vars["domain"]
 
 	{
-		canon_path := join_url(domain, markup.vars["page_path"])
+		canon_path := join_url(domain, markup.vars["url_pretty"])
 
 		buffer.WriteString(sprint(meta_canonical, canon_path))
 		buffer.WriteString(sprint(meta_source, "og:url", canon_path))

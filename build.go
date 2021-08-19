@@ -89,7 +89,9 @@ func load_page(path string, no_drafts bool) (*markup, bool) {
 
 	page_obj.vars = process_vars(page_obj, page_obj.vars)
 
-	page_obj.vars["page_path"] = make_url_from_path(path[6:])
+	page_obj.vars["raw_path"]   = path
+	page_obj.vars["url_pretty"] = make_url_from_path(path[6:])
+	// @todo unpretty url?
 
 	return page_obj, true
 }
