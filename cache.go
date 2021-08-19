@@ -2,21 +2,15 @@ package main
 
 var config *markup
 var cache_plate map[string]*markup
-var cache_chunk map[string]*markup
 var cache_rtext map[string]string
 
 func init() {
 	cache_plate = make(map[string]*markup, 4)
-	cache_chunk = make(map[string]*markup, 4)
 	cache_rtext = make(map[string]string,  4)
 }
 
 func expire_cache_plate() {
 	cache_plate = make(map[string]*markup, len(cache_plate))
-}
-
-func expire_cache_chunk() {
-	cache_chunk = make(map[string]*markup, len(cache_chunk))
 }
 
 func expire_cache_rtext() {

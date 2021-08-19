@@ -41,6 +41,7 @@ func serve_project(args []string) {
 
 	for range time.Tick(time.Second * 1) {
 		if file_has_changes("config/config.x", last_run) {
+			expire_cache_plate()
 			if !load_config() {
 				fmt.Println("error in config.x, stopping server")
 				break
@@ -49,7 +50,6 @@ func serve_project(args []string) {
 
 		if directory_has_changes("config/chunks", last_run) {
 			expire_cache_rtext()
-			expire_cache_chunk()
 		}
 
 		if directory_has_changes("config/plates", last_run) {
