@@ -14,7 +14,7 @@ func generic_resize(img image.Image, w, h int) image.Image {
 	return resize.Resize(uint(w), uint(h), img, resize.MitchellNetravali)
 }
 
-func image_handler(the_file *file, w, h int) {
+func image_handler(the_file *file, long_axis_max int) {
 	source_file, err := os.Open(the_file.source)
 
 	if err != nil {
@@ -37,20 +37,21 @@ func image_handler(the_file *file, w, h int) {
 		panic(err)
 	}
 
-	ratio := con.Width / con.Height
-
 	target_width  := 0
 	target_height := 0
 
-	if ratio >= 1 {
-		if con.Width > w {
-			target_width = w
+	if long_axis_max == 0 {
+		target_width  = con.Width
+		target_height = con.Height
+	} else if con.Width / con.Height >= 1 {
+		if con.Width > long_axis_max {
+			target_width = long_axis_max
 		} else {
 			target_width = con.Width
 		}
 	} else {
-		if con.Height > h {
-			target_height = h
+		if con.Height > long_axis_max {
+			target_height = long_axis_max
 		} else {
 			target_height = con.Height
 		}
@@ -95,7 +96,7 @@ func write_jpeg(img image.Image, out_path string) {
 	}
 	defer out.Close()
 
-	jpeg.Encode(out, img, &jpeg.Options{90})
+	jpeg.Encode(out, img, &jpeg.Options{config.image_jpeg_quality})
 }
 
 func write_png(img image.Image, out_path string) {

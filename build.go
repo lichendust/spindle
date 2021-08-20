@@ -56,7 +56,7 @@ func build_project(args []string) {
 				wg.Add(1)
 				defer wg.Done()
 
-				image_handler(&file, 1920, 1920)
+				image_handler(&file, config.image_target)
 			}()
 
 		default:

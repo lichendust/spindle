@@ -1,6 +1,5 @@
 package main
 
-var config *markup
 var cache_plate map[string]*markup
 var cache_rtext map[string]string
 

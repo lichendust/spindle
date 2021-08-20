@@ -3,9 +3,20 @@ package main
 import (
 	"os"
 	"fmt"
+	"strconv"
 )
 
-var console_handler *console
+var (
+	config *global_config
+	console_handler *console
+)
+
+type global_config struct {
+	vars map[string]string
+
+	image_target        int
+	image_jpeg_quality  int
+}
 
 func load_config() bool {
 	raw_text, ok := load_file("config/config.x")
@@ -14,8 +25,27 @@ func load_config() bool {
 		return false
 	}
 
-	config = markup_parser(raw_text)
-	config.vars = merge_maps(config.vars, tag_defaults)
+	config = &global_config {}
+
+	data := markup_parser(raw_text)
+
+	if x, ok := data.vars["image_target"]; ok {
+		n, err := strconv.Atoi(x)
+
+		if err != nil {
+			console_handler.print(`"image_target" in config.x: "%s" is not a number`, x)
+			return false
+		}
+
+		config.image_target = n
+		delete(data.vars, "image_target")
+	}
+
+	if config.image_target > 0 {
+		config.image_jpeg_quality = 85 // @todo
+	}
+
+	config.vars = merge_maps(data.vars, tag_defaults)
 
 	if _, ok := config.vars["domain"]; !ok {
 		fmt.Println(`"domain" missing from config.x`)
