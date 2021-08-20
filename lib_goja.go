@@ -1,7 +1,6 @@
 package main
 
 import (
-	"time"
 	"github.com/dop251/goja"
 )
 
