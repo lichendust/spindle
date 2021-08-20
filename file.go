@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"errors"
+	"strings"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -96,7 +97,7 @@ func copy_file(source_path, target_path string) {
 
 	defer source.Close()
 
-	destination, err := os.OpenFile(target_path, os.O_CREATE, 0755)
+	destination, err := os.OpenFile(target_path, os.O_CREATE|os.O_WRONLY, 0755)
 
 	if err != nil {
 		panic(err)
@@ -236,9 +237,13 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 
 		switch ext {
 		case ".jpg", ".jpeg":
-			file_type = IMAGE_JPG
+			if !strings.Contains(path, "favicon") {
+				file_type = IMAGE_JPG
+			}
 		case ".png":
-			file_type = IMAGE_PNG
+			if !strings.Contains(path, "favicon") {
+				file_type = IMAGE_PNG
+			}
 		case ".js":
 			file_type = STATIC_JS
 		case ".css":
