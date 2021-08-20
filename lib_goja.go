@@ -16,10 +16,6 @@ func new_script_vm() *goja.Runtime {
 	vm.Set("print", console_handler.print)
 	vm.Set("sprint", sprint)
 
-	vm.Set("time", func() int64 {
-		return time.Now().Unix()
-	})
-
 	return vm
 }
 
