@@ -15,7 +15,7 @@ type global_config struct {
 	vars map[string]string
 
 	image_target        int
-	image_jpeg_quality  int
+	image_jpeg_quality  string
 }
 
 func load_config() bool {
@@ -41,8 +41,11 @@ func load_config() bool {
 		delete(data.vars, "image_target")
 	}
 
-	if config.image_target > 0 {
-		config.image_jpeg_quality = 85 // @todo
+	if x, ok := data.vars["image_jpeg_quality"]; ok {
+		config.image_jpeg_quality = x
+		delete(data.vars, "image_target")
+	} else {
+		config.image_jpeg_quality = "100"
 	}
 
 	config.vars = merge_maps(data.vars, tag_defaults)

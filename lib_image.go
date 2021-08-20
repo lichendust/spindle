@@ -10,6 +10,10 @@ import (
 	"path/filepath"
 )
 
+// @todo make image processing optional, with
+// settings for resizing, multi-resizing,
+// compression-only and straight copying
+
 func image_handler(the_file *file, long_axis_max int) {
 	source_file, err := os.Open(the_file.source)
 
@@ -46,15 +50,21 @@ func image_handler(the_file *file, long_axis_max int) {
 }
 
 func magick_copy(source, output string, long_axis_max int) {
-	// convert -resize "1920x1920>" -strip -interlace Plane -quality 85% $1 $1
-
 	command := make([]string, 0, 9)
 
 	if long_axis_max > 0 {
-		command = append(command, "-resize", fmt.Sprintf("%dX%d>", long_axis_max, long_axis_max))
+		command = append(command,
+			"-resize", fmt.Sprintf("%dX%d>",
+			long_axis_max, long_axis_max))
 	}
 
-	command = append(command, "-strip", "-interlace", "Plane", "-quality", "85%", source, output)
+	fmt.Println(config.image_jpeg_quality)
+
+	command = append(command,
+		"-strip", "-interlace", "Plane",
+		"-quality", config.image_jpeg_quality + "%",
+		source, output,
+	)
 
 	cmd := exec.Command("convert", command...)
 
