@@ -39,10 +39,11 @@ func do_media(args []string) string {
 	viewcode := args[0]
 	args = args[1:]
 
+	// @todo ratio currently busted, need to come up with better recommendation for userland CSS
 	ratio := ""
 
 	if len(args) > 1 {
-		val := split_rune(args[1], ':')
+		val := split_rune(args[0], ':')
 
 		if len(val) > 1 {
 			x, err := strconv.ParseFloat(val[0], 32); if err != nil { panic(err) }
@@ -68,8 +69,8 @@ const (
 )
 
 const (
-	media_vimeo_template   = `<div class='video'><div class='video-container'%s><iframe src='https://player.vimeo.com/video/%s?color=0&title=0&byline=0&portrait=0' frameborder='0' allow='fullscreen' allowfullscreen></iframe></div></div>`
-	media_youtube_template = `<div class='video'><div class='video-container'%s><iframe src='https://www.youtube-nocookie.com/embed/%s?rel=0&controls=1' frameborder='0' allow='accelerometer; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></div></div>`
+	media_vimeo_template   = `<div class='video'%s><iframe src='https://player.vimeo.com/video/%s?color=0&title=0&byline=0&portrait=0' frameborder='0' allow='fullscreen' allowfullscreen></iframe></div>`
+	media_youtube_template = `<div class='video'%s><iframe src='https://www.youtube-nocookie.com/embed/%s?rel=0&controls=1' frameborder='0' allow='accelerometer; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></div>`
 )
 
 func media_vimeo(viewcode, ratio string, args []string) string {
