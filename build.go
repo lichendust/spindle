@@ -74,7 +74,7 @@ func build_project(args []string) {
 	console_handler.flush()
 }
 
-func load_page(path string, no_drafts bool) (*markup, bool) {
+func load_page(path string, build_mode bool) (*markup, bool) {
 	raw_text, ok := load_file(path)
 
 	if !ok {
@@ -83,7 +83,7 @@ func load_page(path string, no_drafts bool) (*markup, bool) {
 
 	page_obj := markup_parser(raw_text)
 
-	page_obj.no_drafts = no_drafts
+	page_obj.build_mode = build_mode
 
 	assign_plate(page_obj)
 

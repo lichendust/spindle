@@ -13,7 +13,7 @@ type markup struct {
 	data []*markup_object
 
 	pos int
-	no_drafts bool
+	build_mode bool
 }
 
 type markup_object struct {
@@ -413,7 +413,7 @@ func safe_join_image_prefix(markup* markup, image_path string) string {
 	if image_prefix, ok := markup.vars["image_prefix"]; ok {
 		image_path = join_image_prefix(image_prefix, image_path)
 	}
-	if markup.no_drafts && is_draft(image_path) {
+	if markup.build_mode && is_draft(image_path) {
 		fmt.Printf("image: %q is draft\n", image_path) // @warning
 	}
 	return image_path
@@ -439,14 +439,14 @@ func process_vars(some_page *markup, vars map[string]string) map[string]string {
 			if ok {
 				value = join_image_prefix(image_prefix, value)
 
-				if !some_page.no_drafts {
+				if !some_page.build_mode {
 					value = strip_image_size(value)
 				}
 
 				vars[key] = value
 			}
 
-			if some_page.no_drafts && is_draft(value) {
+			if some_page.build_mode && is_draft(value) {
 				fmt.Printf("image: %q is draft\n", value) // @warning
 			}
 		}

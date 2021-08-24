@@ -15,8 +15,23 @@ const the_port = ":3011"
 func serve_project(args []string) {
 	the_server := http.NewServeMux()
 
-	the_server.HandleFunc("/", resource_finder)
+	// websocket hub
+	the_hub := &client_hub {
+		clients:    make(map[*client]bool),
+		broadcast:  make(chan []byte),
+		register:   make(chan *client),
+		unregister: make(chan *client),
+	}
 
+	go the_hub.run()
+
+	// server components
+	the_server.HandleFunc("/", resource_finder)
+	the_server.HandleFunc("/__spindle", func(w http.ResponseWriter, r *http.Request) {
+		reload_socket(the_hub, w, r)
+	})
+
+	// start server
 	go func() {
 		err := http.ListenAndServe(the_port, the_server)
 
@@ -25,8 +40,10 @@ func serve_project(args []string) {
 		}
 	}()
 
+	// print server startup message to user
 	print_server_info()
 
+	// open root or requested page in browser on startup
 	{
 		open_target := "/"
 
@@ -37,9 +54,10 @@ func serve_project(args []string) {
 		open_browser(open_target)
 	}
 
+	// monitor files for changes
 	last_run := time.Unix(0,0)
 
-	for range time.Tick(time.Second * 1) {
+	for range time.Tick(time.Second / 2) {
 		if file_has_changes("config/config.x", last_run) {
 			expire_cache_plate()
 			if !load_config() {
@@ -50,15 +68,17 @@ func serve_project(args []string) {
 
 		if directory_has_changes("config/chunks", last_run) {
 			expire_cache_rtext()
+			send_reload(the_hub)
 		}
 
 		if directory_has_changes("config/plates", last_run) {
 			expire_cache_plate()
+			send_reload(the_hub)
 		}
 
-		/*if directory_has_changes("source", last_run) {
-			reload_browser()
-		}*/
+		if directory_has_changes("source", last_run) {
+			send_reload(the_hub)
+		}
 
 		last_run = time.Now()
 	}
@@ -92,8 +112,6 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// fmt.Println(path)
-
 	if is_markup {
 		page_obj, ok := load_page(path, false)
 
@@ -122,9 +140,9 @@ func print_server_info() {
 func open_browser(path string) {
 	url := sprint("http://localhost%s/%s", the_port, path)
 
-	var err error
+		var err error
 
-	switch runtime.GOOS {
+		switch runtime.GOOS {
 		case "linux":   err = exec.Command("xdg-open", url).Start()
 		case "darwin":  err = exec.Command("open", url).Start()
 		case "windows": err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()

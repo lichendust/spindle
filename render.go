@@ -110,6 +110,11 @@ func head_render(markup *markup, buffer *strings.Builder) {
 		}
 	}
 
+	// server mode, include reload socket
+	if !markup.build_mode {
+		buffer.WriteString(client_socket)
+	}
+
 	buffer.WriteString(`</head>`)
 }
 
@@ -299,12 +304,12 @@ func data_render(markup *markup, vars map[string]string) string {
 		case IMPORT:
 			path := filepath.ToSlash(sprint("source/%s.x", obj.text[0]))
 
-			if markup.no_drafts && is_draft(path) {
+			if markup.build_mode && is_draft(path) {
 				console_handler.print("import: %q is draft; skipped", obj.text[0]) // @warning
 				continue
 			}
 
-			page, ok := load_page(path, markup.no_drafts)
+			page, ok := load_page(path, markup.build_mode)
 
 			if !ok {
 				console_handler.print("import: path %q does not exist", obj.text[0]) // @error
@@ -331,7 +336,7 @@ func data_render(markup *markup, vars map[string]string) string {
 
 			image_path := safe_join_image_prefix(markup, obj.text[0])
 
-			if !markup.no_drafts {
+			if !markup.build_mode {
 				image_path = strip_image_size(image_path)
 			}
 
