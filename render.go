@@ -90,7 +90,7 @@ func head_render(markup *markup, buffer *strings.Builder) {
 			if ok := valid_twitter_card[value]; ok {
 				buffer.WriteString(sprint(meta_source, "twitter:card", value))
 			} else {
-				console_handler.print("not a twitter card type: %q", value) // @error
+				console_print("not a twitter card type: %q", value) // @error
 			}
 			continue
 		}
@@ -222,7 +222,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 		case BLOCK_ELSE:
-			console_handler.print("orphaned else block") // @error
+			console_print("orphaned else block") // @error
 			skip_block(markup)
 
 		case BLOCK_CODE:
@@ -267,33 +267,48 @@ func data_render(markup *markup, vars map[string]string) string {
 			buffer.WriteString(final_text)
 
 		case FUNCTION:
-			fname := obj.text[0]
+			name := obj.text[0]
 
-			raw, ok := load_file_cache(sprint("config/chunks/%s.js", fname))
-
-			if !ok {
-				console_handler.print("function not found:", fname) // @error
+			if x, ok := cache_funcs[name]; ok {
+				buffer.WriteString(x)
 				continue
 			}
 
-			text, ok := call_script(vars, raw, obj.text[1:])
+			raw, ok := load_file_cache(sprint("config/chunks/%s.js", name))
 
 			if !ok {
-				console_handler.print(fname, text) // @error
+				console_print("function not found:", name) // @error
 				continue
 			}
 
-			buffer.WriteString(complex_key_mapper(text, vars))
+			result := call_script(vars, raw, obj.text[1:])
+
+			if !result.success {
+				console_print(name, result.text) // @error
+				continue
+			}
+
+			if result.text != "" {
+				text := complex_key_mapper(result.text, vars)
+
+				if result.wants_cache {
+					cache_funcs[name] = text
+				}
+
+				buffer.WriteString(text)
+			}
 
 		case FUNCTION_INLINE:
-			text, ok := call_script(vars, obj.text[0], []string{})
+			result := call_script(vars, obj.text[0], []string{})
 
-			if !ok {
-				console_handler.print(text) // @error
+			if !result.success {
+				console_print(result.text) // @error
 				continue
 			}
 
-			buffer.WriteString(complex_key_mapper(text, vars))
+			if result.text != "" {
+				buffer.WriteString(complex_key_mapper(result.text, vars))
+			}
 
 		case CHUNK:
 			buffer.WriteString(execute_chunk(vars, obj.text[0]))
@@ -305,14 +320,14 @@ func data_render(markup *markup, vars map[string]string) string {
 			path := filepath.ToSlash(sprint("source/%s.x", obj.text[0]))
 
 			if markup.build_mode && is_draft(path) {
-				console_handler.print("import: %q is draft; skipped", obj.text[0]) // @warning
+				console_print("import: %q is draft; skipped", obj.text[0]) // @warning
 				continue
 			}
 
 			page, ok := load_page(path, markup.build_mode)
 
 			if !ok {
-				console_handler.print("import: path %q does not exist", obj.text[0]) // @error
+				console_print("import: path %q does not exist", obj.text[0]) // @error
 				continue
 			}
 
@@ -325,7 +340,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			x, ok := markup.vars[key]
 
 			if !ok {
-				console_handler.print("import: no template %q", obj.text[0]) // @error
+				console_print("import: no template %q", obj.text[0]) // @error
 				continue
 			}
 

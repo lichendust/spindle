@@ -59,7 +59,7 @@ func serve_project(args []string) {
 
 	for range time.Tick(time.Second / 2) {
 		if file_has_changes("config/config.x", last_run) {
-			expire_cache_plate()
+			expire_plates_cache()
 			if !load_config() {
 				fmt.Println("error in config.x, stopping server")
 				break
@@ -67,12 +67,12 @@ func serve_project(args []string) {
 		}
 
 		if directory_has_changes("config/chunks", last_run) {
-			expire_cache_rtext()
+			expire_chunks_cache()
 			send_reload(the_hub)
 		}
 
 		if directory_has_changes("config/plates", last_run) {
-			expire_cache_plate()
+			expire_plates_cache()
 			send_reload(the_hub)
 		}
 
@@ -160,8 +160,6 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(out_text))
-
-			console_handler.flush()
 			return
 		}
 

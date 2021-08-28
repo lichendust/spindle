@@ -6,10 +6,7 @@ import (
 	"strconv"
 )
 
-var (
-	config *global_config
-	console_handler *console
-)
+var config *global_config
 
 type global_config struct {
 	vars map[string]string
@@ -33,7 +30,7 @@ func load_config() bool {
 		n, err := strconv.Atoi(x)
 
 		if err != nil {
-			console_handler.print(`"image_target" in config.x: "%s" is not a number`, x)
+			console_print(`"image_target" in config.x: "%s" is not a number`, x)
 			return false
 		}
 
@@ -58,6 +55,10 @@ func load_config() bool {
 	return true
 }
 
+func console_print(base string, args ...interface{}) {
+	fmt.Println(fmt.Sprintf(base, args...))
+}
+
 func main() {
 	args := os.Args[1:]
 
@@ -74,10 +75,6 @@ func main() {
 	if !load_config() {
 		fmt.Println("not a spindle project!")
 		return
-	}
-
-	console_handler = &console {
-		scrollback: make([]string, 0, 10),
 	}
 
 	switch args[0] {

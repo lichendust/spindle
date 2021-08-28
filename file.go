@@ -175,7 +175,7 @@ func directory_has_changes(root_path string, last_run time.Time) bool {
 
 	filepath.Walk(root_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			console_handler.print("error accessing", path) // @error
+			console_print("error accessing", path) // @error
 			return nil
 		}
 

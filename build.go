@@ -81,8 +81,6 @@ func build_project(args []string) {
 	}
 
 	wg.Wait()
-
-	console_handler.flush()
 }
 
 func load_page(path string, build_mode bool) (*markup, bool) {
