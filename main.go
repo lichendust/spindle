@@ -87,6 +87,9 @@ func main() {
 	case "serve":
 		serve_project(args[1:])
 
+	case "test":
+		serve_test()
+
 	default:
 		fmt.Println(help_message)
 	}

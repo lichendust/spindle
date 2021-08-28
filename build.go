@@ -8,10 +8,17 @@ import (
 )
 
 func build_project(args []string) {
-	public_dir := "public"
+	public_dir  := "public"
+	skip_images := false
 
-	if len(args) > 0 {
-		public_dir = args[0]
+	for _, a := range args {
+		if a[0:2] == "--" {
+			switch a[2:] {
+			case "skip-images": skip_images = true
+			}
+		} else {
+			public_dir = a // @todo warn if multiple args match
+		}
 	}
 
 	init_minify() // for copy_mini
@@ -52,6 +59,10 @@ func build_project(args []string) {
 			}()
 
 		case IMAGE_JPG, IMAGE_PNG:
+			if skip_images {
+				continue
+			}
+
 			go func() {
 				wg.Add(1)
 				defer wg.Done()

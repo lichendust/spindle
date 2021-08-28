@@ -58,8 +58,6 @@ func magick_copy(source, output string, long_axis_max int) {
 			long_axis_max, long_axis_max))
 	}
 
-	fmt.Println(config.image_jpeg_quality)
-
 	command = append(command,
 		"-strip", "-interlace", "Plane",
 		"-quality", config.image_jpeg_quality + "%",
@@ -71,6 +69,6 @@ func magick_copy(source, output string, long_axis_max int) {
 	result, err := cmd.CombinedOutput()
 
 	if err != nil {
-		fmt.Println("imagemagick:", output, string(result))
+		fmt.Println("imagemagick:", output, string(result), err.Error()) // @todo fix this
 	}
 }

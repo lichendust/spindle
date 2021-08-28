@@ -41,7 +41,7 @@ func serve_project(args []string) {
 	}()
 
 	// print server startup message to user
-	print_server_info()
+	print_server_info(the_port)
 
 	// open root or requested page in browser on startup
 	{
@@ -51,7 +51,7 @@ func serve_project(args []string) {
 			open_target = args[0]
 		}
 
-		open_browser(open_target)
+		open_browser(open_target, the_port)
 	}
 
 	// monitor files for changes
@@ -82,6 +82,46 @@ func serve_project(args []string) {
 
 		last_run = time.Now()
 	}
+}
+
+func serve_test() {
+	the_server := http.NewServeMux()
+
+	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+
+		w.Header().Add("Cache-Control", "no-cache")
+
+		if path == "/" {
+			path = "public/index.html"
+		} else {
+			path = filepath.Join("public", path)
+
+			if is_dir(path) {
+				path = filepath.Join(path, "index.html")
+			} else if filepath.Ext(path) == "" {
+				path += ".html"
+			}
+		}
+
+		http.ServeFile(w, r, path)
+	})
+
+	test_port := ":3012"
+
+	go func() {
+		// @todo hardcoded port
+		err := http.ListenAndServe(test_port, the_server)
+
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	print_server_info(test_port)
+	open_browser("/", test_port)
+
+	for range time.Tick(time.Second * 2) {}
 }
 
 func resource_finder(w http.ResponseWriter, r *http.Request) {
@@ -132,20 +172,20 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func print_server_info() {
+func print_server_info(port string) {
 	// @todo get actual network interfaces and print 'em
-	fmt.Printf("spindle server\n\n    localhost%s\n\n", the_port)
+	fmt.Printf("spindle server\n\n    localhost%s\n\n", port)
 }
 
-func open_browser(path string) {
-	url := sprint("http://localhost%s/%s", the_port, path)
+func open_browser(path, port string) {
+	url := sprint("http://localhost%s/%s", port, path)
 
-		var err error
+	var err error
 
-		switch runtime.GOOS {
-		case "linux":   err = exec.Command("xdg-open", url).Start()
-		case "darwin":  err = exec.Command("open", url).Start()
-		case "windows": err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	switch runtime.GOOS {
+	case "linux":   err = exec.Command("xdg-open", url).Start()
+	case "darwin":  err = exec.Command("open", url).Start()
+	case "windows": err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
 	}
 
 	if err != nil {
