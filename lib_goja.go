@@ -60,7 +60,7 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 		result_data.text = v.(string)
 	}
 
-	if cache_me := vm.Get("cache_me"); cache_me.ToBoolean() == true {
+	if cache_return := vm.Get("cache_return"); cache_return.ToBoolean() == true {
 		result_data.wants_cache = true
 	}
 
