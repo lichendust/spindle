@@ -284,7 +284,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			result := call_script(vars, raw, obj.text[1:])
 
 			if !result.success {
-				console_print(name, result.text) // @error
+				console_print("error %q: %s", name, result.text) // @error
 				continue
 			}
 
@@ -302,7 +302,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			result := call_script(vars, obj.text[0], []string{})
 
 			if !result.success {
-				console_print(result.text) // @error
+				console_print("error: %s", result.text) // @error
 				continue
 			}
 
