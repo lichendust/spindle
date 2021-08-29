@@ -24,6 +24,8 @@ type script_result struct {
 func call_script(vars map[string]string, program_text string, args []string) *script_result {
 	vm := goja.New()
 
+	vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
+
 	// per-call setup
 	vm.Set("args", args)
 	vm.Set("the_page", &script_markup {vars})
@@ -55,8 +57,9 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 		return &result_data
 	}
 
+	result_data.success = true
+
 	if v := v.Export(); v != nil {
-		result_data.success = true
 		result_data.text = v.(string)
 	}
 
@@ -64,16 +67,12 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 		result_data.wants_cache = true
 	}
 
-	fmt.Printf("called for %q\n", result_data.text)
-
 	return &result_data
 }
 
 // @experimental
 // just returns unix time
 func git_commit(path string) string {
-	fmt.Println(path)
-
 	cmd := exec.Command("git", "log", "-n", "1", "--format=%ct", "--", path)
 
 	if result, err := cmd.Output(); err == nil {
