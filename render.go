@@ -442,6 +442,12 @@ func merge_vars(a, b map[string]string) map[string]string {
 		new["style"] = b["style"]
 	}
 
+	for k, v := range new {
+		if v == "null" {
+			delete(new, k)
+		}
+	}
+
 	return new
 }
 

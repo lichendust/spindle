@@ -391,7 +391,7 @@ func assign_plate(some_page *markup) {
 
 		the_plate = markup_parser(raw_text)
 
-		the_plate.vars = merge_vars(the_plate.vars, config.vars)
+		assign_plate(the_plate)
 
 		cache_plate[ident] = the_plate
 	}
