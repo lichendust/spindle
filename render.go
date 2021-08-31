@@ -150,6 +150,10 @@ func data_render(markup *markup, vars map[string]string) string {
 	buffer := strings.Builder {}
 	buffer.Grow(256 * len(markup.data) - markup.pos)
 
+	// block level variables, let's look them
+	// up once instead of a zillion times
+	image_prefix, _ := vars["image_prefix"]
+
 	for {
 		markup.pos++
 
@@ -317,7 +321,15 @@ func data_render(markup *markup, vars map[string]string) string {
 			buffer.WriteString(do_media(obj.text))
 
 		case IMPORT:
-			path := filepath.ToSlash(sprint("source/%s.x", obj.text[0]))
+			path := filepath.Join("source", obj.text[0])
+
+			if is_dir(path) {
+				path = filepath.Join(path, "index.x")
+			} else {
+				path += ".x"
+			}
+
+			path = filepath.ToSlash(path)
 
 			if markup.build_mode && is_draft(path) {
 				console_print("import: %q is draft; skipped", obj.text[0]) // @warning
@@ -348,15 +360,20 @@ func data_render(markup *markup, vars map[string]string) string {
 
 		case IMAGE:
 			temp := vars[get_id(obj, "img")]
+			path := obj.text[0]
 
-			image_path := safe_join_image_prefix(markup, obj.text[0])
-
-			if !markup.build_mode {
-				image_path = strip_image_size(image_path)
+			if markup.build_mode && is_draft(path) {
+				fmt.Printf("image: %q is draft\n", path) // @warning
 			}
 
-			obj.text[0] = image_path
-			buffer.WriteString(sprint(temp, obj.text...))
+			path = rewrite_image_path(path, image_prefix, false, !markup.build_mode)
+
+			args := make([]string, 0, len(obj.text))
+
+			args = append(args, path)
+			args = append(args, obj.text[1:]...)
+
+			buffer.WriteString(sprint(temp, args...))
 
 		case DIVIDER:
 			buffer.WriteString(vars["hr"])

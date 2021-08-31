@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"time"
 	"net/http"
 
@@ -115,7 +116,7 @@ func (c *client) read_pump(the_hub *client_hub) {
 
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				panic(err)
+				fmt.Println("reload socket: unexpected closure") // @todo
 			}
 			break
 		}

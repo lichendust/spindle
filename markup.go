@@ -399,55 +399,58 @@ func assign_plate(some_page *markup) {
 	some_page.vars = merge_vars(some_page.vars, the_plate.vars)
 }
 
-func join_image_prefix(image_prefix, image_path string) string {
+
+// @todo
+
+// we could do webp for GIFs too, but magick
+// doesn't have animation target flags and
+// i'm loathed to add cwebp as a dep.
+
+var valid_webp_ext = map[string]bool {
+	".jpg":  true,
+	".jpeg": true,
+	".png":  true,
+}
+
+func rewrite_image_path(image_path, image_prefix string, webp_enabled, strip_scales bool) string {
 	if strings.HasPrefix(image_path, "http") {
 		return image_path
 	}
-	if strings.HasPrefix(image_path, image_prefix) {
-		return image_path
-	}
-	return path.Join(image_prefix, image_path)
-}
 
-func safe_join_image_prefix(markup* markup, image_path string) string {
-	if image_prefix, ok := markup.vars["image_prefix"]; ok {
-		image_path = join_image_prefix(image_prefix, image_path)
+	if !strings.HasPrefix(image_path, image_prefix) {
+		image_path = path.Join(image_prefix, image_path)
 	}
-	if markup.build_mode && is_draft(image_path) {
-		fmt.Printf("image: %q is draft\n", image_path) // @warning
+
+	ext := filepath.Ext(image_path)
+
+	image_path = image_path[:len(image_path) - len(ext)]
+
+	if strip_scales {
+		if n := strings.IndexRune(image_path, '@'); n > -1 {
+			image_path = image_path[:n]
+		}
 	}
+
+	if webp_enabled && valid_webp_ext[ext] {
+		image_path += ".webp"
+	} else {
+		image_path += ext
+	}
+
 	return image_path
 }
 
-func strip_image_size(input string) string {
-	n := strings.IndexRune(input, '@')
-
-	if n < 0 {
-		return input
-	}
-
-	ext := filepath.Ext(input)
-	input = input[:n]
-	return input + ext
-}
-
-func process_vars(some_page *markup, vars map[string]string) map[string]string {
+func process_vars(markup *markup, vars map[string]string) map[string]string {
 	image_prefix, ok := vars["image_prefix"]
 
 	for key, value := range vars {
-		if strings.Contains(key, "image") {
-			if ok {
-				value = join_image_prefix(image_prefix, value)
-
-				if !some_page.build_mode {
-					value = strip_image_size(value)
-				}
-
-				vars[key] = value
+		if strings.HasSuffix(key, "image") {
+			if markup.build_mode && is_draft(value) {
+				fmt.Printf("image: %q is draft\n", value) // @warning
 			}
 
-			if some_page.build_mode && is_draft(value) {
-				fmt.Printf("image: %q is draft\n", value) // @warning
+			if ok {
+				vars[key] = rewrite_image_path(value, image_prefix, false, !markup.build_mode)
 			}
 		}
 	}

@@ -40,7 +40,7 @@ func load_config() bool {
 
 	if x, ok := data.vars["image_jpeg_quality"]; ok {
 		config.image_jpeg_quality = x
-		delete(data.vars, "image_target")
+		delete(data.vars, "image_jpeg_quality")
 	} else {
 		config.image_jpeg_quality = "100"
 	}
