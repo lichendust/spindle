@@ -10,9 +10,7 @@ import (
 	"path/filepath"
 )
 
-const the_port = ":3011"
-
-func serve_project(args []string) {
+func serve_source(args []string) {
 	the_server := http.NewServeMux()
 
 	// websocket hub
@@ -33,7 +31,7 @@ func serve_project(args []string) {
 
 	// start server
 	go func() {
-		err := http.ListenAndServe(the_port, the_server)
+		err := http.ListenAndServe(config.main_port, the_server)
 
 		if err != nil {
 			panic(err)
@@ -41,18 +39,8 @@ func serve_project(args []string) {
 	}()
 
 	// print server startup message to user
-	print_server_info(the_port)
-
-	// open root or requested page in browser on startup
-	{
-		open_target := "/"
-
-		if len(args) > 0 {
-			open_target = args[0]
-		}
-
-		open_browser(open_target, the_port)
-	}
+	print_server_info(config.main_port)
+	open_browser("/", config.main_port)
 
 	// monitor files for changes
 	last_run := time.Unix(0,0)
@@ -85,7 +73,7 @@ func serve_project(args []string) {
 	}
 }
 
-func serve_test() {
+func serve_public(public_dir string) {
 	the_server := http.NewServeMux()
 
 	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -94,9 +82,9 @@ func serve_test() {
 		w.Header().Add("Cache-Control", "no-cache")
 
 		if path == "/" {
-			path = "public/index.html"
+			path = filepath.Join(public_dir, "index.html")
 		} else {
-			path = filepath.Join("public", path)
+			path = filepath.Join(public_dir, path)
 
 			if is_dir(path) {
 				path = filepath.Join(path, "index.html")
@@ -108,19 +96,16 @@ func serve_test() {
 		http.ServeFile(w, r, path)
 	})
 
-	test_port := ":3012"
-
 	go func() {
-		// @todo hardcoded port
-		err := http.ListenAndServe(test_port, the_server)
+		err := http.ListenAndServe(config.test_port, the_server)
 
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	print_server_info(test_port)
-	open_browser("/", test_port)
+	print_server_info(config.test_port)
+	open_browser("/", config.test_port)
 
 	for range time.Tick(time.Second * 2) {}
 }

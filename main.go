@@ -16,6 +16,9 @@ type global_config struct {
 	image_resize      int
 	image_quality     string
 	image_make_webp   bool
+
+	main_port string
+	test_port string
 }
 
 func load_config() bool {
@@ -64,6 +67,10 @@ func load_config() bool {
 		config.image_make_webp = false // no conversions in server mode
 	}
 
+	// @todo hardcoded ports
+	config.main_port = ":3011"
+	config.test_port = ":3022"
+
 	return true
 }
 
@@ -95,10 +102,12 @@ func main() {
 		build_project(args[1:])
 
 	case "serve":
-		serve_project(args[1:])
+		serve_source(args[1:])
 
+	// @todo better command structure for this
 	case "test":
-		serve_test()
+		config.build_mode = true
+		serve_public("public") // make arg driven
 
 	default:
 		fmt.Println(help_message)
