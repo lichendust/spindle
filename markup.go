@@ -13,7 +13,6 @@ type markup struct {
 	data []*markup_object
 
 	pos int
-	build_mode bool
 }
 
 type markup_object struct {
@@ -399,20 +398,16 @@ func assign_plate(some_page *markup) {
 	some_page.vars = merge_vars(some_page.vars, the_plate.vars)
 }
 
-
-// @todo
-
 // we could do webp for GIFs too, but magick
 // doesn't have animation target flags and
 // i'm loathed to add cwebp as a dep.
-
 var valid_webp_ext = map[string]bool {
 	".jpg":  true,
 	".jpeg": true,
 	".png":  true,
 }
 
-func rewrite_image_path(image_path, image_prefix string, webp_enabled, strip_scales bool) string {
+func rewrite_image_path(image_path, image_prefix string, webp_enabled bool) string {
 	if strings.HasPrefix(image_path, "http") {
 		return image_path
 	}
@@ -423,35 +418,23 @@ func rewrite_image_path(image_path, image_prefix string, webp_enabled, strip_sca
 
 	ext := filepath.Ext(image_path)
 
-	image_path = image_path[:len(image_path) - len(ext)]
-
-	if strip_scales {
-		if n := strings.IndexRune(image_path, '@'); n > -1 {
-			image_path = image_path[:n]
-		}
-	}
-
 	if webp_enabled && valid_webp_ext[ext] {
-		image_path += ".webp"
-	} else {
-		image_path += ext
+		image_path = image_path[:len(image_path) - len(ext)] + ".webp"
 	}
 
 	return image_path
 }
 
-func process_vars(markup *markup, vars map[string]string) map[string]string {
-	image_prefix, ok := vars["image_prefix"]
+func process_vars(vars map[string]string) map[string]string {
+	image_prefix, _ := vars["image_prefix"]
 
 	for key, value := range vars {
 		if strings.HasSuffix(key, "image") {
-			if markup.build_mode && is_draft(value) {
+			if config.build_mode && is_draft(value) {
 				fmt.Printf("image: %q is draft\n", value) // @warning
 			}
 
-			if ok {
-				vars[key] = rewrite_image_path(value, image_prefix, false, !markup.build_mode)
-			}
+			vars[key] = rewrite_image_path(value, image_prefix, config.image_make_webp)
 		}
 	}
 

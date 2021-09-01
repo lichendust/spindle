@@ -64,6 +64,7 @@ func serve_project(args []string) {
 				fmt.Println("error in config.x, stopping server")
 				break
 			}
+			send_reload(the_hub)
 		}
 
 		if directory_has_changes("config/chunks", last_run) {
@@ -153,7 +154,7 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if is_markup {
-		page_obj, ok := load_page(path, false)
+		page_obj, ok := load_page(path)
 
 		if ok {
 			out_text := markup_render(page_obj)
@@ -164,10 +165,23 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 		}
 
 		w.WriteHeader(http.StatusNotFound)
-
-	} else {
-		http.ServeFile(w, r, path)
+		return
 	}
+
+	ext := filepath.Ext(path)
+
+	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" {
+		if n := strings.IndexRune(path, '@'); n > -1 {
+			if is_file(path) {
+				http.ServeFile(w, r, path)
+			} else {
+				http.ServeFile(w, r, path[:n] + ext)
+			}
+			return
+		}
+	}
+
+	http.ServeFile(w, r, path)
 }
 
 func print_server_info(port string) {

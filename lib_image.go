@@ -1,12 +1,16 @@
 package main
 
 import (
+	"fmt"
+
 	"os"
 	"os/exec"
-	"fmt"
+
 	"image"
 	"image/png"
 	"image/jpeg"
+
+	"strings"
 	"path/filepath"
 )
 
@@ -37,20 +41,30 @@ func image_handler(the_file *file, long_axis_max int) {
 		panic(err)
 	}
 
+	do_sizes := true
+
 	if con.Width < long_axis_max && con.Height < long_axis_max {
 		long_axis_max = 0
+		do_sizes = false
 	}
 
-	ext := filepath.Ext(the_file.source)
+	if n := strings.IndexRune(the_file.source, '@'); n > -1 {
+		do_sizes = false
+	}
+
+	ext := filepath.Ext(the_file.output)
 	out_path := the_file.output[:len(the_file.output) - len(ext)]
 
-	magick_copy(the_file.source, the_file.output,            long_axis_max)
-	magick_copy(the_file.source, out_path + "@medium" + ext, long_axis_max / 2)
-	magick_copy(the_file.source, out_path + "@small"  + ext, long_axis_max / 4)
+	magick_copy(the_file.source, the_file.output, long_axis_max)
+
+	if do_sizes {
+		magick_copy(the_file.source, out_path + "@medium" + ext, long_axis_max / 2)
+		magick_copy(the_file.source, out_path + "@small"  + ext, long_axis_max / 4)
+	}
 }
 
 func magick_copy(source, output string, long_axis_max int) {
-	command := make([]string, 0, 9)
+	command := make([]string, 0, 11)
 
 	if long_axis_max > 0 {
 		command = append(command,
@@ -60,7 +74,8 @@ func magick_copy(source, output string, long_axis_max int) {
 
 	command = append(command,
 		"-strip", "-interlace", "Plane",
-		"-quality", config.image_jpeg_quality + "%",
+		"-quality", config.image_quality + "%",
+		"-define", "webp:lossless=false",
 		source, output,
 	)
 

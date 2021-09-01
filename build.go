@@ -34,7 +34,7 @@ func build_project(args []string) {
 	// currently non-thread safe
 	for _, file := range files {
 		if file.file_type == MARKUP {
-			page_obj, _ := load_page(file.source, true)
+			page_obj, _ := load_page(file.source)
 			make_file(file.output, markup_render(page_obj))
 		}
 	}
@@ -67,7 +67,7 @@ func build_project(args []string) {
 				wg.Add(1)
 				defer wg.Done()
 
-				image_handler(&file, config.image_target)
+				image_handler(&file, config.image_resize)
 			}()
 
 		default:
@@ -83,7 +83,7 @@ func build_project(args []string) {
 	wg.Wait()
 }
 
-func load_page(path string, build_mode bool) (*markup, bool) {
+func load_page(path string) (*markup, bool) {
 	raw_text, ok := load_file(path)
 
 	if !ok {
@@ -92,11 +92,9 @@ func load_page(path string, build_mode bool) (*markup, bool) {
 
 	page_obj := markup_parser(raw_text)
 
-	page_obj.build_mode = build_mode
-
 	assign_plate(page_obj)
 
-	page_obj.vars = process_vars(page_obj, page_obj.vars)
+	page_obj.vars = process_vars(page_obj.vars)
 
 	page_obj.vars["raw_path"]   = path
 	page_obj.vars["url_pretty"] = make_url_from_path(path[6:])

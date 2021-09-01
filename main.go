@@ -11,8 +11,11 @@ var config *global_config
 type global_config struct {
 	vars map[string]string
 
-	image_target        int
-	image_jpeg_quality  string
+	build_mode bool
+
+	image_resize      int
+	image_quality     string
+	image_make_webp   bool
 }
 
 func load_config() bool {
@@ -26,23 +29,28 @@ func load_config() bool {
 
 	data := markup_parser(raw_text)
 
-	if x, ok := data.vars["image_target"]; ok {
+	if x, ok := data.vars["image_resize"]; ok {
 		n, err := strconv.Atoi(x)
 
 		if err != nil {
-			console_print(`"image_target" in config.x: "%s" is not a number`, x)
+			console_print(`"image_resize" in config.x: "%s" is not a number`, x)
 			return false
 		}
 
-		config.image_target = n
-		delete(data.vars, "image_target")
+		config.image_resize = n
+		delete(data.vars, "image_resize")
 	}
 
-	if x, ok := data.vars["image_jpeg_quality"]; ok {
-		config.image_jpeg_quality = x
-		delete(data.vars, "image_jpeg_quality")
+	if x, ok := data.vars["image_quality"]; ok {
+		config.image_quality = x
+		delete(data.vars, "image_quality")
 	} else {
-		config.image_jpeg_quality = "100"
+		config.image_quality = "100"
+	}
+
+	if _, ok := data.vars["image_make_webp"]; ok {
+		config.image_make_webp = true
+		delete(data.vars, "image_make_webp")
 	}
 
 	config.vars = merge_maps(data.vars, tag_defaults)
@@ -50,6 +58,10 @@ func load_config() bool {
 	if _, ok := config.vars["domain"]; !ok {
 		fmt.Println(`"domain" missing from config.x`)
 		return false
+	}
+
+	if !config.build_mode {
+		config.image_make_webp = false // no conversions in server mode
 	}
 
 	return true
@@ -79,6 +91,7 @@ func main() {
 
 	switch args[0] {
 	case "build":
+		config.build_mode = true
 		build_project(args[1:])
 
 	case "serve":

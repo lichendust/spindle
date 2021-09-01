@@ -130,21 +130,23 @@ func make_blank_project() {
 }
 
 func is_dir(path string) bool {
-	f, err := os.Open(path)
+	stat, err := os.Stat(path)
 
-	if err != nil {
+	if os.IsNotExist(err) {
 		return false
 	}
 
-	defer f.Close()
+	return stat.IsDir()
+}
 
-	info, err := f.Stat()
+func is_file(path string) bool {
+	stat, err := os.Stat(path)
 
-	if err != nil {
+	if os.IsNotExist(err) {
 		return false
 	}
 
-	return info.IsDir()
+	return !stat.IsDir()
 }
 
 func file_has_changes(path string, last_run time.Time) bool {
@@ -199,6 +201,8 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 	files   := make([]*file, 0, 32)
 	folders := make([]*file, 0, 16)
 
+	do_webp := config.image_make_webp
+
 	err := filepath.Walk(root_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return nil
@@ -239,10 +243,18 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 		case ".jpg", ".jpeg":
 			if !strings.Contains(path, "favicon") {
 				file_type = IMAGE_JPG
+
+				if do_webp {
+					out_path = rewrite_extension(out_path, ".webp")
+				}
 			}
 		case ".png":
 			if !strings.Contains(path, "favicon") {
 				file_type = IMAGE_PNG
+
+				if do_webp {
+					out_path = rewrite_extension(out_path, ".webp")
+				}
 			}
 		case ".js":
 			file_type = STATIC_JS
@@ -252,7 +264,7 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 			file_type = STATIC_HTML
 		case ".x":
 			file_type = MARKUP
-			out_path  = out_path[:len(out_path) - 2] + ".html"
+			out_path = rewrite_extension(out_path, ".html")
 		}
 
 		files = append(files, &file {path, out_path, file_type})
@@ -264,4 +276,8 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 	}
 
 	return files, folders
+}
+
+func rewrite_extension(path, new_ext string) string {
+	return path[:len(path) - len(filepath.Ext(path))] + new_ext
 }

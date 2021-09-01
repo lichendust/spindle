@@ -111,7 +111,7 @@ func head_render(markup *markup, buffer *strings.Builder) {
 	}
 
 	// server mode, include reload socket
-	if !markup.build_mode {
+	if !config.build_mode {
 		buffer.WriteString(client_socket)
 	}
 
@@ -173,14 +173,14 @@ func data_render(markup *markup, vars map[string]string) string {
 		case BLOCK:
 			name := obj.text[0]
 
-			new_vars := process_vars(markup, merge_maps(obj.vars, vars))
+			new_vars := process_vars(merge_maps(obj.vars, vars)) // @todo make more efficient
 			new_text := data_render(markup, new_vars)
 			temp, ok := vars[name]
 
 			if ok {
 				new_text = sprint(temp, new_text)
-			} else if ok := html_defaults[name]; ok {
-				new_text = sprint("<%s>%s</%s>", name, new_text, name)
+			} else if x, ok := html_defaults[name]; ok {
+				new_text = sprint(x, new_text)
 			} else {
 				new_text = sprint("<div class='%s'>%s</div>", name, new_text)
 			}
@@ -198,7 +198,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 			if eval {
-				new_vars := process_vars(markup, merge_maps(obj.vars, vars))
+				new_vars := process_vars(merge_maps(obj.vars, vars)) // @todo make more efficient
 				new_text := data_render(markup, new_vars)
 				buffer.WriteString(complex_key_mapper(new_text, new_vars))
 			} else {
@@ -331,12 +331,12 @@ func data_render(markup *markup, vars map[string]string) string {
 
 			path = filepath.ToSlash(path)
 
-			if markup.build_mode && is_draft(path) {
+			if config.build_mode && is_draft(path) {
 				console_print("import: %q is draft; skipped", obj.text[0]) // @warning
 				continue
 			}
 
-			page, ok := load_page(path, markup.build_mode)
+			page, ok := load_page(path)
 
 			if !ok {
 				console_print("import: path %q does not exist", obj.text[0]) // @error
@@ -362,11 +362,11 @@ func data_render(markup *markup, vars map[string]string) string {
 			temp := vars[get_id(obj, "img")]
 			path := obj.text[0]
 
-			if markup.build_mode && is_draft(path) {
+			if config.build_mode && is_draft(path) {
 				fmt.Printf("image: %q is draft\n", path) // @warning
 			}
 
-			path = rewrite_image_path(path, image_prefix, false, !markup.build_mode)
+			path = rewrite_image_path(path, image_prefix, config.image_make_webp)
 
 			args := make([]string, 0, len(obj.text))
 
@@ -496,7 +496,7 @@ func execute_chunk(vars map[string]string, name string) string {
 	chunk_markup.pos  = -1
 
 	assign_plate(chunk_markup)
-	chunk_markup.vars = process_vars(chunk_markup, chunk_markup.vars)
+	chunk_markup.vars = process_vars(chunk_markup.vars)
 
 	return data_render(chunk_markup, chunk_markup.vars)
 }
