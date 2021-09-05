@@ -21,14 +21,16 @@ type global_config struct {
 	test_port string
 }
 
-func load_config() bool {
+func load_config(build bool) bool {
 	raw_text, ok := load_file("config/config.x")
 
 	if !ok {
 		return false
 	}
 
-	config = &global_config {}
+	config = &global_config {
+		build_mode: build,
+	}
 
 	data := markup_parser(raw_text)
 
@@ -91,20 +93,21 @@ func main() {
 		return
 	}
 
-	if !load_config() {
+	if !load_config(true) {
 		fmt.Println("not a spindle project!")
 		return
 	}
 
 	switch args[0] {
 	case "build":
-		config.build_mode = true
 		build_project(args[1:])
 
 	case "serve":
+		config.build_mode = false
+		config.image_make_webp = false
 		serve_source(args[1:])
 
-	// @todo better command structure for this
+	// @todo rename this command
 	case "test":
 		config.build_mode = true
 		serve_public("public") // make arg driven

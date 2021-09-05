@@ -48,7 +48,7 @@ func serve_source(args []string) {
 	for range time.Tick(time.Second / 2) {
 		if file_has_changes("config/config.x", last_run) {
 			expire_plates_cache()
-			if !load_config() {
+			if !load_config(false) {
 				fmt.Println("error in config.x, stopping server")
 				break
 			}

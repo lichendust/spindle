@@ -7,8 +7,8 @@ import (
 	"os/exec"
 
 	"image"
-	"image/png"
-	"image/jpeg"
+	png "image/png"
+	jpg "image/jpeg"
 
 	"strings"
 	"path/filepath"
@@ -25,14 +25,11 @@ func image_handler(the_file *file, long_axis_max int) {
 		panic(err)
 	}
 
-	var con image.Config
+	var img_data image.Config
 
 	switch the_file.file_type {
-		case IMAGE_JPG:
-			con, err = jpeg.DecodeConfig(source_file)
-
-		case IMAGE_PNG:
-			con, err = png.DecodeConfig(source_file)
+	case IMAGE_JPG: img_data, err = jpg.DecodeConfig(source_file)
+	case IMAGE_PNG: img_data, err = png.DecodeConfig(source_file)
 	}
 
 	source_file.Close()
@@ -43,9 +40,12 @@ func image_handler(the_file *file, long_axis_max int) {
 
 	do_sizes := true
 
-	if con.Width < long_axis_max && con.Height < long_axis_max {
-		long_axis_max = 0
-		do_sizes = false
+	if img_data.Width < long_axis_max && img_data.Height < long_axis_max {
+		if img_data.Width < img_data.Height {
+			long_axis_max = img_data.Height
+		} else {
+			long_axis_max = img_data.Width
+		}
 	}
 
 	if n := strings.IndexRune(the_file.source, '@'); n > -1 {

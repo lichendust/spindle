@@ -222,12 +222,9 @@ func markup_parser(input string) *markup {
 				data = strings.TrimSpace(data)
 			}
 
-			if data == "" {
-				panic("bad variable in page")
-			}
-
-			if data == "false" {
-				data = "0"
+			switch data {
+			case "":       console_print("bad variable in page") // @error
+			case "false":  data = "0"
 			}
 
 			active_map[ident] = data
@@ -258,7 +255,7 @@ func markup_parser(input string) *markup {
 			switch ident {
 			case "if":
 				if !args_valid {
-					panic("unknown guff in 'if' statement")
+					console_print("unknown guff in 'if' statement") // @error
 				}
 
 				the_token.object_type = BLOCK_IF
