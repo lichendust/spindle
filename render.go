@@ -181,7 +181,7 @@ func data_render(markup *markup, vars map[string]string) string {
 				new_text = sprint(temp, new_text)
 			} else if x, ok := html_defaults[name]; ok {
 				new_text = sprint(x, new_text)
-			} else {
+			} else if name != "" {
 				new_text = sprint("<div class='%s'>%s</div>", name, new_text)
 			}
 
