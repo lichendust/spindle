@@ -18,11 +18,9 @@ Spindle will generate a project file structure _in the current directory_.
 
 ### Serve
 
-	spindle serve <path>
+	spindle serve
 
 Spindle will start a local webserver and serve up pages from the application. It will automatically open the root index page in a browser.
-
-The second argument can also be used to open a different page on startup, in the form `folder/page`, without any extension. This is a time-saving feature for quickly previewing the page the user is most interested in seeing, like the blog post they just wrote.
 
 ### Build
 
@@ -30,7 +28,15 @@ The second argument can also be used to open a different page on startup, in the
 
 Spindle will render or copy all content from `source` into a newly created `public` directory alongside `config` and `source`.
 
-The output location can be overridden by an additional argument if necessary.
+The optional argument allows for the output location to be overridden.
+
+### Test ⚠
+
+	spindle test <output_path>
+
+Spindle will start a local webserver and serve the "public" build directory instead with no additional handling, allowing the final build to be tested locally without needing additional steps, tools or deployment.
+
+The optional argument allows specifying a non-standard directory for output.
 
 ## Documentation
 
