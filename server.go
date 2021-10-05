@@ -10,7 +10,12 @@ import (
 	"path/filepath"
 )
 
-func serve_source(args []string) {
+func serve_source() {
+	if !load_config(false) {
+		fmt.Println(startup_error)
+		return
+	}
+
 	the_server := http.NewServeMux()
 
 	// websocket hub
@@ -73,7 +78,25 @@ func serve_source(args []string) {
 	}
 }
 
-func serve_public(public_dir string) {
+func serve_public(args []string) {
+	// @todo sort out these default definitions
+	// they're scattered about a bit too much
+
+	public_dir := "public"
+	test_port  := ":3022"
+
+	switch len(args) {
+	case 0:
+	case 1: public_dir = args[0]
+	case 2:
+		// @error bad arguments
+		return
+	}
+
+	if load_config(true) {
+		test_port = config.test_port
+	}
+
 	the_server := http.NewServeMux()
 
 	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -97,15 +120,15 @@ func serve_public(public_dir string) {
 	})
 
 	go func() {
-		err := http.ListenAndServe(config.test_port, the_server)
+		err := http.ListenAndServe(test_port, the_server)
 
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	print_server_info(config.test_port)
-	open_browser("/", config.test_port)
+	print_server_info(test_port)
+	open_browser("/", test_port)
 
 	for range time.Tick(time.Second * 2) {}
 }

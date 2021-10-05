@@ -147,6 +147,7 @@ const index_template  = `# Index
 
 Welcome to your new Spindle project!`
 
+const startup_error = `not a spindle project!`
 const new_project_message = `created new spindle project!
 
 first steps:

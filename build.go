@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"sync"
 	"sort"
 	"strings"
@@ -8,6 +9,11 @@ import (
 )
 
 func build_project(args []string) {
+	if !load_config(true) {
+		fmt.Println(startup_error)
+		return
+	}
+
 	public_dir  := "public"
 	skip_images := false
 

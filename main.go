@@ -88,29 +88,18 @@ func main() {
 		return
 	}
 
-	if args[0] == "new" {
-		make_blank_project()
-		return
-	}
-
-	if !load_config(true) {
-		fmt.Println("not a spindle project!")
-		return
-	}
-
 	switch args[0] {
+	case "new":
+		make_blank_project()
+
 	case "build":
 		build_project(args[1:])
 
 	case "serve":
-		config.build_mode = false
-		config.image_make_webp = false
-		serve_source(args[1:])
+		serve_source()
 
-	// @todo rename this command
 	case "test":
-		config.build_mode = true
-		serve_public("public") // make arg driven
+		serve_public(args[1:]) // @todo rename this command
 
 	default:
 		fmt.Println(help_message)
