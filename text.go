@@ -8,6 +8,7 @@ import (
 )
 
 var ascii_space = [256]uint8{'\t': 1, '\n': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
+var ascii_number = [256]uint8{'0': 1, '1': 1, '2': 1, '3': 1, '4': 1, '5': 1, '6': 1, '7': 1, '8': 1, '9': 1}
 
 func consume_whitespace(input string) string {
 	start := 0
@@ -25,6 +26,20 @@ func consume_whitespace(input string) string {
 	}
 
 	return input[start:]
+}
+
+func is_all_numbers(input string) bool {
+	for _, c := range input {
+		if c >= utf8.RuneSelf && !unicode.IsNumber(c) {
+			return false
+		}
+
+		if ascii_number[c] == 0 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func extract_ident(input string) string {

@@ -79,9 +79,6 @@ func serve_source() {
 }
 
 func serve_public(args []string) {
-	// @todo sort out these default definitions
-	// they're scattered about a bit too much
-
 	public_dir := "public"
 	test_port  := ":3022"
 

@@ -65,13 +65,31 @@ func load_config(build bool) bool {
 		return false
 	}
 
+	if v, ok := data.vars["main_port"]; ok {
+		if !is_all_numbers(v) {
+			panic(sprint(`config.main_port — invalid port number %s`, v)) // @error
+		}
+
+		config.main_port = ":" + v
+		delete(data.vars, "main_port")
+	} else {
+		config.main_port = ":3011" // default port
+	}
+
+	if v, ok := data.vars["test_port"]; ok {
+		if !is_all_numbers(v) {
+			panic(sprint(`config.test_port — invalid port number %s`, v)) // @error
+		}
+
+		config.test_port = ":" + v
+		delete(data.vars, "test_port")
+	} else {
+		config.test_port = ":3022" // default port
+	}
+
 	if !config.build_mode {
 		config.image_make_webp = false // no conversions in server mode
 	}
-
-	// @todo hardcoded ports
-	config.main_port = ":3011"
-	config.test_port = ":3022"
 
 	return true
 }
