@@ -50,7 +50,7 @@ func serve_source() {
 	// monitor files for changes
 	last_run := time.Unix(0,0)
 
-	for range time.Tick(time.Second / 2) {
+	for range time.Tick(time.Second / 20) {
 		if file_has_changes("config/config.x", last_run) {
 			expire_plates_cache()
 			if !load_config(false) {
