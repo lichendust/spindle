@@ -6,6 +6,7 @@ const (
 	meta_canonical    = "<link rel='canonical' href='%s'>"
 	meta_favicon      = "<link rel='icon' type='image/%s' href='%s'>"
 	meta_viewport     = "<meta name='viewport' content='width=device-width, initial-scale=%s'>"
+	meta_theme        = "<meta name='theme-color' content='%s'>"
 )
 
 const (

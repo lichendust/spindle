@@ -93,6 +93,10 @@ func head_render(markup *markup, buffer *strings.Builder) {
 				console_print("not a twitter card type: %q", value) // @error
 			}
 			continue
+
+		case "theme_color":
+			buffer.WriteString(sprint(meta_theme, value))
+			continue
 		}
 
 		buffer.WriteString(sprint(meta_source, "og:" + key, value))
