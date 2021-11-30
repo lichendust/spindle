@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"path"
 	"strings"
 	"unicode/utf8"
-	"path/filepath"
 )
 
 type markup struct {
@@ -395,33 +393,6 @@ func assign_plate(some_page *markup) {
 	some_page.vars = merge_vars(some_page.vars, the_plate.vars)
 }
 
-// we could do webp for GIFs too, but magick
-// doesn't have animation target flags and
-// i'm loathed to add cwebp as a dep.
-var valid_webp_ext = map[string]bool {
-	".jpg":  true,
-	".jpeg": true,
-	".png":  true,
-}
-
-func rewrite_image_path(image_path, image_prefix string, webp_enabled bool) string {
-	if strings.HasPrefix(image_path, "http") {
-		return image_path
-	}
-
-	if !strings.HasPrefix(image_path, image_prefix) {
-		image_path = path.Join(image_prefix, image_path)
-	}
-
-	ext := filepath.Ext(image_path)
-
-	if webp_enabled && valid_webp_ext[ext] {
-		image_path = image_path[:len(image_path) - len(ext)] + ".webp"
-	}
-
-	return image_path
-}
-
 func process_vars(vars map[string]string) map[string]string {
 	image_prefix, _ := vars["image_prefix"]
 
@@ -431,7 +402,7 @@ func process_vars(vars map[string]string) map[string]string {
 				fmt.Printf("image: %q is draft\n", value) // @warning
 			}
 
-			vars[key] = rewrite_image_path(value, image_prefix, config.image_make_webp)
+			vars[key] = rewrite_image_path(value, image_prefix, config.image_rewrite_extensions)
 		}
 	}
 

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
-	"strconv"
+	"strings"
 )
 
 var config *global_config
@@ -13,9 +13,7 @@ type global_config struct {
 
 	build_mode bool
 
-	image_resize      int
-	image_quality     string
-	image_make_webp   bool
+	image_rewrite_extensions bool
 
 	main_port string
 	test_port string
@@ -34,28 +32,12 @@ func load_config(build bool) bool {
 
 	data := markup_parser(raw_text)
 
-	if x, ok := data.vars["image_resize"]; ok {
-		n, err := strconv.Atoi(x)
-
-		if err != nil {
-			console_print(`"image_resize" in config.x: "%s" is not a number`, x)
-			return false
+	for key, v := range data.vars {
+		if strings.HasPrefix(key, "image_ext.") {
+			config.image_rewrite_extensions = true
+			rewrite_image_table[key[10:]] = v
+			delete(data.vars, key)
 		}
-
-		config.image_resize = n
-		delete(data.vars, "image_resize")
-	}
-
-	if x, ok := data.vars["image_quality"]; ok {
-		config.image_quality = x
-		delete(data.vars, "image_quality")
-	} else {
-		config.image_quality = "100"
-	}
-
-	if _, ok := data.vars["image_make_webp"]; ok {
-		config.image_make_webp = true
-		delete(data.vars, "image_make_webp")
 	}
 
 	config.vars = merge_maps(data.vars, tag_defaults)
@@ -88,7 +70,7 @@ func load_config(build bool) bool {
 	}
 
 	if !config.build_mode {
-		config.image_make_webp = false // no conversions in server mode
+		config.image_rewrite_extensions = false // no conversions in server mode
 	}
 
 	return true

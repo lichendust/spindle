@@ -15,13 +15,10 @@ func build_project(args []string) {
 	}
 
 	public_dir  := "public"
-	skip_images := false
 
 	for _, a := range args {
 		if a[0:2] == "--" {
-			switch a[2:] {
-			case "skip-images": skip_images = true
-			}
+			// nothing right now
 		} else {
 			public_dir = a // @todo warn if multiple args match
 		}
@@ -62,26 +59,6 @@ func build_project(args []string) {
 				defer wg.Done()
 
 				copy_mini(&file)
-			}()
-
-		case IMAGE_JPG, IMAGE_PNG:
-			if skip_images {
-				continue
-			}
-
-			go func() {
-				wg.Add(1)
-				defer wg.Done()
-
-				image_handler(&file, config.image_resize)
-			}()
-
-		default:
-			go func() {
-				wg.Add(1)
-				defer wg.Done()
-
-				copy_file(file.source, file.output)
 			}()
 		}
 	}

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 	"errors"
-	"strings"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -201,7 +200,7 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 	files   := make([]*file, 0, 32)
 	folders := make([]*file, 0, 16)
 
-	do_webp := config.image_make_webp
+	// do_webp := config.image_make_webp
 
 	err := filepath.Walk(root_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -240,7 +239,7 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 		file_type := STATIC
 
 		switch ext {
-		case ".jpg", ".jpeg":
+		/*case ".jpg", ".jpeg":
 			if !strings.Contains(path, "favicon") {
 				file_type = IMAGE_JPG
 
@@ -255,7 +254,7 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 				if do_webp {
 					out_path = rewrite_extension(out_path, ".webp")
 				}
-			}
+			}*/
 		case ".js":
 			file_type = STATIC_JS
 		case ".css":

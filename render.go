@@ -370,7 +370,7 @@ func data_render(markup *markup, vars map[string]string) string {
 				fmt.Printf("image: %q is draft\n", path) // @warning
 			}
 
-			path = rewrite_image_path(path, image_prefix, config.image_make_webp)
+			path = rewrite_image_path(path, image_prefix, config.image_rewrite_extensions)
 
 			args := make([]string, 0, len(obj.text))
 
