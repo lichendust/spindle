@@ -15,8 +15,8 @@ type global_config struct {
 
 	image_rewrite_extensions bool
 
-	main_port string
-	test_port string
+	serve_port string
+	check_port string
 }
 
 func load_config(build bool) bool {
@@ -32,6 +32,8 @@ func load_config(build bool) bool {
 
 	data := markup_parser(raw_text)
 
+	config.vars = merge_maps(data.vars, tag_defaults)
+
 	for key, v := range data.vars {
 		if strings.HasPrefix(key, "image_ext.") {
 			config.image_rewrite_extensions = true
@@ -40,33 +42,31 @@ func load_config(build bool) bool {
 		}
 	}
 
-	config.vars = merge_maps(data.vars, tag_defaults)
-
 	if _, ok := config.vars["domain"]; !ok {
 		fmt.Println(`"domain" missing from config.x`)
 		return false
 	}
 
-	if v, ok := data.vars["main_port"]; ok {
+	if v, ok := data.vars["serve_port"]; ok {
 		if !is_all_numbers(v) {
-			panic(sprint(`config.main_port — invalid port number %s`, v)) // @error
+			panic(sprint(`config.serve_port — invalid port number %s`, v)) // @error
 		}
 
-		config.main_port = ":" + v
-		delete(data.vars, "main_port")
+		config.serve_port = ":" + v
+		delete(data.vars, "serve_port")
 	} else {
-		config.main_port = ":3011" // default port
+		config.serve_port = ":3011" // default port
 	}
 
-	if v, ok := data.vars["test_port"]; ok {
+	if v, ok := data.vars["check_port"]; ok {
 		if !is_all_numbers(v) {
-			panic(sprint(`config.test_port — invalid port number %s`, v)) // @error
+			panic(sprint(`config.check_port — invalid port number %s`, v)) // @error
 		}
 
-		config.test_port = ":" + v
-		delete(data.vars, "test_port")
+		config.check_port = ":" + v
+		delete(data.vars, "check_port")
 	} else {
-		config.test_port = ":3022" // default port
+		config.check_port = ":3022" // default port
 	}
 
 	if !config.build_mode {
@@ -98,8 +98,8 @@ func main() {
 	case "serve":
 		serve_source()
 
-	case "test":
-		serve_public(args[1:]) // @todo rename this command
+	case "check":
+		serve_public(args[1:])
 
 	default:
 		fmt.Println(help_message)

@@ -36,7 +36,7 @@ func serve_source() {
 
 	// start server
 	go func() {
-		err := http.ListenAndServe(config.main_port, the_server)
+		err := http.ListenAndServe(config.serve_port, the_server)
 
 		if err != nil {
 			panic(err)
@@ -44,8 +44,8 @@ func serve_source() {
 	}()
 
 	// print server startup message to user
-	print_server_info(config.main_port)
-	open_browser("/", config.main_port)
+	print_server_info(config.serve_port)
+	open_browser("/", config.serve_port)
 
 	// monitor files for changes
 	last_run := time.Unix(0,0)
@@ -80,7 +80,7 @@ func serve_source() {
 
 func serve_public(args []string) {
 	public_dir := "public"
-	test_port  := ":3022"
+	check_port  := ":3022"
 
 	switch len(args) {
 	case 0:
@@ -91,7 +91,7 @@ func serve_public(args []string) {
 	}
 
 	if load_config(true) {
-		test_port = config.test_port
+		check_port = config.check_port
 	}
 
 	the_server := http.NewServeMux()
@@ -117,15 +117,15 @@ func serve_public(args []string) {
 	})
 
 	go func() {
-		err := http.ListenAndServe(test_port, the_server)
+		err := http.ListenAndServe(check_port, the_server)
 
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	print_server_info(test_port)
-	open_browser("/", test_port)
+	print_server_info(check_port)
+	open_browser("/", check_port)
 
 	for range time.Tick(time.Second * 2) {}
 }
