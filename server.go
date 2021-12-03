@@ -175,15 +175,13 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 
 	ext := filepath.Ext(path)
 
-	if ext == ".png" || ext == ".jpg" || ext == ".jpeg" {
-		if n := strings.IndexRune(path, '@'); n > -1 {
-			if is_file(path) {
-				http.ServeFile(w, r, path)
-			} else {
-				http.ServeFile(w, r, path[:n] + ext)
-			}
-			return
+	if n := strings.IndexRune(path, '@'); n > -1 {
+		if is_file(path) {
+			http.ServeFile(w, r, path)
+		} else {
+			http.ServeFile(w, r, path[:n] + ext)
 		}
+		return
 	}
 
 	http.ServeFile(w, r, path)
