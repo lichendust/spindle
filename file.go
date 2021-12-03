@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"errors"
+	"strings"
 	"io/ioutil"
 	"path/filepath"
 )
@@ -196,11 +197,18 @@ func directory_has_changes(root_path string, last_run time.Time) bool {
 	return has_changes
 }
 
+func reject_excluded(path string) bool {
+	for _, name := range config.exclude_list {
+		if !strings.Contains(path, name) {
+			return false
+		}
+	}
+	return true
+}
+
 func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*file) {
 	files   := make([]*file, 0, 32)
 	folders := make([]*file, 0, 16)
-
-	// do_webp := config.image_make_webp
 
 	err := filepath.Walk(root_path, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -224,7 +232,7 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 				return nil
 			}
 
-			if fchr == '.' || draft && reject_drafts {
+			if fchr == '.' || draft && reject_drafts || reject_excluded(path) {
 				return filepath.SkipDir
 			}
 
@@ -239,22 +247,6 @@ func get_files(root_path, public_dir string, reject_drafts bool) ([]*file, []*fi
 		file_type := STATIC
 
 		switch ext {
-		/*case ".jpg", ".jpeg":
-			if !strings.Contains(path, "favicon") {
-				file_type = IMAGE_JPG
-
-				if do_webp {
-					out_path = rewrite_extension(out_path, ".webp")
-				}
-			}
-		case ".png":
-			if !strings.Contains(path, "favicon") {
-				file_type = IMAGE_PNG
-
-				if do_webp {
-					out_path = rewrite_extension(out_path, ".webp")
-				}
-			}*/
 		case ".js":
 			file_type = STATIC_JS
 		case ".css":
