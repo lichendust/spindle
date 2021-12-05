@@ -1,19 +1,5 @@
 package main
 
-const (
-	meta_source       = "<meta property='%s' content='%s'>"
-	meta_description  = "<meta name='description' content='%s'>"
-	meta_canonical    = "<link rel='canonical' href='%s'>"
-	meta_favicon      = "<link rel='icon' type='image/%s' href='%s'>"
-	meta_viewport     = "<meta name='viewport' content='width=device-width, initial-scale=%s'>"
-	meta_theme        = "<meta name='theme-color' content='%s'>"
-)
-
-const (
-	script_template = "<script type='text/javascript' src='%s' defer></script>"
-	style_template  = "<link rel='stylesheet' type='text/css' href='%s'/>"
-)
-
 var valid_twitter_card = map[string]bool {
 	"summary": true,
 	"summary_large_image": true,
@@ -159,8 +145,8 @@ first steps:
 
 commands:
 
-	spindle serve   start a local development server
-	spindle build   render your project to /public/
+    spindle serve   start a local development server
+    spindle build   render your project to /public/
 
 initial layout:
 
@@ -179,6 +165,25 @@ const help_message = `commands:
 `
 
 const (
+	meta_source       = "<meta property='%s' content='%s'>"
+	meta_description  = "<meta name='description' content='%s'>"
+	meta_canonical    = "<link rel='canonical' href='%s'>"
+	meta_favicon      = "<link rel='icon' type='image/%s' href='%s'>"
+	meta_viewport     = "<meta name='viewport' content='width=device-width, initial-scale=%s'>"
+	meta_theme        = "<meta name='theme-color' content='%s'>"
+)
+
+const (
+	script_template = "<script type='text/javascript' src='%s' defer></script>"
+	style_template  = "<link rel='stylesheet' type='text/css' href='%s'/>"
+)
+
+const (
 	sitemap_template = `<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">`
 	sitemap_entry = `<url><loc>%s</loc></url>`
+)
+
+const (
+	media_vimeo_template   = `<div class='video'><iframe src='https://player.vimeo.com/video/%s?color=0&title=0&byline=0&portrait=0' frameborder='0' allow='fullscreen' allowfullscreen></iframe></div>`
+	media_youtube_template = `<div class='video'><iframe src='https://www.youtube-nocookie.com/embed/%s?rel=0&controls=1' frameborder='0' allow='accelerometer; encrypted-media; gyroscope; picture-in-picture' allowfullscreen></iframe></div>`
 )

@@ -177,7 +177,7 @@ func data_render(markup *markup, vars map[string]string) string {
 		case BLOCK:
 			name := obj.text[0]
 
-			new_vars := process_vars(merge_maps(obj.vars, vars)) // @todo make more efficient
+			new_vars := process_vars(merge_maps(obj.vars, vars))
 			new_text := data_render(markup, new_vars)
 			temp, ok := vars[name]
 
@@ -202,7 +202,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 			if eval {
-				new_vars := process_vars(merge_maps(obj.vars, vars)) // @todo make more efficient
+				new_vars := process_vars(merge_maps(obj.vars, vars))
 				new_text := data_render(markup, new_vars)
 				buffer.WriteString(complex_key_mapper(new_text, new_vars))
 			} else {

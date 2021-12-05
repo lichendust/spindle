@@ -14,7 +14,7 @@ func build_project(args []string) {
 		return
 	}
 
-	public_dir  := "public"
+	public_dir := "public"
 
 	for _, a := range args {
 		if a[0:2] == "--" {

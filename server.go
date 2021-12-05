@@ -10,6 +10,30 @@ import (
 	"path/filepath"
 )
 
+
+
+func print_server_info(port string) {
+	fmt.Printf("spindle server\n\n    localhost%s\n\n", port)
+}
+
+func open_browser(path, port string) {
+	url := sprint("http://localhost%s/%s", port, path)
+
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":   err = exec.Command("xdg-open", url).Start()
+	case "darwin":  err = exec.Command("open", url).Start()
+	case "windows": err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	}
+
+	if err != nil {
+		panic(err)
+	}
+}
+
+
+
 func serve_source() {
 	if !load_config(false) {
 		fmt.Println(startup_error)
@@ -31,7 +55,7 @@ func serve_source() {
 	// server components
 	the_server.HandleFunc("/", resource_finder)
 	the_server.HandleFunc("/__spindle", func(w http.ResponseWriter, r *http.Request) {
-		reload_socket(the_hub, w, r)
+		register_client(the_hub, w, r)
 	})
 
 	// start server
@@ -77,6 +101,8 @@ func serve_source() {
 		last_run = time.Now()
 	}
 }
+
+
 
 func serve_public(args []string) {
 	public_dir := "public"
@@ -129,6 +155,8 @@ func serve_public(args []string) {
 
 	for range time.Tick(time.Second * 2) {}
 }
+
+
 
 func resource_finder(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Path
@@ -185,25 +213,4 @@ func resource_finder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.ServeFile(w, r, path)
-}
-
-func print_server_info(port string) {
-	// @todo get actual network interfaces and print 'em
-	fmt.Printf("spindle server\n\n    localhost%s\n\n", port)
-}
-
-func open_browser(path, port string) {
-	url := sprint("http://localhost%s/%s", port, path)
-
-	var err error
-
-	switch runtime.GOOS {
-	case "linux":   err = exec.Command("xdg-open", url).Start()
-	case "darwin":  err = exec.Command("open", url).Start()
-	case "windows": err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
-	}
-
-	if err != nil {
-		panic(err)
-	}
 }
