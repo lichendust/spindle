@@ -78,6 +78,7 @@ var html_defaults = map[string]string{
 	"legend":     "<legend>%s</legend>",
 	"li":         "<li>%s</li>",
 	"link":       "<link>%s</link>",
+	"main":       "<main>%s</main>",
 	"map":        "<map>%s</map>",
 	"mark":       "<mark>%s</mark>",
 	"menu":       "<menu>%s</menu>",
@@ -125,7 +126,6 @@ var html_defaults = map[string]string{
 	"var":        "<var>%s</var>",
 	"video":      "<video>%s</video>",
 	"wbr":        "<wbr>%s</wbr>",
-	"main":       "<main>%s</main>",
 }
 
 // new project
@@ -156,7 +156,9 @@ initial layout:
     │   ├── chunks
     │   └── plates
     └── source
-        └── index.x`
+        └── index.x
+
+`
 
 const help_message = `commands:
 
@@ -170,7 +172,11 @@ const (
 	meta_canonical    = "<link rel='canonical' href='%s'>"
 	meta_favicon      = "<link rel='icon' type='image/%s' href='%s'>"
 	meta_viewport     = "<meta name='viewport' content='width=device-width, initial-scale=%s'>"
+
 	meta_theme        = "<meta name='theme-color' content='%s'>"
+
+	meta_theme_light  = "<meta name='theme-color' content='%s' media='(prefers-color-scheme: light)'>"
+	meta_theme_dark   = "<meta name='theme-color' content='%s' media='(prefers-color-scheme: dark)'>"
 )
 
 const (

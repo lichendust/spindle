@@ -79,11 +79,11 @@ func load_file_cache(source_file string) (string, bool) {
 }
 
 func make_directory(path string) {
-	os.MkdirAll(path, os.ModeDir)
+	os.MkdirAll(path, 0777)
 }
 
 func make_file(path, content string) {
-	if err := ioutil.WriteFile(path, []byte(content), 0644); err != nil {
+	if err := ioutil.WriteFile(path, []byte(content), 0777); err != nil {
 		panic(err)
 	}
 }

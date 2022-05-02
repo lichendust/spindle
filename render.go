@@ -94,8 +94,12 @@ func head_render(markup *markup, buffer *strings.Builder) {
 			}
 			continue
 
-		case "theme_color":
-			buffer.WriteString(sprint(meta_theme, value))
+		case "theme_color_dark":
+			buffer.WriteString(sprint(meta_theme_dark, value))
+			continue
+
+		case "theme_color_light":
+			buffer.WriteString(sprint(meta_theme_light, value))
 			continue
 		}
 

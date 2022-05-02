@@ -1,9 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"time"
 	"os/exec"
+	"strconv"
+	"strings"
+	"path/filepath"
 	"github.com/dop251/goja"
 )
 
@@ -30,20 +32,38 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 	vm.Set("args", args)
 	vm.Set("the_page", &script_markup {vars})
 
+	vm.Set("get_page", func(path string) *script_markup {
+		path = filepath.Join("source", path)
+
+		if is_dir(path) {
+			path = filepath.Join(path, "index.x")
+		} else {
+			path += ".x"
+		}
+
+		page, ok := load_page(path)
+
+		if !ok {
+			console_print("bad times with that page")
+			return nil
+		}
+
+		return &script_markup {page.vars}
+	})
+
 	// configuration
 	vm.Set("cache_return", false)
 
 	// functions
-	vm.Set("print", console_print)
-	vm.Set("sprint", sprint)
+	vm.Set("print",      console_print)
+	vm.Set("sprint",     sprint)
+	vm.Set("title_case", make_title)
+
+	// vm.Set("import", )
 
 	// returns unix time stamp of last git commit
-	vm.Set("time", func(a ...string) string {
-		// return passed file path or self if none
-		if len(a) > 0 {
-			return git_commit(a[0])
-		}
-		return git_commit(vars["raw_path"])
+	vm.Set("git_time", func(format_string string) string {
+		return git_commit(vars["raw_path"], format_string)
 	})
 
 	// execution
@@ -72,12 +92,22 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 
 // @experimental
 // just returns unix time
-func git_commit(path string) string {
+func git_commit(path, format_string string) string {
 	cmd := exec.Command("git", "log", "-n", "1", "--format=%ct", "--", path)
 
-	if result, err := cmd.Output(); err == nil {
-		return string(result)
+	result, err := cmd.Output()
+
+	if err != nil {
+		return ""
 	}
 
-	return fmt.Sprintf("%d", time.Now().Unix())
+	i, err := strconv.ParseInt(strings.TrimSpace(string(result)), 10, 64)
+
+	if err != nil {
+		return ""
+	}
+
+	the_time := time.Unix(i, 0)
+
+	return nsdate(the_time, format_string)
 }

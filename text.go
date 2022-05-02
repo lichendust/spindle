@@ -384,3 +384,63 @@ func join_url(a, b string) string {
 
 	return base.ResolveReference(u).String()
 }
+
+// https://www.grammarly.com/blog/capitalization-in-the-titles/
+// @todo complete this
+var short_words = map[string]bool {
+	"a":    true,
+	"an":   true,
+	"and":  true,
+	"the":  true,
+	"on":   true,
+	"to":   true,
+	"in":   true,
+	"for":  true,
+	"nor":  true,
+	"or":   true,
+	"from": true,
+	"but":  true,
+	"is":   true,
+}
+
+// a title caser that actually works!
+func make_title(input string) string {
+	words := strings.Split(input, " ")
+
+	for i, word := range words {
+		if i > 0 && short_words[word] {
+			continue
+		}
+
+		buffer := strings.Builder {}
+		buffer.Grow(len(word))
+
+		for len(word) > 0 {
+			c, width := utf8.DecodeRuneInString(word)
+
+			if buffer.Len() == 0 {
+				buffer.WriteRune(unicode.ToUpper(c))
+				word = word[width:]
+				continue
+			}
+
+			if c == '-' || c == '—' {
+				buffer.WriteRune(unicode.ToLower(c))
+				word = word[width:]
+
+				c, width = utf8.DecodeRuneInString(word)
+
+				buffer.WriteRune(unicode.ToUpper(c))
+				word = word[width:]
+				continue
+			}
+
+			buffer.WriteRune(unicode.ToLower(c))
+			word = word[width:]
+		}
+
+		words[i] = buffer.String()
+	}
+
+	return strings.Join(words, " ")
+}

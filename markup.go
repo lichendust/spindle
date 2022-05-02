@@ -47,47 +47,47 @@ type parser_def struct {
 	args bool
 }
 
-var single_token = map[rune]*parser_def{
-	'*': &parser_def{
+var single_token = map[rune]*parser_def {
+	'*': &parser_def {
 		enum: RAW_TEXT,
 	},
-	'#': &parser_def{
+	'#': &parser_def {
 		enum: HEADING,
 		trim: true,
 	},
-	'%': &parser_def{
+	'%': &parser_def {
 		enum: IMAGE,
 		args: true,
 	},
-	'.': &parser_def{
+	'.': &parser_def {
 		enum: PARAGRAPH,
 		trim: true,
 	},
-	'-': &parser_def{
+	'-': &parser_def {
 		enum: LIST_U,
 		trim: true,
 	},
-	'+': &parser_def{
+	'+': &parser_def {
 		enum: LIST_O,
 		trim: true,
 	},
-	'@': &parser_def{
+	'@': &parser_def {
 		enum: MEDIA,
 		args: true,
 	},
-	'>': &parser_def{
+	'>': &parser_def {
 		enum: CHUNK,
 		args: true,
 	},
-	'~': &parser_def{
+	'~': &parser_def {
 		enum: IMPORT,
 		args: true,
 	},
-	'ø': &parser_def{
+	'ø': &parser_def {
 		enum: FUNCTION,
 		args: true,
 	},
-	'$': &parser_def{
+	'$': &parser_def {
 		enum: FUNCTION_INLINE,
 		trim: true,
 	},
