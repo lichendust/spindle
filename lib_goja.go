@@ -44,12 +44,16 @@ func call_script(vars map[string]string, program_text string, args []string) *sc
 		page, ok := load_page(path)
 
 		if !ok {
-			console_print("bad times with that page")
+			warnings.new("bad times with that page")
 			return nil
 		}
 
 		return &script_markup {page.vars}
 	})
+
+	if x, ok := vars["url_pretty"]; ok {
+		vm.Set("slug", x)
+	}
 
 	// configuration
 	vm.Set("cache_return", false)

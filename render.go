@@ -90,7 +90,7 @@ func head_render(markup *markup, buffer *strings.Builder) {
 			if ok := valid_twitter_card[value]; ok {
 				buffer.WriteString(sprint(meta_source, "twitter:card", value))
 			} else {
-				console_print("not a twitter card type: %q", value) // @error
+				warnings.new("not a twitter card type: %q", value) // @error
 			}
 			continue
 
@@ -234,18 +234,23 @@ func data_render(markup *markup, vars map[string]string) string {
 			}
 
 		case BLOCK_ELSE:
-			console_print("orphaned else block") // @error
+			warnings.new("orphaned else block") // @error
 			skip_block(markup)
 
 		case BLOCK_CODE:
 			text := obj.text[0]
+			lang := ""
 
 			// @todo highlighting engine
 			/*if len(obj.text) > 1 {
 				text = highlight(text, obj.text[1])
 			}*/
 
-			buffer.WriteString(sprint(vars["codeblock"], text))
+			if len(obj.text) > 1 {
+				lang = "language-" + obj.text[1]
+			}
+
+			buffer.WriteString(sprint(vars["codeblock"], lang, text))
 
 		case LIST_O, LIST_U:
 			the_type := obj.object_type
@@ -289,14 +294,14 @@ func data_render(markup *markup, vars map[string]string) string {
 			raw, ok := load_file_cache(sprint("config/chunks/%s.js", name))
 
 			if !ok {
-				console_print("function not found:", name) // @error
+				warnings.new("function not found:", name) // @error
 				continue
 			}
 
 			result := call_script(vars, raw, obj.text[1:])
 
 			if !result.success {
-				console_print("error %q: %s", name, result.text) // @error
+				warnings.new("error %q: %s", name, result.text) // @error
 				continue
 			}
 
@@ -314,7 +319,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			result := call_script(vars, obj.text[0], []string{})
 
 			if !result.success {
-				console_print("error: %s", result.text) // @error
+				warnings.new("error: %s", result.text) // @error
 				continue
 			}
 
@@ -340,14 +345,14 @@ func data_render(markup *markup, vars map[string]string) string {
 			path = filepath.ToSlash(path)
 
 			if config.build_mode && is_draft(path) {
-				console_print("import: %q is draft; skipped", obj.text[0]) // @warning
+				warnings.new("imported page %q was skipped", filepath.Base(obj.text[0])) // @warning
 				continue
 			}
 
 			page, ok := load_page(path)
 
 			if !ok {
-				console_print("import: path %q does not exist", obj.text[0]) // @error
+				warnings.new("import: path %q does not exist", obj.text[0]) // @error
 				continue
 			}
 
@@ -360,7 +365,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			x, ok := markup.vars[key]
 
 			if !ok {
-				console_print("import: no template %q", obj.text[0]) // @error
+				warnings.new("import: no template %q", obj.text[0]) // @error
 				continue
 			}
 
@@ -371,7 +376,7 @@ func data_render(markup *markup, vars map[string]string) string {
 			path := obj.text[0]
 
 			if config.build_mode && is_draft(path) {
-				fmt.Printf("image: %q is draft\n", path) // @warning
+				warnings.new("image %q will not be built", filepath.Base(path)) // @warning
 			}
 
 			path = rewrite_image_path(path, image_prefix, config.image_rewrite_extensions)

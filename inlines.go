@@ -14,6 +14,7 @@ var strike  = regexp.MustCompile(`~(\S(.+?)\S)~`)
 var italics = regexp.MustCompile(`\*(\S(.+?)\S)\*`)
 var bold    = regexp.MustCompile(`\*\*(\S(.+?)\S)\*\*`)
 var link    = regexp.MustCompile(`\[(.+?)\]\((.+?)\)`)
+var link2   = regexp.MustCompile(`\[\[(.+?)\]\]\((.+?)\)`)
 var inline  = regexp.MustCompile(`c\.(.+?){(.+?)}`)
 
 var code = regexp.MustCompile("`(.+?)`")
@@ -21,10 +22,12 @@ var code = regexp.MustCompile("`(.+?)`")
 func format_inlines(v string, vars map[string]string) string {
 	input := []byte(v)
 
-	code_temp := sprint(vars["code"], "$1")
-	link_temp := sprint(vars["link"], "$2", "$1")
+	code_temp  := sprint(vars["code"],  "$1")
+	link_temp  := sprint(vars["link"],  "$2", "$1")
+	link2_temp := sprint(vars["link2"], "$2", "$1")
 
 	input = code.ReplaceAll(input,    []byte(code_temp)) // inline needs ReplaceFunc with inline_sub
+	input = link2.ReplaceAll(input,   []byte(link2_temp))
 	input = link.ReplaceAll(input,    []byte(link_temp))
 	input = bold.ReplaceAll(input,    []byte(`<b>$1</b>`))
 	input = italics.ReplaceAll(input, []byte(`<i>$1</i>`))

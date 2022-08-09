@@ -89,6 +89,8 @@ func console_print(base string, args ...interface{}) {
 	fmt.Println(fmt.Sprintf(base, args...))
 }
 
+var warnings *warning_handler
+
 func main() {
 	args := os.Args[1:]
 
@@ -102,9 +104,12 @@ func main() {
 		make_blank_project()
 
 	case "build":
+		warnings = new_warning_handler()
 		build_project(args[1:])
+		warnings.print_all()
 
 	case "serve":
+		warnings = new_warning_handler()
 		serve_source()
 
 	case "check":

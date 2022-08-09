@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf8"
+	"path/filepath"
 )
 
 type markup struct {
@@ -123,7 +124,7 @@ func markup_parser(input string) *markup {
 			break
 		}
 
-		if input[0] == '/' && len(input) > 1 && input[1] == '/' {
+		if input[0] == '/' {
 			line := extract_to_newline(input)
 			input = input[len(line):]
 
@@ -221,7 +222,7 @@ func markup_parser(input string) *markup {
 			}
 
 			switch data {
-			case "":       console_print("bad variable in page") // @error
+			case "":       warnings.new("bad variable in page") // @error
 			case "false":  data = "0"
 			}
 
@@ -253,7 +254,7 @@ func markup_parser(input string) *markup {
 			switch ident {
 			case "if":
 				if !args_valid {
-					console_print("unknown guff in 'if' statement") // @error
+					warnings.new("unknown guff in 'if' statement") // @error
 				}
 
 				the_token.object_type = BLOCK_IF
@@ -399,7 +400,7 @@ func process_vars(vars map[string]string) map[string]string {
 	for key, value := range vars {
 		if strings.HasSuffix(key, "image") {
 			if config.build_mode && is_draft(value) {
-				fmt.Printf("image: %q is draft\n", value) // @warning
+				warnings.new("image %q will not be built", filepath.Base(value)) // @warning
 			}
 
 			vars[key] = rewrite_image_path(value, image_prefix, config.image_rewrite_extensions)

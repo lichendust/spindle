@@ -17,6 +17,8 @@ var tag_defaults = map[string]string {
 
 	"img":       "<img src='%s'>",
 	"link":      "<a href='%s'>%s</a>",
+	"link2":     "<a href='%s' target='_blank' rel='noopener noreferrer'>%s</a>",
+
 	"paragraph": "<p>%s</p>",
 
 	"ol": "<ol>%s</ol>",
@@ -26,7 +28,7 @@ var tag_defaults = map[string]string {
 	"hr": "<hr>",
 
 	"code":      "<code>%s</code>",
-	"codeblock": "<pre><code>%s</code></pre>",
+	"codeblock": "<pre class='%s'><code>%s</code></pre>",
 }
 
 var html_defaults = map[string]string{
