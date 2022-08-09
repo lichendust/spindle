@@ -2,6 +2,10 @@
 
 Spindle is a static site builder based around repeatable templating and core web development principles — HTML, CSS and JavaScript.
 
+## Updates Coming!
+
+⚠ Spindle is being rebuilt from the ground up on the `dev` branch.  A lot is changing.
+
 ## Philosophy
 
 Spindle is designed to outlast framework races. This program (and indeed Golang itself) may not last forever, but another tool supporting Spindle's features could be written in a week.
