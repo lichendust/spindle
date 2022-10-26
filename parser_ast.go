@@ -5,12 +5,14 @@ const (
 	NULL ast_type = iota
 
 	BLANK
+	RAW
 	NORMAL
 	TOKEN
 
 	IMPORT
 	PARTIAL
 	TEMPLATE
+	SCOPE_UNSET
 
 	DECL
 	DECL_BLOCK
@@ -59,6 +61,7 @@ const (
 	AMPERSAND
 	TILDE
 	PLUS
+	MULTIPLY
 	PERCENT
 
 	EOF
@@ -74,6 +77,7 @@ type ast_modifier uint8
 const (
 	NONE ast_modifier = iota
 	SLUG
+	UNIQUE_SLUG
 	UPPER
 	LOWER
 	TITLE
@@ -166,8 +170,9 @@ func (t *ast_token) get_children() []ast_data {
 
 type finder_type uint8
 const (
-	PAGE finder_type = iota
-	IMAGE
+	_PAGE finder_type = iota
+	_IMAGE
+	_STATIC
 )
 
 type path_type uint8
@@ -187,7 +192,7 @@ func check_path_type(input string) path_type {
 	case "root", "rooted":
 		return ROOTED
 	}
-	return ROOTED
+	return NO_PATH_TYPE
 }
 
 type ast_finder struct {

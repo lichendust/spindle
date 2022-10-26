@@ -3,6 +3,10 @@ package main
 import "strings"
 import "strconv"
 
+const base_hash    uint32 = 537692064  // "%"
+const x_hash       uint32 = 681441407  // "×"
+const default_hash uint32 = 2470140894 // "default"
+
 type parser struct {
 	index int
 	array []*lexer_token
@@ -58,13 +62,14 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 			array = append(array, new_tok)
 			continue
 
-		case AMPERSAND, ANGLE_CLOSE, TILDE:
+		case AMPERSAND, ANGLE_CLOSE, TILDE, MULTIPLY:
 			new_tok := &ast_normal{}
 
 			switch token.ast_type {
 			case AMPERSAND:   new_tok.ast_type = TEMPLATE
 			case ANGLE_CLOSE: new_tok.ast_type = PARTIAL // don't exist yet
 			case TILDE:       new_tok.ast_type = IMPORT
+			case MULTIPLY:    new_tok.ast_type = SCOPE_UNSET
 			}
 
 			parser.eat_whitespace()
@@ -234,7 +239,13 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 			tok := ast_normal{
 				ast_type: NORMAL,
 			}
+
 			tok.children = parser.parse_paragraph(NULL)
+
+			if token.ast_type == ANGLE_OPEN {
+				tok.ast_type = RAW
+			}
+
 			array = append(array, &tok)
 		}
 	}
@@ -315,8 +326,9 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 					if word.ast_type == WORD {
 						parser.next()
 						switch strings.ToLower(word.field) {
-						case "page":  new_finder.finder_type = PAGE
-						case "image": new_finder.finder_type = IMAGE
+						case "page":   new_finder.finder_type = _PAGE
+						case "image":  new_finder.finder_type = _IMAGE
+						case "static": new_finder.finder_type = _STATIC
 						default: // @error
 						}
 
@@ -412,17 +424,28 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 
 						b := parser.peek()
 
-						if b.ast_type == WORD {
+						if b.ast_type.is(WORD, IDENT) {
 							parser.next()
 
-							switch strings.ToUpper(b.field) {
-							case "SLUG":       new_var.modifier = SLUG
- 							case "UPPER":      new_var.modifier = UPPER
- 							case "LOWER":      new_var.modifier = LOWER
- 							case "TITLE":      new_var.modifier = TITLE
- 							case "EXPAND":     new_var.modifier = EXPAND
- 							case "EXPAND_ALL": new_var.modifier = EXPAND_ALL
+							switch strings.ToLower(b.field) {
+							case "slug", "s":
+								new_var.modifier = SLUG
+							case "unique_slug", "uslug", "us":
+								new_var.modifier = UNIQUE_SLUG
+ 							case "upper", "u":
+ 								new_var.modifier = UPPER
+ 							case "lower", "l":
+ 								new_var.modifier = LOWER
+ 							case "title", "t":
+ 								new_var.modifier = TITLE
+							// @todo
+ 							/*case "expand", "e":
+ 								new_var.modifier = EXPAND
+ 							case "expand_all", "ea":
+ 								new_var.modifier = EXPAND_ALL*/
 							}
+						} else {
+							parser.step_back() // revert the colon
 						}
 					}
 				}
@@ -541,4 +564,34 @@ func (parser *parser) eat_whitespace() {
 		}
 		break
 	}
+}
+
+func recursive_anon_count(children []ast_data) int {
+	count := 0
+	for _, entry := range children {
+		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
+			continue
+		}
+		if entry.type_check().is(VAR_ANON, VAR_ENUM) {
+			count++
+			continue
+		}
+		if x := entry.get_children(); len(x) > 0 {
+			count += recursive_anon_count(x)
+		}
+	}
+	return count
+}
+
+func immediate_decl_count(children []ast_data) int {
+	count := 0
+	for _, entry := range children {
+		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
+			count++
+		}
+		if entry.type_check() == TEMPLATE {
+			count += 8
+		}
+	}
+	return count
 }

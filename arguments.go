@@ -5,16 +5,10 @@ import (
 	"fmt"
 )
 
-const (
-	VERSION uint8 = iota
-	HELP
-	BUILD
-	SERVE
-)
-
 type config struct {
 	command uint8
 	domain  string
+	path    string
 
 	default_path_type path_type
 }
@@ -38,10 +32,31 @@ func get_arguments() (*config, bool) {
 		if len(args) > 0 {
 			switch args[0] {
 			case "build":
+				counter++
+				config.command = BUILD
 				continue
 
 			case "serve":
+				counter++
+				config.command = SERVE
 				continue
+
+			case "init":
+				config.command = INIT
+
+				if len(args) < 2 {
+					return config, true
+				}
+
+				path := args[1]
+
+				if !is_valid_path(path) {
+					// @error
+					return nil, false
+				}
+
+				config.path = path
+				return config, true
 
 			case "help":
 				config.command = HELP

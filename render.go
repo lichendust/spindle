@@ -1,81 +1,90 @@
 package main
 
+import "fmt"
 import "strings"
 
-// base % variable
-const base_hash uint32 = 537692064
+func render_syntax_tree(spindle *spindle, page *page_object) string {
+	scope_stack := make([]map[uint32]*ast_declare, 4)
+	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 16))
 
-func copy_map(input map[uint32]*ast_declare) map[uint32]*ast_declare {
-	copy := make(map[uint32]*ast_declare, len(input))
-
-	for k, v := range input {
-		copy[k] = v
+	renderer := &renderer{
+		anon_stack:  make([]*anon_entry, 0, 4),
+		scope_stack: scope_stack,
 	}
 
-	return copy
+	return renderer.render_ast(spindle, page, page.content)
 }
 
-type _scope map[uint32]*ast_declare
+type renderer struct {
+	anon_stack  []*anon_entry
+	scope_stack []map[uint32]*ast_declare
+}
 
-type stack_container struct {
+type anon_entry struct {
 	anon_count int
 	children   []ast_data
 }
 
-func push(array []*stack_container, content, wrapper []ast_data) []*stack_container {
-	stack_entry := &stack_container{}
+func (r *renderer) get_anon() *anon_entry {
+	if len(r.anon_stack) > 0 {
+		return r.anon_stack[len(r.anon_stack) - 1]
+	}
+	return nil
+}
+
+func (r *renderer) pop_anon() {
+	if len(r.anon_stack) > 0 {
+		r.anon_stack = r.anon_stack[:len(r.anon_stack) - 1]
+	}
+}
+
+func (r *renderer) push_anon(content, wrapper []ast_data) {
+	stack_entry := &anon_entry{}
 
 	stack_entry.anon_count = recursive_anon_count(wrapper)
 	stack_entry.children   = content
 
-	array = append(array, stack_entry)
-	return array
+	r.anon_stack = append(r.anon_stack, stack_entry)
 }
 
-func recursive_anon_count(children []ast_data) int {
-	count := 0
-	for _, entry := range children {
-		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
-			continue
-		}
-		if entry.type_check().is(VAR_ANON, VAR_ENUM) {
-			count++
-			continue
-		}
-		if x := entry.get_children(); len(x) > 0 {
-			count += recursive_anon_count(x)
+func (r *renderer) get_in_scope(value uint32) (ast_data, bool) {
+	for i := len(r.scope_stack) - 1; i >= 0; i-- {
+		level := r.scope_stack[i]
+
+		if x, ok := level[value]; ok {
+			return x, true
 		}
 	}
-	return count
+	return nil, false
 }
 
-func immediate_decl_count(children []ast_data) int {
-	count := 0
-	for _, entry := range children {
-		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
-			count++
+func (r *renderer) write_to_scope(field uint32, entry *ast_declare) {
+	r.scope_stack[len(r.scope_stack) - 1][field] = entry
+}
+
+func (r *renderer) push_blank_scope(alloc int) {
+	r.scope_stack = append(r.scope_stack, make(map[uint32]*ast_declare, alloc))
+}
+
+func (r *renderer) pop_scope() {
+	r.scope_stack = r.scope_stack[:len(r.scope_stack) - 1]
+}
+
+func (r *renderer) delete_scope_entry(value uint32) {
+	for i := len(r.scope_stack) - 1; i >= 0; i-- {
+		level := r.scope_stack[i]
+		if _, ok := level[value]; ok {
+			delete(level, value)
+			break
 		}
 	}
-	return count
 }
 
-func render_syntax_tree(spindle *spindle, page *page_object) string {
-	return render_ast(spindle, page, page.content, make(map[uint32]*ast_declare, 64), make([]*stack_container, 0, 8))
-}
-
-func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_scope _scope, anon_stack []*stack_container) string {
-	scope := copy_map(incoming_scope)
-
-	var popped_anon *stack_container
-	can_commit_pop := false
-
-	if len(anon_stack) > 0 {
-		popped_anon = anon_stack[len(anon_stack) - 1]
-		can_commit_pop = (popped_anon.anon_count <= 0)
-	}
-
+func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_data) string {
 	buffer := strings.Builder{}
 	buffer.Grow(256)
+
+	popped_anon := r.get_anon()
 
 	index := 0
 
@@ -91,7 +100,7 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 
 		if tc.is(DECL, DECL_BLOCK, DECL_TOKEN) {
 			entry := entry.(*ast_declare)
-			scope[entry.field] = entry
+			r.write_to_scope(entry.field, entry)
 			continue
 		}
 
@@ -107,23 +116,42 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 		}
 
 		switch entry.type_check() {
+		case SCOPE_UNSET:
+			entry := entry.(*ast_normal)
+			r.delete_scope_entry(new_hash(entry.field))
+
+		case TEMPLATE:
+			entry := entry.(*ast_normal)
+
+			t, ok := spindle.templates[new_hash(entry.field)]
+
+			if !ok {
+				// @error
+				panic("can't find template")
+			}
+
+			for _, decl := range t.top_scope {
+				r.write_to_scope(decl.field, decl)
+			}
+
 		case VAR, VAR_ENUM, VAR_ANON:
 			entry := entry.(*ast_variable)
 
 			text := ""
 
-			// @todo this is difficult to follow, might need to clean up
-
 			if entry.ast_type.is(VAR_ANON, VAR_ENUM) {
-				if can_commit_pop {
-					can_commit_pop = false
-					anon_stack = anon_stack[:len(anon_stack) - 1]
-				}
 				popped_anon.anon_count -= 1
-				text = render_ast(spindle, page, popped_anon.children, scope, anon_stack)
 
-			} else if x, ok := scope[entry.field]; ok {
-				text = render_ast(spindle, page, x.get_children(), scope, anon_stack)
+				if popped_anon.anon_count <= 0 {
+					r.pop_anon()
+				}
+
+				text = r.render_ast(spindle, page, popped_anon.children)
+
+			} else {
+				if found, ok := r.get_in_scope(entry.field); ok {
+					text = r.render_ast(spindle, page, found.get_children())
+				}
 			}
 
 			if entry.ast_type == VAR_ENUM && entry.subname > 0 {
@@ -139,12 +167,22 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 
 			if entry.modifier != NONE {
 				switch entry.modifier {
-				// we'll pass the page down here which will
-				// track slug usage and append -1 etc.
-				case SLUG:  text = make_slug(text)
-				case TITLE: text = make_title(text)
-				case UPPER: text = strings.ToUpper(text)
-				case LOWER: text = strings.ToLower(text)
+				case SLUG:
+					text = make_slug(text)
+				case UNIQUE_SLUG:
+					text = make_slug(text)
+					if n, ok := page.slug_tracker[text]; ok {
+						page.slug_tracker[text] = n + 1
+						text = fmt.Sprintf("%s-%d", text, n)
+					} else {
+						page.slug_tracker[text] = 1
+					}
+				case TITLE:
+					text = make_title(text)
+				case UPPER:
+					text = strings.ToUpper(text)
+				case LOWER:
+					text = strings.ToLower(text)
 				}
 			}
 
@@ -153,13 +191,7 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 		case RES_FINDER:
 			entry := entry.(*ast_finder)
 
-			/*
-				@todo cache these lookups for subsequent runs because they are _slow_.
-				in fact, make the parser knowledgeable about whether or not _any_ node can be cached.
-				then we can cache text on the fly, based on whether vars exist.
-			*/
-
-			find_text := render_ast(spindle, page, entry.children[:1], scope, anon_stack)
+			find_text := r.render_ast(spindle, page, entry.children[:1])
 
 			// check cache
 			found_file, ok := spindle.finder_cache[find_text]
@@ -173,16 +205,19 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 				path := found_file.path
 
 				switch entry.finder_type {
-				case IMAGE:
+				case _IMAGE:
 					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
 						panic("res_find not an image") // @error
 					}
-				case PAGE:
+				case _PAGE:
 					if !(found_file.file_type > is_page && found_file.file_type < end_page) {
 						panic("res_find not a page") // @error
 					}
-
 					path = rewrite_ext(path, "") // @todo global config on pretty urls
+				case _STATIC:
+					if !(found_file.file_type > is_static && found_file.file_type < end_static) {
+						panic("res_find not a page") // @error
+					}
 				}
 
 				if entry.path_type == NO_PATH_TYPE {
@@ -217,82 +252,117 @@ func render_ast(spindle *spindle, page *page_object, input []ast_data, incoming_
 			entry := entry.(*ast_block)
 
 			x := entry.get_children()
+			r.push_blank_scope(8)
 
 			if entry.decl_hash > 0 {
-				wrapper_block, ok := scope[entry.decl_hash]
+				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 				if ok {
-					var new_scope _scope
+					r.push_anon(x, wrapper_block.get_children())
 
-					if immediate_decl_count(wrapper_block.get_children()) > 0 {
-						new_scope = copy_map(scope)
-					} else {
-						new_scope = scope
-					}
+					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 
-					anon_stack = push(anon_stack, x, wrapper_block.get_children())
-
-					buffer.WriteString(render_ast(spindle, page, wrapper_block.get_children(), new_scope, anon_stack))
+					r.pop_scope()
 					continue
 				}
 			}
 
 			// else:
-			buffer.WriteString(render_ast(spindle, page, x, scope, anon_stack))
+			buffer.WriteString(r.render_ast(spindle, page, x))
+			r.pop_scope()
 
 		case TOKEN:
 			entry := entry.(*ast_token)
 
+			/*_, has_group := r.get_in_scope(entry.decl_hash + 1)
+
+			if has_group {
+				n := count_repeat_tokens(input[index:], entry.decl_hash)
+				index += n
+			}*/
+
 			x := entry.get_children()
 
-			wrapper_block, ok := scope[entry.decl_hash]
+			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 			if ok {
-				var new_scope _scope
+				n := immediate_decl_count(wrapper_block.get_children())
 
-				if immediate_decl_count(wrapper_block.get_children()) > 0 {
-					new_scope = copy_map(scope)
-				} else {
-					new_scope = scope
+				if n > 0 {
+					r.push_blank_scope(n + 1)
 				}
 
-				anon_stack = push(anon_stack, x, wrapper_block.get_children())
+				r.push_anon(x, wrapper_block.get_children())
 
-				buffer.WriteString(render_ast(spindle, page, wrapper_block.get_children(), new_scope, anon_stack))
+				buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+
+				if n > 0 {
+					r.pop_scope()
+				}
 				continue
 			}
 
 			// else:
-			buffer.WriteString(render_ast(spindle, page, x, scope, anon_stack))
+			buffer.WriteString(r.render_ast(spindle, page, x))
 
 		case NORMAL:
 			entry := entry.(*ast_normal)
 
 			x := entry.get_children()
 
-			var text string
-
 			if len(x) > 0 {
-				text = render_ast(spindle, page, x, scope, anon_stack)
+				wrapper_block, ok := r.get_in_scope(default_hash)
+				if ok {
+					n := immediate_decl_count(wrapper_block.get_children())
+
+					if n > 0 {
+						r.push_blank_scope(n + 1)
+					}
+
+					r.push_anon(x, wrapper_block.get_children())
+
+					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+
+					if n > 0 {
+						r.pop_scope()
+					}
+					continue
+				}
+
+				// else:
+				buffer.WriteString(r.render_ast(spindle, page, x))
 			} else {
-				text = entry.field
+				buffer.WriteString(entry.field)
 			}
 
-			buffer.WriteString(text)
+		case RAW:
+			entry := entry.(*ast_normal)
+
+			x := entry.get_children()
+
+			if len(x) > 0 {
+				buffer.WriteString(r.render_ast(spindle, page, x))
+			} else {
+				buffer.WriteString(entry.field)
+			}
 		}
 	}
 
 	return buffer.String()
 }
 
-/*func push_string_on_scope(scope map[uint32]*ast_declare, ident, text string) {
-	decl := &ast_declare {
-		ast_type: DECL,
-		field:    new_hash(ident),
+func count_repeat_tokens(input []ast_data, hash uint32) int {
+	for i, forward_check := range input {
+		t := forward_check.type_check()
+
+		if t != TOKEN {
+			return i
+		}
+
+		x := forward_check.(*ast_token)
+
+		if x.decl_hash != hash {
+			return i
+		}
 	}
-	decl.children = []ast_data{
-		&ast_normal{
-			ast_type: NORMAL,
-			field:    text,
-		},
-	}
-	scope[decl.field] = decl
-}*/
+
+	return len(input)
+}

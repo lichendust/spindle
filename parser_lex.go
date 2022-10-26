@@ -25,6 +25,7 @@ var rune_match = map[rune]ast_type {
 	'.':  STOP,
 	':':  COLON,
 	'+':  PLUS,
+	'×':  MULTIPLY,
 }
 
 func lex_blob(input string) []*lexer_token {

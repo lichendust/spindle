@@ -4,13 +4,20 @@ import (
 	"os"
 	"time"
 	"io/fs"
+	"unicode"
 	"path/filepath"
 )
 
 const (
+	extension   = ".x"
+
 	source_path = "source"
 	public_path = "public"
 	config_path = "config"
+
+	template_path = config_path + "/templates"
+	partial_path  = config_path + "/partials"
+	script_path   = config_path + "/scripts"
 )
 
 type file_type uint8
@@ -48,6 +55,18 @@ type disk_object struct {
 	parent    *disk_object
 	children  []*disk_object
 	path      string
+}
+
+func get_template_path(name string) string {
+	return filepath.Join(template_path, name) + extension
+}
+
+func get_partial_path(name string) string {
+	return filepath.Join(partial_path, name) + extension
+}
+
+func get_script_path(name string) string {
+	return filepath.Join(script_path, name) + extension
 }
 
 func new_file_tree() []*disk_object {
@@ -306,6 +325,24 @@ func load_file(source_file string) (string, bool) {
 	return string(content), true
 }
 
+func write_file(path, content string) bool {
+	err := os.WriteFile(path, []byte(content), 0777)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
+func make_dir(path string) bool {
+	err := os.MkdirAll(path, os.ModeDir)
+	if err != nil {
+		return false
+	}
+
+	return true
+}
+
 // path tools
 func is_draft(input string) bool {
 	if input[0] == '_' {
@@ -359,4 +396,15 @@ func filepath_relative(a, b string) (string, bool) {
 		return "", false
 	}
 	return filepath.ToSlash(path), true
+}
+
+// validates user input to make sure you're not typing something insane
+func is_valid_path(input string) bool {
+	for _, c := range input {
+		if !(unicode.IsLetter(c) || unicode.IsNumber(c) || c == '.' || c == '/' || c == '\\') {
+			return false
+		}
+	}
+
+	return true
 }
