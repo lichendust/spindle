@@ -14,10 +14,10 @@ type parser struct {
 
 func parse_stream(array []*lexer_token) []ast_data {
 	parser := parser { array: array	}
-	return parser.parse_block(EOF)
+	return parser.parse_block(0)
 }
 
-func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
+func (parser *parser) parse_block(max_depth int) []ast_data {
 	array := make([]ast_data, 0, 32)
 
 	for {
@@ -25,15 +25,20 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 
 		token := parser.next()
 
-		if token == nil {
+		if token == nil || token.ast_type.is(EOF, BRACE_CLOSE) {
 			break
 		}
-		if token.ast_type == exit_upon {
+		if max_depth > 0 && len(array) >= max_depth {
 			break
 		}
+
 		if token.ast_type == NEWLINE {
 			if p := parser.prev(); p != nil && p.ast_type == NEWLINE {
-				array = append(array, &ast_normal{ ast_type: BLANK })
+				t := &ast_base{
+					ast_type: BLANK,
+				}
+				t.position = token.position
+				array = append(array, t)
 			}
 			continue
 		}
@@ -63,7 +68,7 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 			continue
 
 		case AMPERSAND, ANGLE_CLOSE, TILDE, MULTIPLY:
-			new_tok := &ast_normal{}
+			new_tok := &ast_base{}
 
 			switch token.ast_type {
 			case AMPERSAND:   new_tok.ast_type = TEMPLATE
@@ -94,6 +99,33 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 			continue
 
 		case WORD, IDENT:
+			if token.field == "if" {
+				the_if := &ast_if{}
+
+				the_if.condition_list = parser.parse_if()
+				parser.eat_whitespace()
+
+				the_if.children = parser.parse_block(1)
+				the_if.position = token.position
+
+				array = append(array, the_if)
+				continue
+			}
+
+			if token.field == "for" {
+				the_for := &ast_for{}
+				parser.eat_whitespace()
+
+				the_for.iterator_source = parser.parse_paragraph(WHITESPACE)[0]
+				parser.eat_whitespace()
+
+				the_for.children = parser.parse_block(1)
+				the_for.position = token.position
+
+				array = append(array, the_for)
+				continue
+			}
+
 			x := parser.peek_whitespace()
 
 			if x.ast_type == BRACE_OPEN {
@@ -106,7 +138,7 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 				}
 				array = append(array, new_tok)
 
-				new_tok.children = parser.parse_block(BRACE_CLOSE)
+				new_tok.children = parser.parse_block(0)
 				new_tok.position = token.position
 				continue
 			}
@@ -134,10 +166,9 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 						new_block := &ast_block{
 							decl_hash: new_hash(x.field),
 						}
-						new_block.children = parser.parse_block(BRACE_CLOSE)
+						new_block.children = parser.parse_block(0)
 						the_token.children = []ast_data{new_block}
 					} else {
-						parser.step_back()
 						parser.step_back()
 						the_token.children = parser.parse_paragraph(NULL)
 					}
@@ -154,7 +185,7 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 				new_tok := &ast_block{}
 				array = append(array, new_tok)
 
-				new_tok.children = parser.parse_block(BRACE_CLOSE)
+				new_tok.children = parser.parse_block(0)
 				new_tok.position = token.position
 				continue
 			}
@@ -215,7 +246,7 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 					new_block := &ast_block{
 						decl_hash: new_hash(x.field),
 					}
-					new_block.children = parser.parse_block(BRACE_CLOSE)
+					new_block.children = parser.parse_block(0)
 					the_token.children = []ast_data{new_block}
 				} else {
 					parser.step_back()
@@ -224,7 +255,7 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 				}
 			} else if x.ast_type == BRACE_OPEN {
 				parser.next()
-				the_token.children = parser.parse_block(BRACE_CLOSE)
+				the_token.children = parser.parse_block(0)
 			} else {
 				the_token.children = parser.parse_paragraph(NULL)
 			}
@@ -236,14 +267,22 @@ func (parser *parser) parse_block(exit_upon ast_type) []ast_data {
 		{
 			// parse_p needs to get the first tok again
 			parser.step_back()
-			tok := ast_normal{
+			tok := ast_base{
 				ast_type: NORMAL,
 			}
+			tok.position = token.position
 
-			tok.children = parser.parse_paragraph(NULL)
+			children := parser.parse_paragraph(NULL)
 
 			if token.ast_type == ANGLE_OPEN {
 				tok.ast_type = RAW
+			}
+
+			// simplify if possible
+			if len(children) == 1 && children[0].type_check() == NORMAL {
+				tok.field = children[0].(*ast_base).field
+			} else {
+				tok.children = children
 			}
 
 			array = append(array, &tok)
@@ -302,7 +341,7 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 				}
 
 				if buffer.Len() > 0 {
-					array = append(array, &ast_normal {
+					array = append(array, &ast_base {
 						ast_type: NORMAL,
 						field:    buffer.String(),
 					})
@@ -310,7 +349,7 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 					buffer.Grow(256)
 				}
 
-				array = append(array, &ast_normal {
+				array = append(array, &ast_base {
 					ast_type: the_type,
 				})
 				continue
@@ -350,65 +389,28 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 						// @todo need to deal with additional arguments here
 					}
 
+					if buffer.Len() > 0 {
+						array = append(array, &ast_base {
+							ast_type: NORMAL,
+							field:    buffer.String(),
+						})
+						buffer.Reset()
+						buffer.Grow(256)
+					}
+
 					array = append(array, new_finder)
 					continue
 				}
 
-				new_var := &ast_variable{}
+				new_var := parser.parse_variable()
 
-				a := parser.peek()
-
-				the_type := VAR
-
-				if a.ast_type.is(WORD, IDENT) {
-					parser.next()
-
-					b := parser.peek()
-
-					if b.ast_type == STOP {
-						parser.next()
-
-						c := parser.peek()
-
-						if c.ast_type.is(WORD, IDENT) {
-							parser.next()
-
-							new_var.field    = new_hash(a.field + "." + c.field)
-							new_var.taxonomy = new_hash(a.field)
-							new_var.subname  = new_hash(c.field)
-						} else {
-							new_var.field = new_hash(a.field)
-						}
-					} else {
-						new_var.field = new_hash(a.field)
-					}
-
-				} else if a.ast_type == NUMBER {
-					parser.next()
-					the_type = VAR_ENUM
-
-					n, err := strconv.ParseInt(a.field, 10, 32)
-					if err != nil {
-						panic(err)
-					}
-
-					new_var.field   = base_hash
-					new_var.subname = uint32(n)
-
-				} else if a.ast_type == PERCENT {
-					parser.next()
-					the_type      = VAR_ANON
-					new_var.field = base_hash // just a %
-				} else {
+				if new_var == nil {
 					buffer.WriteRune('%')
 					continue
 				}
 
-				// apply the type
-				new_var.ast_type = the_type
-
 				if buffer.Len() > 0 {
-					array = append(array, &ast_normal {
+					array = append(array, &ast_base {
 						ast_type: NORMAL,
 						field:    buffer.String(),
 					})
@@ -416,46 +418,12 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 					buffer.Grow(256)
 				}
 
-				{
-					a := parser.peek()
-
-					if a.ast_type == COLON {
-						parser.next()
-
-						b := parser.peek()
-
-						if b.ast_type.is(WORD, IDENT) {
-							parser.next()
-
-							switch strings.ToLower(b.field) {
-							case "slug", "s":
-								new_var.modifier = SLUG
-							case "unique_slug", "uslug", "us":
-								new_var.modifier = UNIQUE_SLUG
- 							case "upper", "u":
- 								new_var.modifier = UPPER
- 							case "lower", "l":
- 								new_var.modifier = LOWER
- 							case "title", "t":
- 								new_var.modifier = TITLE
-							// @todo
- 							/*case "expand", "e":
- 								new_var.modifier = EXPAND
- 							case "expand_all", "ea":
- 								new_var.modifier = EXPAND_ALL*/
-							}
-						} else {
-							parser.step_back() // revert the colon
-						}
-					}
-				}
-
 				array = append(array, new_var)
 			}
 		}
 
 		if buffer.Len() > 0 {
-			array = append(array, &ast_normal {
+			array = append(array, &ast_base {
 				ast_type: NORMAL,
 				field:    buffer.String(),
 			})
@@ -476,6 +444,137 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 	// @todo if any scope contains var_enum, replace all var_anon with var_enum
 
 	return array
+}
+
+func (parser *parser) parse_if() []ast_data {
+	array := make([]ast_data, 0, 8)
+
+	for {
+		parser.eat_whitespace()
+		token := parser.next()
+
+		switch token.ast_type {
+		// case BANG:
+		case PLUS:
+			array = append(array, &ast_base{
+				ast_type: OP_AND,
+			})
+
+		case PIPE:
+			array = append(array, &ast_base{
+				ast_type: OP_OR,
+			})
+
+		case PERCENT:
+			new_var := parser.parse_variable()
+
+			if new_var == nil {
+				panic("bad thing in if")
+			}
+			if new_var.ast_type != VAR {
+				panic("bad variable in if")
+			}
+
+			array = append(array, new_var)
+
+		default:
+			parser.step_back()
+			return array
+		}
+	}
+
+	return array
+}
+
+func (parser *parser) parse_variable() *ast_variable {
+	new_var := &ast_variable{}
+
+	a := parser.peek()
+
+	the_type := VAR
+
+	if a.ast_type.is(WORD, IDENT) {
+		parser.next()
+
+		b := parser.peek()
+
+		if b.ast_type == STOP {
+			parser.next()
+
+			c := parser.peek()
+
+			if c.ast_type.is(WORD, IDENT) {
+				parser.next()
+
+				new_var.field    = new_hash(a.field + "." + c.field)
+				new_var.taxonomy = new_hash(a.field)
+				new_var.subname  = new_hash(c.field)
+			} else {
+				parser.step_back()
+				new_var.field = new_hash(a.field)
+			}
+		} else {
+			new_var.field = new_hash(a.field)
+		}
+
+	} else if a.ast_type == NUMBER {
+		parser.next()
+		the_type = VAR_ENUM
+
+		n, err := strconv.ParseInt(a.field, 10, 32)
+		if err != nil {
+			panic(err)
+		}
+
+		new_var.field   = base_hash
+		new_var.subname = uint32(n)
+
+	} else if a.ast_type == PERCENT {
+		parser.next()
+		the_type      = VAR_ANON
+		new_var.field = base_hash // just a %
+	} else {
+		return nil
+	}
+
+	// apply the type
+	new_var.ast_type = the_type
+
+	{
+		a := parser.peek()
+
+		if a.ast_type == COLON {
+			parser.next()
+
+			b := parser.peek()
+
+			if b.ast_type.is(WORD, IDENT) {
+				parser.next()
+
+				switch strings.ToLower(b.field) {
+				case "slug", "s":
+					new_var.modifier = SLUG
+				case "unique_slug", "uslug", "us":
+					new_var.modifier = UNIQUE_SLUG
+					case "upper", "u":
+						new_var.modifier = UPPER
+					case "lower", "l":
+						new_var.modifier = LOWER
+					case "title", "t":
+						new_var.modifier = TITLE
+				// @todo
+					/*case "expand", "e":
+						new_var.modifier = EXPAND
+					case "expand_all", "ea":
+						new_var.modifier = EXPAND_ALL*/
+				}
+			} else {
+				parser.step_back() // revert the colon
+			}
+		}
+	}
+
+	return new_var
 }
 
 func (parser *parser) eat_comment() {

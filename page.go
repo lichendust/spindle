@@ -34,7 +34,7 @@ func load_page(full_path string) (*page_object, bool) {
 	array := make([]*ast_declare, 0, 8)
 
 	for _, entry := range syntax_tree {
-		if entry.type_check().is(DECL, DECL_TOKEN, DECL_TOKEN) {
+		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
 			entry := entry.(*ast_declare)
 			array = append(array, entry)
 		}
@@ -56,6 +56,7 @@ func load_template(full_path string) (*template_object, bool) {
 
 	token_stream := lex_blob(blob)
 	syntax_tree  := parse_stream(token_stream)
+	// print_syntax_tree(syntax_tree, 0)
 
 	array := make([]*ast_declare, 0, 8)
 
@@ -96,7 +97,6 @@ func load_all_templates() map[uint32]*template_object {
 
 		return nil
 	})
-
 	if err != nil {
 		return nil
 	}

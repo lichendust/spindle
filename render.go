@@ -3,6 +3,8 @@ package main
 import "fmt"
 import "strings"
 
+const it_hash uint32 = 1194886160 // "%it" for the for iterator
+
 func render_syntax_tree(spindle *spindle, page *page_object) string {
 	scope_stack := make([]map[uint32]*ast_declare, 4)
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 16))
@@ -80,6 +82,52 @@ func (r *renderer) delete_scope_entry(value uint32) {
 	}
 }
 
+func (r *renderer) push_string_on_scope(ident uint32, text string) {
+	decl := &ast_declare {
+		ast_type: DECL,
+		field:    ident,
+	}
+	decl.children = []ast_data{
+		&ast_base{
+			ast_type: NORMAL,
+			field:    text,
+		},
+	}
+	r.write_to_scope(decl.field, decl)
+}
+
+func (r *renderer) evaluate_if(entry *ast_if) bool {
+	result  := false
+	has_not := false
+
+	for _, sub := range entry.condition_list {
+		switch sub.type_check() {
+		case OP_NOT:
+			has_not = true
+			continue
+
+		case OP_OR:
+			if result {
+				return true
+			}
+			continue
+
+		case VAR:
+			_, ok := r.get_in_scope(sub.(*ast_variable).field)
+			if has_not {
+				ok = !ok
+			}
+			result = ok
+		}
+
+		if has_not {
+			has_not = false
+		}
+	}
+
+	return result
+}
+
 func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_data) string {
 	buffer := strings.Builder{}
 	buffer.Grow(256)
@@ -117,11 +165,11 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 		switch entry.type_check() {
 		case SCOPE_UNSET:
-			entry := entry.(*ast_normal)
+			entry := entry.(*ast_base)
 			r.delete_scope_entry(new_hash(entry.field))
 
 		case TEMPLATE:
-			entry := entry.(*ast_normal)
+			entry := entry.(*ast_base)
 
 			t, ok := spindle.templates[new_hash(entry.field)]
 
@@ -130,6 +178,37 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				panic("can't find template")
 			}
 
+			// if template is the first thing in the block/page
+			if index == 1 {
+				// if this happens we completely break flow,
+				// swapping the entire input for the template
+				// and return the rendered string immediately
+				// to the caller level above
+
+				// we're treating the template body as a
+				// block-template declaration and abdicating
+				// responsibility on this pass
+
+				// we also reverse the order in which the
+				// top-level scope is applied
+				r.push_blank_scope(16)
+
+				for _, entry := range input[1:] {
+					if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
+						entry := entry.(*ast_declare)
+						r.write_to_scope(entry.field, entry)
+					}
+				}
+
+				r.push_anon(input[1:], t.content)
+				buffer.WriteString(r.render_ast(spindle, page, t.content))
+				r.pop_scope()
+				return buffer.String() // hard exit
+			}
+
+			// if we're not the first, we just pull in the
+			// declarations from the template to be used from
+			// here on out in this scope
 			for _, decl := range t.top_scope {
 				r.write_to_scope(decl.field, decl)
 			}
@@ -216,11 +295,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					path = rewrite_ext(path, "") // @todo global config on pretty urls
 				case _STATIC:
 					if !(found_file.file_type > is_static && found_file.file_type < end_static) {
-						panic("res_find not a page") // @error
+						panic("res_find not static") // @error
 					}
 				}
 
-				if entry.path_type == NO_PATH_TYPE {
+				if spindle.server_mode {
+					entry.path_type = ROOTED
+				} else if entry.path_type == NO_PATH_TYPE {
 					entry.path_type = spindle.config.default_path_type
 				}
 
@@ -303,8 +384,69 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			// else:
 			buffer.WriteString(r.render_ast(spindle, page, x))
 
+		case CONTROL_IF:
+			entry := entry.(*ast_if)
+
+			if !r.evaluate_if(entry) {
+				continue
+			}
+
+			the_block := entry.get_children()[0].(*ast_block)
+
+			x := the_block.get_children()
+			r.push_blank_scope(8)
+
+			if the_block.decl_hash > 0 {
+				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
+				if ok {
+					r.push_anon(x, wrapper_block.get_children())
+
+					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+
+					r.pop_scope()
+					continue
+				}
+			}
+
+			// else:
+			buffer.WriteString(r.render_ast(spindle, page, x))
+			r.pop_scope()
+
+		case CONTROL_FOR:
+			entry := entry.(*ast_for)
+			array := unix_args(r.render_ast(spindle, page, []ast_data{entry.iterator_source}))
+
+			if len(array) == 0 {
+				continue
+			}
+
+			the_block := entry.get_children()[0].(*ast_block)
+
+			r.push_blank_scope(12)
+
+			sub_buffer := strings.Builder{}
+			sub_buffer.Grow(512)
+
+			for _, t := range array {
+				r.push_string_on_scope(it_hash, t)
+				sub_buffer.WriteString(r.render_ast(spindle, page, the_block.get_children()))
+			}
+
+			if the_block.decl_hash > 0 {
+				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
+				if ok {
+					r.push_anon([]ast_data{&ast_base{ast_type:NORMAL,field:sub_buffer.String()}}, wrapper_block.get_children())
+					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+				}
+			} else {
+				buffer.WriteString(sub_buffer.String())
+			}
+
+			sub_buffer.Reset()
+			r.pop_scope()
+
 		case NORMAL:
-			entry := entry.(*ast_normal)
+			entry := entry.(*ast_base)
 
 			x := entry.get_children()
 
@@ -334,7 +476,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 		case RAW:
-			entry := entry.(*ast_normal)
+			entry := entry.(*ast_base)
 
 			x := entry.get_children()
 

@@ -12,6 +12,7 @@ var rune_match = map[rune]ast_type {
 	'\n': NEWLINE,
 	'\\': ESCAPE,
 	'/':  FORWARD_SLASH,
+	'|':  PIPE,
 	'%':  PERCENT,
 	'{':  BRACE_OPEN,
 	'}':  BRACE_CLOSE,

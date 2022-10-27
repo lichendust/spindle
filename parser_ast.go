@@ -22,6 +22,12 @@ const (
 	VAR_ENUM
 	VAR_ANON
 
+	CONTROL_FOR
+	CONTROL_IF
+	OP_AND
+	OP_OR
+	OP_NOT
+
 	RES_FINDER
 	BLOCK
 
@@ -63,6 +69,7 @@ const (
 	PLUS
 	MULTIPLY
 	PERCENT
+	PIPE
 
 	EOF
 )
@@ -105,17 +112,18 @@ type ast_base_fields struct {
 }
 
 // normal token, which is the real "base object"
-type ast_normal struct {
+type ast_base struct {
 	ast_base_fields
 	ast_type   ast_type
 	field      string
 }
-func (t *ast_normal) type_check() ast_type {
+func (t *ast_base) type_check() ast_type {
 	return t.ast_type
 }
-func (t *ast_normal) get_children() []ast_data {
+func (t *ast_base) get_children() []ast_data {
 	return t.children
 }
+
 
 type ast_variable struct {
 	ast_base_fields
@@ -132,6 +140,7 @@ func (t *ast_variable) get_children() []ast_data {
 	return t.children
 }
 
+
 type ast_declare struct {
 	ast_base_fields
 	ast_type   ast_type
@@ -145,6 +154,7 @@ func (t *ast_declare) type_check() ast_type {
 func (t *ast_declare) get_children() []ast_data {
 	return t.children
 }
+
 
 type ast_block struct {
 	ast_base_fields
@@ -167,6 +177,44 @@ func (t *ast_token) type_check() ast_type {
 func (t *ast_token) get_children() []ast_data {
 	return t.children
 }
+
+
+type ast_finder struct {
+	ast_base_fields
+	finder_type finder_type
+	path_type   path_type
+}
+func (t *ast_finder) type_check() ast_type {
+	return RES_FINDER
+}
+func (t *ast_finder) get_children() []ast_data {
+	return t.children
+}
+
+
+type ast_for struct {
+	ast_base_fields
+	iterator_source ast_data
+}
+func (t *ast_for) type_check() ast_type {
+	return CONTROL_FOR
+}
+func (t *ast_for) get_children() []ast_data {
+	return t.children
+}
+
+
+type ast_if struct {
+	ast_base_fields
+	condition_list []ast_data
+}
+func (t *ast_if) type_check() ast_type {
+	return CONTROL_IF
+}
+func (t *ast_if) get_children() []ast_data {
+	return t.children
+}
+
 
 type finder_type uint8
 const (
@@ -193,16 +241,4 @@ func check_path_type(input string) path_type {
 		return ROOTED
 	}
 	return NO_PATH_TYPE
-}
-
-type ast_finder struct {
-	ast_base_fields
-	finder_type finder_type
-	path_type   path_type
-}
-func (t *ast_finder) type_check() ast_type {
-	return RES_FINDER
-}
-func (t *ast_finder) get_children() []ast_data {
-	return t.children
 }

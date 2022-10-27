@@ -51,10 +51,11 @@ type disk_object struct {
 	file_type file_type
 	hash_name uint32
 	is_used   bool
+	is_built  bool
 	is_draft  bool
+	path      string
 	parent    *disk_object
 	children  []*disk_object
-	path      string
 }
 
 func get_template_path(name string) string {

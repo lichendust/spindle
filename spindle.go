@@ -6,6 +6,8 @@ const title = "Spindle 0.4.0"
 
 type spindle struct {
 	config       *config
+	server_mode  bool
+
 	file_tree    *disk_object
 	templates    map[uint32]*template_object
 	finder_cache map[string]*disk_object

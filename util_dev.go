@@ -9,6 +9,8 @@ import (
 	"hash/fnv"
 	"encoding/xml"
 	// "path/filepath"
+
+	"github.com/yosssi/gohtml"
 )
 
 func _println(name ...any) {
@@ -55,7 +57,7 @@ func print_syntax_tree(array []ast_data, level int) {
 
 		switch _type {
 		case NORMAL:
-			cast := entry.(*ast_normal)
+			cast := entry.(*ast_base)
 			fmt.Print(" ", cast.field)
 
 		case VAR, VAR_ENUM, VAR_ANON:
@@ -116,4 +118,8 @@ func validate_html(input string) bool {
 	}
 
 	return false
+}
+
+func format_html(input string) string {
+	return gohtml.Format(input)
 }
