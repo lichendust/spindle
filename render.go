@@ -3,8 +3,6 @@ package main
 import "fmt"
 import "strings"
 
-const it_hash uint32 = 1194886160 // "%it" for the for iterator
-
 func render_syntax_tree(spindle *spindle, page *page_object) string {
 	scope_stack := make([]map[uint32]*ast_declare, 4)
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 16))
@@ -18,6 +16,7 @@ func render_syntax_tree(spindle *spindle, page *page_object) string {
 }
 
 type renderer struct {
+	unwind      bool
 	anon_stack  []*anon_entry
 	scope_stack []map[uint32]*ast_declare
 }
@@ -128,7 +127,41 @@ func (r *renderer) evaluate_if(entry *ast_if) bool {
 	return result
 }
 
+func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data) {
+	for _, entry := range input {
+		_type := entry.type_check()
+
+		if _type.is(DECL, DECL_TOKEN, DECL_BLOCK) {
+			entry := entry.(*ast_declare)
+			r.write_to_scope(entry.field, entry)
+			continue
+		}
+
+		if _type == TEMPLATE {
+			entry := entry.(*ast_base)
+			if t, ok := spindle.templates[new_hash(entry.field)]; ok {
+				r.write_collective_to_scope(spindle, t.top_scope)
+			} else {
+				spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "failed to load template %q", entry.field)
+				r.unwind = true
+				break
+			}
+			continue
+		}
+
+		if _type == BLANK {
+			continue
+		}
+
+		return
+	}
+}
+
 func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_data) string {
+	if r.unwind {
+		return ""
+	}
+
 	buffer := strings.Builder{}
 	buffer.Grow(256)
 
@@ -174,12 +207,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			t, ok := spindle.templates[new_hash(entry.field)]
 
 			if !ok {
-				// @error
-				panic("can't find template")
+				spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "failed to load template %q", entry.field)
+				r.unwind = true
+				return ""
 			}
 
 			// if template is the first thing in the block/page
-			if index == 1 {
+			if t.has_body && index == 1 {
 				// if this happens we completely break flow,
 				// swapping the entire input for the template
 				// and return the rendered string immediately
@@ -193,25 +227,19 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				// top-level scope is applied
 				r.push_blank_scope(16)
 
-				for _, entry := range input[1:] {
-					if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
-						entry := entry.(*ast_declare)
-						r.write_to_scope(entry.field, entry)
-					}
-				}
-
+				r.write_collective_to_scope(spindle, input[1:])
 				r.push_anon(input[1:], t.content)
+
 				buffer.WriteString(r.render_ast(spindle, page, t.content))
 				r.pop_scope()
+
 				return buffer.String() // hard exit
 			}
 
 			// if we're not the first, we just pull in the
 			// declarations from the template to be used from
 			// here on out in this scope
-			for _, decl := range t.top_scope {
-				r.write_to_scope(decl.field, decl)
-			}
+			r.write_collective_to_scope(spindle, t.top_scope)
 
 		case VAR, VAR_ENUM, VAR_ANON:
 			entry := entry.(*ast_variable)
@@ -286,16 +314,19 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				switch entry.finder_type {
 				case _IMAGE:
 					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
-						panic("res_find not an image") // @error
+						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "image resource finder cannot process non-image file %q", find_text)
+						r.unwind = true
 					}
 				case _PAGE:
 					if !(found_file.file_type > is_page && found_file.file_type < end_page) {
-						panic("res_find not a page") // @error
+						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "page resource finder cannot process non-page file %q", find_text)
+						r.unwind = true
 					}
 					path = rewrite_ext(path, "") // @todo global config on pretty urls
 				case _STATIC:
 					if !(found_file.file_type > is_static && found_file.file_type < end_static) {
-						panic("res_find not static") // @error
+						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "static resource finder cannot process non-static file %q", find_text)
+						r.unwind = true
 					}
 				}
 
@@ -324,8 +355,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				spindle.finder_cache[find_text] = found_file
 
 			} else {
-				// @error not found file
-				panic("res_find didn't find file") // @error
+				spindle.errors.new_pos(RENDER_WARNING, *entry.position, "resource finder did not find file %q", find_text)
 			}
 			continue
 
@@ -364,6 +394,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			x := entry.get_children()
 
 			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
+
 			if ok {
 				n := immediate_decl_count(wrapper_block.get_children())
 
@@ -379,6 +410,10 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					r.pop_scope()
 				}
 				continue
+			}
+
+			if entry.decl_hash != stop_hash {
+				spindle.errors.new_pos(RENDER_WARNING, *entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
 			}
 
 			// else:

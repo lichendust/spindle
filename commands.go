@@ -1,7 +1,10 @@
 package main
 
-import "os"
-import "path/filepath"
+import (
+	"os"
+	"fmt"
+	"path/filepath"
+)
 
 const (
 	VERSION uint8 = iota
@@ -32,6 +35,7 @@ func command_init(config *config) {
 func command_build(config *config) {
 	spindle := &spindle{}
 	spindle.config = config
+	spindle.errors = new_error_handler()
 
 	new_hash("default")
 
@@ -42,7 +46,7 @@ func command_build(config *config) {
 		spindle.file_tree = data
 	}
 
-	spindle.templates    = load_all_templates()
+	spindle.templates    = load_all_templates(spindle)
 	spindle.finder_cache = make(map[string]*disk_object, 64)
 
 	make_dir(public_path)
@@ -64,16 +68,23 @@ func command_build(config *config) {
 	for {
 		done := build_pages(spindle, spindle.file_tree)
 
+		if spindle.errors.has_failures {
+			break
+		}
 		if done {
 			break
 		}
+	}
+
+	if spindle.errors.has_errors() {
+		fmt.Fprintln(os.Stderr, spindle.errors.render_term_errors())
 	}
 }
 
 func build_pages(spindle *spindle, file *disk_object) bool {
 	has_changes := false
 
-	for _, file := range file.children {
+	main_loop: for _, file := range file.children {
 		if file.file_type == DIRECTORY {
 			child_changes := build_pages(spindle, file)
 			if child_changes {
@@ -91,18 +102,19 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 
 		switch file.file_type {
 		case MARKUP:
-			page, ok := load_page(file.path)
+			page, ok := load_page(spindle, file.path)
 			if !ok {
-				panic("failed to load page")
+				panic("failed to load page") // this should be impossible, so i'm leaving it so it'll catch me out if it ever happens
 			}
 
 			assembled   := render_syntax_tree(spindle, page)
 			output_path := rewrite_ext(rewrite_root(file.path, public_path), ".html")
 
-			assembled = format_html(assembled)
+			// assembled = format_html(assembled)
 
 			if !write_file(output_path, assembled) {
-				panic("failed to write")
+				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
+				break main_loop
 			}
 		}
 	}

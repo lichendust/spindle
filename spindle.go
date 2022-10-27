@@ -8,6 +8,7 @@ type spindle struct {
 	config       *config
 	server_mode  bool
 
+	errors       *error_handler
 	file_tree    *disk_object
 	templates    map[uint32]*template_object
 	finder_cache map[string]*disk_object

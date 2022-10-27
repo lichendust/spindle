@@ -1,5 +1,12 @@
 package main
 
+const (
+	default_hash uint32 = 2470140894 // "default"
+	base_hash    uint32 = 537692064  // "%"
+	it_hash      uint32 = 1194886160 // "it"
+	stop_hash    uint32 = 722245873  // "."
+)
+
 const main_template = `/ markdown emulation
 / headings
 [#]      = <h1 id="%%:unique_slug">%%</h1>

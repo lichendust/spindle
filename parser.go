@@ -3,24 +3,53 @@ package main
 import "strings"
 import "strconv"
 
-const base_hash    uint32 = 537692064  // "%"
-const x_hash       uint32 = 681441407  // "×"
-const default_hash uint32 = 2470140894 // "default"
-
 type parser struct {
-	index int
-	array []*lexer_token
+	index  int
+	unwind bool
+	errors *error_handler
+	array  []*lexer_token
+	location string
 }
 
-func parse_stream(array []*lexer_token) []ast_data {
-	parser := parser { array: array	}
+func parse_stream(who_am_i string, errors *error_handler, array []*lexer_token) []ast_data {
+	parser := parser {
+		array:    array,
+		errors:   errors,
+		location: who_am_i,
+	}
 	return parser.parse_block(0)
+}
+
+func (parser *parser) get_non_word(token *lexer_token) string {
+	if token.ast_type == NON_WORD {
+		return token.field
+	}
+
+	count := 0
+
+	for i, c := range parser.array[parser.index:] {
+		if c.ast_type != token.ast_type {
+			count = i
+			break
+		}
+	}
+
+	parser.index += count
+
+	// count is + 1 because the first of the series has already
+	// been docked by the parser, which is also why we don't add
+	// + 1 to the index above
+	return strings.Repeat(token.field, count + 1)
 }
 
 func (parser *parser) parse_block(max_depth int) []ast_data {
 	array := make([]ast_data, 0, 32)
 
-	for {
+	if parser.unwind {
+		return array
+	}
+
+	main_loop: for {
 		parser.eat_whitespace()
 
 		token := parser.next()
@@ -37,9 +66,29 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				t := &ast_base{
 					ast_type: BLANK,
 				}
-				t.position = token.position
+				t.position = &position{token.position, parser.location}
 				array = append(array, t)
 			}
+			continue
+		}
+
+		if token.ast_type > is_non_word {
+			word := parser.get_non_word(token)
+
+			new_tok := &ast_token {
+				decl_hash:  new_hash(word),
+				orig_field: word,
+			}
+
+			if p := parser.peek(); p != nil && p.ast_type != WHITESPACE {
+				break // not a token, has to be spaced
+			}
+
+			parser.eat_whitespace()
+			new_tok.children = parser.parse_paragraph(NULL)
+			new_tok.position = &position{token.position, parser.location}
+
+			array = append(array, new_tok)
 			continue
 		}
 
@@ -49,22 +98,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				break // not a token, has to be spaced
 			}
 			parser.eat_comment()
-			continue
-
-		case NON_WORD:
-			new_tok := &ast_token {
-				decl_hash: new_hash(token.field),
-			}
-
-			if p := parser.peek(); p != nil && p.ast_type != WHITESPACE {
-				break // not a token, has to be spaced
-			}
-
-			parser.eat_whitespace()
-			new_tok.children = parser.parse_paragraph(NULL)
-			new_tok.position = token.position
-
-			array = append(array, new_tok)
 			continue
 
 		case AMPERSAND, ANGLE_CLOSE, TILDE, MULTIPLY:
@@ -85,16 +118,19 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.next()
 				new_tok.field = x.field
 			} else {
-				panic("bad declaration")
+				parser.errors.new_pos(PARSER_WARNING, position{token.position, parser.location}, "ambiguous token %q should be escaped", token.field)
+				break
 			}
 
 			parser.eat_whitespace()
 
 			if parser.peek().ast_type != NEWLINE {
-				panic("unexpected item in the scope area")
+				parser.step_backn(3)
+				parser.errors.new_pos(PARSER_WARNING, position{token.position, parser.location}, "ambiguous token %q should be escaped", token.field)
+				break
 			}
 
-			new_tok.position = token.position
+			new_tok.position = &position{token.position, parser.location}
 			array = append(array, new_tok)
 			continue
 
@@ -103,10 +139,16 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_if := &ast_if{}
 
 				the_if.condition_list = parser.parse_if()
+
+				if len(the_if.condition_list) == 0 {
+					parser.step_back()
+					break
+				}
+
 				parser.eat_whitespace()
 
 				the_if.children = parser.parse_block(1)
-				the_if.position = token.position
+				the_if.position = &position{token.position, parser.location}
 
 				array = append(array, the_if)
 				continue
@@ -116,11 +158,26 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_for := &ast_for{}
 				parser.eat_whitespace()
 
-				the_for.iterator_source = parser.parse_paragraph(WHITESPACE)[0]
+				x := parser.parse_paragraph(WHITESPACE)
+
+				if len(x) == 0 {
+					parser.step_back()
+					break
+				}
+
+				n := x[0]
+
+				if !n.type_check().is(VAR, VAR_ANON, VAR_ENUM, RES_FINDER) {
+					parser.step_backn(3)
+					break
+				}
+
+				the_for.iterator_source = n
+
 				parser.eat_whitespace()
 
 				the_for.children = parser.parse_block(1)
-				the_for.position = token.position
+				the_for.position = &position{token.position, parser.location}
 
 				array = append(array, the_for)
 				continue
@@ -133,13 +190,14 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.eat_whitespace()
 				parser.next()
 
-				new_tok := &ast_block {
+				the_block := &ast_block {
 					decl_hash: new_hash(token.field),
 				}
-				array = append(array, new_tok)
 
-				new_tok.children = parser.parse_block(0)
-				new_tok.position = token.position
+				the_block.children = parser.parse_block(0)
+				the_block.position = &position{token.position, parser.location}
+
+				array = append(array, the_block)
 				continue
 			}
 
@@ -149,11 +207,11 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.next()
 				parser.eat_whitespace()
 
-				the_token := &ast_declare{
+				the_decl := &ast_declare{
 					ast_type: DECL,
 					field:    new_hash(token.field),
 				}
-				the_token.position = token.position
+				the_decl.position = &position{token.position, parser.location}
 
 				x = parser.peek()
 
@@ -167,14 +225,14 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 							decl_hash: new_hash(x.field),
 						}
 						new_block.children = parser.parse_block(0)
-						the_token.children = []ast_data{new_block}
+						the_decl.children = []ast_data{new_block}
 					} else {
 						parser.step_back()
-						the_token.children = parser.parse_paragraph(NULL)
+						the_decl.children = parser.parse_paragraph(NULL)
 					}
 				}
 
-				array = append(array, the_token)
+				array = append(array, the_decl)
 				continue
 			}
 			// if not, we're a a normal line,
@@ -182,60 +240,78 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 		case BRACE_OPEN:
 			if p := parser.peek(); p.ast_type.is(WHITESPACE, NEWLINE) {
-				new_tok := &ast_block{}
-				array = append(array, new_tok)
+				the_block := &ast_block{}
 
-				new_tok.children = parser.parse_block(0)
-				new_tok.position = token.position
+				the_block.children = parser.parse_block(0)
+				the_block.position = &position{token.position, parser.location}
+
+				array = append(array, the_block)
 				continue
 			}
 			fallthrough // try for {#} declaration
 
 		case BRACKET_OPEN:
-			x := parser.next()
+			inner_text := parser.next()
 
 			is_brace := token.ast_type == BRACE_OPEN
 
-			the_token := &ast_declare{}
-			the_token.position = token.position
+			the_decl := &ast_declare{}
+			the_decl.position = &position{token.position, parser.location}
+
+			isnt_valid := false
 
 			{
-				if x.ast_type > is_non_word {
-					the_token.ast_type = DECL_TOKEN
-				} else if !is_brace && x.ast_type.is(WORD, IDENT) {
-					the_token.ast_type = DECL_BLOCK
-				} else {
-					if is_brace {
-						panic("bad type in {decl}") // @error
-					}
-					panic("bad type in [decl]")
-				}
+				if inner_text.ast_type > is_non_word {
+					the_decl.ast_type = DECL_TOKEN
+					the_decl.field = new_hash(parser.get_non_word(inner_text))
 
-				the_token.field = new_hash(x.field)
+				} else if !is_brace && inner_text.ast_type.is(WORD, IDENT) {
+					the_decl.ast_type = DECL_BLOCK
+					the_decl.field = new_hash(inner_text.field)
+				} else {
+					isnt_valid = true
+				}
 
 				// if brace instead of square bracket
 				if is_brace {
-					the_token.field += 1
+					the_decl.field += 1
 				}
 			}
 
-			x = parser.next()
+			{
+				bracket_close := parser.next()
 
-			if !x.ast_type.is(BRACKET_CLOSE, BRACE_CLOSE) {
-				panic("bad closure on declaration")
+				if !bracket_close.ast_type.is(BRACKET_CLOSE, BRACE_CLOSE) {
+					parser.step_backn(2)
+					break
+				}
 			}
 
 			parser.eat_whitespace()
 
-			x = parser.next()
+			{
+				equals := parser.next()
 
-			if x.ast_type != EQUALS {
-				panic("bad declaration")
+				if equals.ast_type != EQUALS {
+					parser.step_backn(4)
+					break
+				}
+			}
+
+			// now that we're certain the user intended a declaration, we're killing it
+			if isnt_valid {
+				if is_brace {
+					parser.errors.new_pos(PARSER_FAILURE, *the_decl.position, "bad type in {declaration}: %q cannot be used as a token character", inner_text.field)
+				} else {
+					parser.errors.new_pos(PARSER_FAILURE, *the_decl.position, "bad type in [declaration]: %q cannot be used as a block template name", inner_text.field)
+				}
+				parser.unwind = true
+				break main_loop
 			}
 
 			parser.eat_whitespace()
 
-			x = parser.peek()
+			x := parser.peek()
 
 			if x.ast_type.is(WORD, IDENT) {
 				parser.next()
@@ -247,45 +323,44 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						decl_hash: new_hash(x.field),
 					}
 					new_block.children = parser.parse_block(0)
-					the_token.children = []ast_data{new_block}
+					the_decl.children = []ast_data{new_block}
 				} else {
-					parser.step_back()
-					parser.step_back()
-					the_token.children = parser.parse_paragraph(NULL)
+					parser.step_backn(2)
+					the_decl.children = parser.parse_paragraph(NULL)
 				}
 			} else if x.ast_type == BRACE_OPEN {
 				parser.next()
-				the_token.children = parser.parse_block(0)
+				the_decl.children = parser.parse_block(0)
 			} else {
-				the_token.children = parser.parse_paragraph(NULL)
+				the_decl.children = parser.parse_paragraph(NULL)
 			}
 
-			array = append(array, the_token)
+			array = append(array, the_decl)
 			continue
 		}
 
 		{
 			// parse_p needs to get the first tok again
 			parser.step_back()
-			tok := ast_base{
+			the_para := ast_base{
 				ast_type: NORMAL,
 			}
-			tok.position = token.position
+			the_para.position = &position{token.position, parser.location}
+			the_para.children = parser.parse_paragraph(NULL)
 
-			children := parser.parse_paragraph(NULL)
+			// @todo sanitise any special characters that fall down here
 
 			if token.ast_type == ANGLE_OPEN {
-				tok.ast_type = RAW
+				the_para.ast_type = RAW
+
+				// simplify if possible
+				if len(the_para.children) == 1 && the_para.children[0].type_check() == NORMAL {
+					the_para.field = the_para.children[0].(*ast_base).field
+					the_para.children = nil
+				}
 			}
 
-			// simplify if possible
-			if len(children) == 1 && children[0].type_check() == NORMAL {
-				tok.field = children[0].(*ast_base).field
-			} else {
-				tok.children = children
-			}
-
-			array = append(array, &tok)
+			array = append(array, &the_para)
 		}
 	}
 
@@ -295,6 +370,10 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 	array := make([]ast_data, 0, 32)
 	break_all := false
+
+	if parser.unwind {
+		return array
+	}
 
 	for {
 		buffer := strings.Builder{}
@@ -341,7 +420,7 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 				}
 
 				if buffer.Len() > 0 {
-					array = append(array, &ast_base {
+					array = append(array, &ast_base{
 						ast_type: NORMAL,
 						field:    buffer.String(),
 					})
@@ -349,7 +428,7 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 					buffer.Grow(256)
 				}
 
-				array = append(array, &ast_base {
+				array = append(array, &ast_base{
 					ast_type: the_type,
 				})
 				continue
@@ -454,7 +533,11 @@ func (parser *parser) parse_if() []ast_data {
 		token := parser.next()
 
 		switch token.ast_type {
-		// case BANG:
+		case BANG:
+			array = append(array, &ast_base{
+				ast_type: OP_NOT,
+			})
+
 		case PLUS:
 			array = append(array, &ast_base{
 				ast_type: OP_AND,
@@ -591,7 +674,9 @@ func (parser *parser) eat_comment() {
 		}
 
 		switch entry.ast_type {
-		case NEWLINE:     passed_newline = true
+		case NEWLINE:
+			passed_newline = true
+
 		case BRACE_OPEN:
 			if !is_escaped {
 				index++
@@ -603,6 +688,9 @@ func (parser *parser) eat_comment() {
 			if passed_newline {
 				passed_newline = false
 			}
+		case EOF:
+			parser.index += i
+			return
 		}
 
 		if passed_newline && index == 0 {
@@ -616,6 +704,10 @@ func (parser *parser) eat_comment() {
 
 func (parser *parser) step_back() {
 	parser.index--
+}
+
+func (parser *parser) step_backn(n int) {
+	parser.index -= n
 }
 
 func (parser *parser) prev() *lexer_token {

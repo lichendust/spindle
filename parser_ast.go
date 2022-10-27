@@ -48,7 +48,6 @@ const (
 	NEWLINE
 	WORD
 	IDENT
-	EQUALS
 	BRACE_OPEN
 	BRACE_CLOSE
 	BRACKET_OPEN
@@ -56,22 +55,24 @@ const (
 	ANGLE_OPEN
 	ANGLE_CLOSE
 
-	is_non_word
-	NON_WORD // see below
 	ESCAPE
-	FORWARD_SLASH
 	NUMBER
-	STOP
-	COLON
-	ASTERISK
-	AMPERSAND
-	TILDE
-	PLUS
+	FORWARD_SLASH
 	MULTIPLY
+	AMPERSAND
+	COLON
+	TILDE
+	EOF
+
+	is_non_word
+	NON_WORD
+	ASTERISK
+	EQUALS
+	BANG
+	STOP
+	PLUS
 	PERCENT
 	PIPE
-
-	EOF
 )
 
 /*
@@ -107,7 +108,7 @@ type ast_data interface {
 	get_children() []ast_data
 }
 type ast_base_fields struct {
-	position uint16
+	position *position
 	children []ast_data
 }
 
@@ -169,7 +170,8 @@ func (t *ast_block) get_children() []ast_data {
 
 type ast_token struct {
 	ast_base_fields
-	decl_hash uint32
+	decl_hash  uint32
+	orig_field string
 }
 func (t *ast_token) type_check() ast_type {
 	return TOKEN

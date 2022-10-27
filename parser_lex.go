@@ -23,6 +23,7 @@ var rune_match = map[rune]ast_type {
 	'~':  TILDE,
 	'&':  AMPERSAND,
 	'=':  EQUALS,
+	'!':  BANG,
 	'.':  STOP,
 	':':  COLON,
 	'+':  PLUS,
