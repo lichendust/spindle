@@ -224,6 +224,9 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				continue
 			}
 
+			parser.step_back() // revert for first part of variable (if any)
+			field, taxonomy, subname := parser.parse_variable_ident()
+
 			x := parser.peek_whitespace()
 
 			if x.ast_type == BRACE_OPEN {
@@ -244,9 +247,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				array = append(array, the_block)
 				continue
-			}
-
-			if x.ast_type == EQUALS {
+			} else if x.ast_type == EQUALS {
 				parser.next()
 				parser.eat_whitespace()
 				parser.next()
@@ -254,7 +255,9 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				the_decl := &ast_declare{
 					ast_type: DECL,
-					field:    new_hash(token.field),
+					field:    field,
+					taxonomy: taxonomy,
+					subname:  subname,
 				}
 				the_decl.position = token.position
 
@@ -290,8 +293,14 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				array = append(array, the_decl)
 				continue
 			}
+
 			// if not, we're a a normal line,
 			// so we just continue past the switch
+			if taxonomy == 0 {
+				parser.step_back()
+			} else {
+				parser.step_backn(2)
+			}
 
 		case BRACE_OPEN:
 			if p := parser.peek(); p.ast_type.is(WHITESPACE, NEWLINE) {
@@ -631,6 +640,27 @@ func (parser *parser) parse_if() []ast_data {
 	return array
 }
 
+func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
+	a := parser.next()
+	b := parser.peek()
+
+	if b.ast_type == STOP {
+		parser.next()
+
+		c := parser.peek()
+
+		if c.ast_type.is(WORD, IDENT) {
+			parser.next()
+			return new_hash(a.field + c.field), new_hash(a.field), new_hash(c.field)
+		}
+
+		parser.step_back()
+		return new_hash(a.field), 0, 0
+	}
+
+	return new_hash(a.field), 0, 0
+}
+
 func (parser *parser) parse_variable() *ast_variable {
 	new_var := &ast_variable{}
 
@@ -639,28 +669,11 @@ func (parser *parser) parse_variable() *ast_variable {
 	the_type := VAR
 
 	if a.ast_type.is(WORD, IDENT) {
-		parser.next()
+		field, taxonomy, subname := parser.parse_variable_ident()
 
-		b := parser.peek()
-
-		if b.ast_type == STOP {
-			parser.next()
-
-			c := parser.peek()
-
-			if c.ast_type.is(WORD, IDENT) {
-				parser.next()
-
-				new_var.field    = new_hash(a.field + "." + c.field)
-				new_var.taxonomy = new_hash(a.field)
-				new_var.subname  = new_hash(c.field)
-			} else {
-				parser.step_back()
-				new_var.field = new_hash(a.field)
-			}
-		} else {
-			new_var.field = new_hash(a.field)
-		}
+		new_var.field    = field
+		new_var.taxonomy = taxonomy
+		new_var.subname  = subname
 
 	} else if a.ast_type == NUMBER {
 		parser.next()
