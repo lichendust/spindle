@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"io"
 	"time"
 	"io/fs"
 	"unicode"
@@ -243,33 +244,6 @@ func find_file_descending(start_location *disk_object, path string) (*disk_objec
 	return nil, false
 }
 
-func new_conf_list() map[uint32]*disk_object {
-	return make(map[uint32]*disk_object, 32)
-}
-
-func load_conf_list() (map[uint32]*disk_object, bool) {
-	the_map := new_conf_list()
-
-	err := filepath.WalkDir(config_path, func(path string, file fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-
-		if file.IsDir() {
-			return filepath.SkipDir
-		}
-
-		_println(file.Name())
-
-		return nil
-	})
-	if err != nil {
-		return nil, false
-	}
-
-	return the_map, true
-}
-
 func file_has_changes(path string, last_run time.Time) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -336,7 +310,7 @@ func write_file(path, content string) bool {
 }
 
 func make_dir(path string) bool {
-	err := os.MkdirAll(path, os.ModeDir)
+	err := os.MkdirAll(path, os.ModeDir|0777)
 	if err != nil {
 		return false
 	}
@@ -408,4 +382,25 @@ func is_valid_path(input string) bool {
 	}
 
 	return true
+}
+
+func copy_file(source_path, target_path string) {
+	source, err := os.Open(source_path)
+	if err != nil {
+		panic(err) // @error
+	}
+
+	defer source.Close()
+
+	destination, err := os.OpenFile(target_path, os.O_CREATE|os.O_WRONLY, 0777)
+	if err != nil {
+		panic(err)
+	}
+
+	defer destination.Close()
+
+	_, err = io.Copy(destination, source)
+	if err != nil {
+		panic(err)
+	}
 }

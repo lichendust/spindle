@@ -11,6 +11,8 @@ type page_object struct {
 	content      []ast_data
 	top_scope    []ast_data
 	slug_tracker map[string]uint
+	raw_string   string
+	position     position
 }
 
 type template_object struct {
@@ -18,6 +20,14 @@ type template_object struct {
 	template_path string
 	content       []ast_data
 	top_scope     []ast_data
+	raw_string    string
+	position      position
+}
+
+type partial_object struct {
+	partial_path string
+	content      []ast_data
+	raw_string   string
 }
 
 func arrange_top_scope(content []ast_data) []ast_data {
@@ -39,18 +49,26 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 		return nil, false
 	}
 
-	token_stream := lex_blob(blob)
+	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree := parse_stream(full_path, spindle.errors, token_stream)
+	syntax_tree := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
+
+	if spindle.errors.has_failures {
+		return nil, false
+	}
 
 	p := &page_object{
 		page_path:    full_path,
 		content:      syntax_tree,
 		top_scope:    arrange_top_scope(syntax_tree),
+		raw_string:   blob,
 		slug_tracker: make(map[string]uint, 4),
+		position:     position{0,0,0,full_path},
 	}
+
+	update_block_positions(&p.position, p.content)
 
 	return p, true
 }
@@ -62,8 +80,8 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 		return nil, false
 	}
 
-	token_stream := lex_blob(blob)
-	syntax_tree  := parse_stream(full_path, spindle.errors, token_stream)
+	token_stream := lex_blob(full_path, blob)
+	syntax_tree  := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
@@ -71,7 +89,11 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 		template_path: full_path,
 		top_scope:     arrange_top_scope(syntax_tree),
 		has_body:      recursive_anon_count(syntax_tree) > 0,
+		raw_string:    blob,
+		position:      position{0,0,0,full_path},
 	}
+
+	update_block_positions(&t.position, t.content)
 
 	return t, true
 }
@@ -98,6 +120,60 @@ func load_all_templates(spindle *spindle) map[uint32]*template_object {
 		name = name[:len(name) - len(ext)]
 
 		if x, ok := load_template(spindle, path); ok {
+			the_map[new_hash(name)] = x
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+
+	return the_map
+}
+
+func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
+	blob, ok := load_file(full_path)
+
+	if !ok {
+		return nil, false
+	}
+
+	token_stream := lex_blob(full_path, blob)
+	syntax_tree  := parse_stream(spindle.errors, token_stream)
+	// print_syntax_tree(syntax_tree, 0)
+
+	p := &partial_object{
+		partial_path: full_path,
+		content:      syntax_tree,
+		raw_string:   blob,
+	}
+
+	return p, true
+}
+
+func load_all_partials(spindle *spindle) map[uint32]*partial_object {
+	the_map := make(map[uint32]*partial_object, 8)
+
+	err := filepath.WalkDir(partial_path, func(path string, file fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		if path == partial_path {
+			return nil
+		}
+		if file.IsDir() {
+			return filepath.SkipDir
+		}
+
+		path = filepath.ToSlash(path)
+
+		name := filepath.Base(path)
+		ext  := filepath.Ext(name)
+
+		name = name[:len(name) - len(ext)]
+
+		if x, ok := load_partial(spindle, path); ok {
 			the_map[new_hash(name)] = x
 		}
 

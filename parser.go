@@ -1,28 +1,29 @@
 package main
 
-import "strings"
-import "strconv"
+import (
+	"strings"
+	"strconv"
+	"unicode/utf8"
+)
 
 type parser struct {
 	index  int
 	unwind bool
 	errors *error_handler
 	array  []*lexer_token
-	location string
 }
 
-func parse_stream(who_am_i string, errors *error_handler, array []*lexer_token) []ast_data {
+func parse_stream(errors *error_handler, array []*lexer_token) []ast_data {
 	parser := parser {
 		array:    array,
 		errors:   errors,
-		location: who_am_i,
 	}
 	return parser.parse_block(0)
 }
 
-func (parser *parser) get_non_word(token *lexer_token) string {
+func (parser *parser) get_non_word(token *lexer_token) (string, int) {
 	if token.ast_type == NON_WORD {
-		return token.field
+		return token.field, 1
 	}
 
 	count := 0
@@ -39,19 +40,17 @@ func (parser *parser) get_non_word(token *lexer_token) string {
 	// count is + 1 because the first of the series has already
 	// been docked by the parser, which is also why we don't add
 	// + 1 to the index above
-	return strings.Repeat(token.field, count + 1)
+	return strings.Repeat(token.field, count + 1), count
 }
 
 func (parser *parser) parse_block(max_depth int) []ast_data {
-	array := make([]ast_data, 0, 32)
-
 	if parser.unwind {
-		return array
+		return []ast_data{}
 	}
 
-	main_loop: for {
-		parser.eat_whitespace()
+	array := make([]ast_data, 0, 32)
 
+	main_loop: for {
 		token := parser.next()
 
 		if token == nil || token.ast_type.is(EOF, BRACE_CLOSE) {
@@ -66,33 +65,44 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				t := &ast_base{
 					ast_type: BLANK,
 				}
-				t.position = &position{token.position, parser.location}
+				t.position = token.position
 				array = append(array, t)
 			}
 			continue
 		}
 
 		if token.ast_type > is_non_word {
-			word := parser.get_non_word(token)
+			word, count := parser.get_non_word(token)
 
-			new_tok := &ast_token {
-				decl_hash:  new_hash(word),
-				orig_field: word,
+			if p := parser.peek(); p != nil && p.ast_type == WHITESPACE {
+				new_tok := &ast_token{
+					decl_hash:  new_hash(word),
+					orig_field: word,
+				}
+
+				parser.eat_whitespace()
+				new_tok.children = parser.parse_paragraph(NULL)
+				new_tok.position = token.position
+
+				update_block_positions(&new_tok.position, new_tok.children)
+
+				array = append(array, new_tok)
+				continue
+			} else if count > 1 {
+				parser.step_backn(count)
 			}
-
-			if p := parser.peek(); p != nil && p.ast_type != WHITESPACE {
-				break // not a token, has to be spaced
-			}
-
-			parser.eat_whitespace()
-			new_tok.children = parser.parse_paragraph(NULL)
-			new_tok.position = &position{token.position, parser.location}
-
-			array = append(array, new_tok)
-			continue
 		}
 
 		switch token.ast_type {
+		case WHITESPACE:
+			whitespace := &ast_base{
+				ast_type: WHITESPACE,
+				field:    token.field,
+			}
+			whitespace.position = token.position
+			array = append(array, whitespace)
+			continue
+
 		case FORWARD_SLASH:
 			if p := parser.peek(); p != nil && p.ast_type != WHITESPACE {
 				break // not a token, has to be spaced
@@ -100,38 +110,61 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			parser.eat_comment()
 			continue
 
-		case AMPERSAND, ANGLE_CLOSE, TILDE, MULTIPLY:
-			new_tok := &ast_base{}
+		case TILDE, MULTIPLY, AMPERSAND, ANGLE_CLOSE:
+			the_builtin := &ast_builtin{}
+			the_type    := NULL
 
 			switch token.ast_type {
-			case AMPERSAND:   new_tok.ast_type = TEMPLATE
-			case ANGLE_CLOSE: new_tok.ast_type = PARTIAL // don't exist yet
-			case TILDE:       new_tok.ast_type = IMPORT
-			case MULTIPLY:    new_tok.ast_type = SCOPE_UNSET
+			case TILDE:
+				the_type = IMPORT
+			case MULTIPLY:
+				the_type = SCOPE_UNSET
+			case AMPERSAND:
+				the_type = TEMPLATE
+			case ANGLE_CLOSE:
+				the_type = PARTIAL
 			}
+
+			the_builtin.ast_type = the_type
 
 			parser.eat_whitespace()
 
-			x := parser.peek()
+			if the_type == IMPORT {
+				x := parser.parse_paragraph(WHITESPACE)
 
-			if x.ast_type.is(WORD, IDENT) {
+				if len(x) == 0 {
+					panic("no children")
+				}
+
+				the_builtin.children = x
+				parser.eat_whitespace()
+			}
+
+			peeked := parser.peek()
+
+			if peeked.ast_type.is(WORD, IDENT) {
 				parser.next()
-				new_tok.field = x.field
+				the_builtin.hash_name = new_hash(peeked.field)
 			} else {
-				parser.errors.new_pos(PARSER_WARNING, position{token.position, parser.location}, "ambiguous token %q should be escaped", token.field)
+				parser.errors.new_pos(PARSER_WARNING, token.position, "ambiguous token %q should be escaped", token.field)
 				break
 			}
 
 			parser.eat_whitespace()
 
-			if parser.peek().ast_type != NEWLINE {
-				parser.step_backn(3)
-				parser.errors.new_pos(PARSER_WARNING, position{token.position, parser.location}, "ambiguous token %q should be escaped", token.field)
+			if !parser.peek().ast_type.is(NEWLINE, EOF) {
+				if the_type == IMPORT {
+					parser.errors.new_pos(PARSER_FAILURE, token.position, "malformed import (or unescaped ~ at start of line)")
+					parser.unwind = true
+				} else {
+					parser.step_backn(3)
+					parser.errors.new_pos(PARSER_WARNING, token.position, "ambiguous token %q should be escaped", token.field)
+				}
 				break
 			}
 
-			new_tok.position = &position{token.position, parser.location}
-			array = append(array, new_tok)
+			the_builtin.position = token.position
+			array = append(array, the_builtin)
 			continue
 
 		case WORD, IDENT:
@@ -148,7 +181,11 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.eat_whitespace()
 
 				the_if.children = parser.parse_block(1)
-				the_if.position = &position{token.position, parser.location}
+				the_if.position = token.position
+
+				update_block_positions(&the_if.position, the_if.children)
+
+				the_if.position.end += 1 // the closing brace
 
 				array = append(array, the_if)
 				continue
@@ -177,7 +214,11 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.eat_whitespace()
 
 				the_for.children = parser.parse_block(1)
-				the_for.position = &position{token.position, parser.location}
+				the_for.position = token.position
+
+				update_block_positions(&the_for.position, the_for.children)
+
+				the_for.position.end += 1 // the closing brace
 
 				array = append(array, the_for)
 				continue
@@ -195,7 +236,11 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				}
 
 				the_block.children = parser.parse_block(0)
-				the_block.position = &position{token.position, parser.location}
+				the_block.position = token.position
+
+				update_block_positions(&the_block.position, the_block.children)
+
+				the_block.position.end += 1 // the closing brace
 
 				array = append(array, the_block)
 				continue
@@ -211,7 +256,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					ast_type: DECL,
 					field:    new_hash(token.field),
 				}
-				the_decl.position = &position{token.position, parser.location}
+				the_decl.position = token.position
 
 				x = parser.peek()
 
@@ -225,10 +270,20 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 							decl_hash: new_hash(x.field),
 						}
 						new_block.children = parser.parse_block(0)
+						new_block.position = x.position
+
+						update_block_positions(&new_block.position, new_block.children)
+
+						new_block.position.end += 1 // the closing brace
+
 						the_decl.children = []ast_data{new_block}
+						the_decl.position = new_block.position
+
 					} else {
-						parser.step_back()
+						parser.step_backn(2)
+						parser.eat_whitespace()
 						the_decl.children = parser.parse_paragraph(NULL)
+						update_block_positions(&the_decl.position, the_decl.children)
 					}
 				}
 
@@ -243,7 +298,11 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_block := &ast_block{}
 
 				the_block.children = parser.parse_block(0)
-				the_block.position = &position{token.position, parser.location}
+				the_block.position = token.position
+
+				update_block_positions(&the_block.position, the_block.children)
+
+				the_block.position.end += 1 // the closing brace
 
 				array = append(array, the_block)
 				continue
@@ -256,18 +315,20 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			is_brace := token.ast_type == BRACE_OPEN
 
 			the_decl := &ast_declare{}
-			the_decl.position = &position{token.position, parser.location}
+			the_decl.position = token.position
 
 			isnt_valid := false
 
 			{
 				if inner_text.ast_type > is_non_word {
 					the_decl.ast_type = DECL_TOKEN
-					the_decl.field = new_hash(parser.get_non_word(inner_text))
+					word, _ := parser.get_non_word(inner_text)
+					the_decl.field = new_hash(word)
 
 				} else if !is_brace && inner_text.ast_type.is(WORD, IDENT) {
 					the_decl.ast_type = DECL_BLOCK
 					the_decl.field = new_hash(inner_text.field)
+
 				} else {
 					isnt_valid = true
 				}
@@ -301,9 +362,9 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			// now that we're certain the user intended a declaration, we're killing it
 			if isnt_valid {
 				if is_brace {
-					parser.errors.new_pos(PARSER_FAILURE, *the_decl.position, "bad type in {declaration}: %q cannot be used as a token character", inner_text.field)
+					parser.errors.new_pos(PARSER_FAILURE, the_decl.position, "bad type in {declaration}: %q cannot be used as a token character", inner_text.field)
 				} else {
-					parser.errors.new_pos(PARSER_FAILURE, *the_decl.position, "bad type in [declaration]: %q cannot be used as a block template name", inner_text.field)
+					parser.errors.new_pos(PARSER_FAILURE, the_decl.position, "bad type in [declaration]: %q cannot be used as a block template name", inner_text.field)
 				}
 				parser.unwind = true
 				break main_loop
@@ -323,7 +384,14 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						decl_hash: new_hash(x.field),
 					}
 					new_block.children = parser.parse_block(0)
+					new_block.position = x.position
+
+					update_block_positions(&new_block.position, new_block.children)
+
+					new_block.position.end += 1 // the closing brace
+
 					the_decl.children = []ast_data{new_block}
+					the_decl.position.start = new_block.position.start
 				} else {
 					parser.step_backn(2)
 					the_decl.children = parser.parse_paragraph(NULL)
@@ -335,6 +403,8 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_decl.children = parser.parse_paragraph(NULL)
 			}
 
+			update_block_positions(&the_decl.position, the_decl.children)
+
 			array = append(array, the_decl)
 			continue
 		}
@@ -345,19 +415,15 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			the_para := ast_base{
 				ast_type: NORMAL,
 			}
-			the_para.position = &position{token.position, parser.location}
+			the_para.position = token.position
 			the_para.children = parser.parse_paragraph(NULL)
 
-			// @todo sanitise any special characters that fall down here
+			update_block_positions(&the_para.position, the_para.children)
+
+			// @todo sanitise any escaped special characters that fall down here
 
 			if token.ast_type == ANGLE_OPEN {
 				the_para.ast_type = RAW
-
-				// simplify if possible
-				if len(the_para.children) == 1 && the_para.children[0].type_check() == NORMAL {
-					the_para.field = the_para.children[0].(*ast_base).field
-					the_para.children = nil
-				}
 			}
 
 			array = append(array, &the_para)
@@ -367,149 +433,147 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 	return array
 }
 
-func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
-	array := make([]ast_data, 0, 32)
-	break_all := false
-
+func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 	if parser.unwind {
-		return array
+		return []ast_data{}
 	}
 
+	array := make([]ast_data, 0, 32)
+
 	for {
-		buffer := strings.Builder{}
-		buffer.Grow(256)
+		token := parser.next()
 
-		for {
-			token := parser.next()
-
-			if token == nil {
-				return array
-			}
-			if token.ast_type.is(NEWLINE, EOF, exit_upon) {
-				break_all = true
-				break
-			}
-
-			switch token.ast_type {
-			default:
-				buffer.WriteString(token.field)
-
-			case WHITESPACE:
-				buffer.WriteRune(' ')
-
-			case ASTERISK:
-				open := parser.prev().ast_type.is(WHITESPACE, NEWLINE)
-
-				x := parser.peek()
-
-				if open && x.ast_type.is(WHITESPACE, NEWLINE, EOF) {
-					buffer.WriteString(strings.Repeat("*", len(token.field)))
-					continue
-				}
-
-				the_type := is_formatter
-
-				switch len(token.field) {
-				case 1: the_type = ITALIC_OPEN
-				case 2: the_type = BOLD_OPEN
-				case 3: the_type = BOLD_ITALIC_OPEN
-				}
-
-				if !open {
-					the_type += 1
-				}
-
-				if buffer.Len() > 0 {
-					array = append(array, &ast_base{
-						ast_type: NORMAL,
-						field:    buffer.String(),
-					})
-					buffer.Reset()
-					buffer.Grow(256)
-				}
-
-				array = append(array, &ast_base{
-					ast_type: the_type,
-				})
-				continue
-
-			case PERCENT:
-				if parser.peek().ast_type == BRACE_OPEN {
-					parser.next()
-
-					new_finder := &ast_finder{}
-
-					word := parser.peek()
-
-					if word.ast_type == WORD {
-						parser.next()
-						switch strings.ToLower(word.field) {
-						case "page":   new_finder.finder_type = _PAGE
-						case "image":  new_finder.finder_type = _IMAGE
-						case "static": new_finder.finder_type = _STATIC
-						default: // @error
-						}
-
-						// @todo clean up
-						if parser.peek().ast_type == COLON {
-							parser.next()
-							word := parser.next()
-
-							new_finder.path_type = check_path_type(strings.ToLower(word.field))
-						} else {
-							new_finder.path_type = NO_PATH_TYPE
-						}
-					}
-
-					{
-						parser.eat_whitespace()
-						new_finder.children = parser.parse_paragraph(BRACE_CLOSE)
-
-						// @todo need to deal with additional arguments here
-					}
-
-					if buffer.Len() > 0 {
-						array = append(array, &ast_base {
-							ast_type: NORMAL,
-							field:    buffer.String(),
-						})
-						buffer.Reset()
-						buffer.Grow(256)
-					}
-
-					array = append(array, new_finder)
-					continue
-				}
-
-				new_var := parser.parse_variable()
-
-				if new_var == nil {
-					buffer.WriteRune('%')
-					continue
-				}
-
-				if buffer.Len() > 0 {
-					array = append(array, &ast_base {
-						ast_type: NORMAL,
-						field:    buffer.String(),
-					})
-					buffer.Reset()
-					buffer.Grow(256)
-				}
-
-				array = append(array, new_var)
-			}
+		if token == nil {
+			return array
 		}
-
-		if buffer.Len() > 0 {
-			array = append(array, &ast_base {
-				ast_type: NORMAL,
-				field:    buffer.String(),
-			})
-		}
-
-		if break_all {
+		if token.ast_type.is(NEWLINE, EOF) {
 			break
+		}
+		if token.ast_type.is(exit_upon...) {
+			parser.step_back()
+			break
+		}
+
+		switch token.ast_type {
+		default:
+			n := &ast_base{
+				ast_type: NORMAL,
+				field:    token.field,
+			}
+			n.position = token.position
+			array = append(array, n)
+
+		case WHITESPACE:
+			n := &ast_base{
+				ast_type: WHITESPACE,
+				field:    token.field,
+			}
+			n.position = token.position
+			array = append(array, n)
+
+		case ASTERISK:
+			open := parser.prev().ast_type.is(WHITESPACE, NEWLINE)
+
+			x := parser.peek()
+
+			if open && x.ast_type.is(WHITESPACE, NEWLINE, EOF) {
+				n := &ast_base{
+					ast_type: WHITESPACE,
+					field:    token.field,
+				}
+				n.position = token.position
+				array = append(array, n)
+				continue
+			}
+
+			the_type := is_formatter
+
+			switch len(token.field) {
+			case 1: the_type = ITALIC_OPEN
+			case 2: the_type = BOLD_OPEN
+			case 3: the_type = BOLD_ITALIC_OPEN
+			}
+
+			if !open {
+				the_type += 1
+			}
+
+			the_formatter := &ast_base{
+				ast_type: the_type,
+			}
+			the_formatter.position = token.position
+
+			array = append(array, the_formatter)
+			continue
+
+		case PERCENT:
+			if parser.peek().ast_type == BRACE_OPEN {
+				parser.next()
+
+				the_finder := &ast_finder{}
+				the_finder.position = token.position
+
+				word := parser.peek()
+
+				if word.ast_type == WORD {
+					parser.next()
+					switch strings.ToLower(word.field) {
+					case "page":   the_finder.finder_type = _PAGE
+					case "image":  the_finder.finder_type = _IMAGE
+					case "static": the_finder.finder_type = _STATIC
+					default: // @error
+					}
+
+					if parser.peek().ast_type == COLON {
+						parser.next()
+						word := parser.next()
+						the_finder.path_type = check_path_type(strings.ToLower(word.field)) // @todo revert colon if not word
+					} else {
+						the_finder.path_type = NO_PATH_TYPE
+					}
+				}
+
+				{
+					parser.eat_whitespace()
+					the_finder.children = parser.parse_paragraph(WHITESPACE, BRACE_CLOSE)
+					// @error error if more than one child
+
+					parser.eat_whitespace()
+
+					if parser.peek().ast_type == BRACE_CLOSE {
+						parser.next()
+					} else {
+						if the_finder.finder_type == _IMAGE {
+							the_finder.image_settings = parser.parse_image_settings()
+
+							if parser.unwind {
+								return array
+							}
+						}
+						if parser.peek().ast_type == BRACE_CLOSE {
+							parser.next()
+						}
+					}
+				}
+
+				array = append(array, the_finder)
+				continue
+			}
+
+			new_var := parser.parse_variable()
+			new_var.position = token.position
+
+			if new_var == nil {
+				n := &ast_base{
+					ast_type: NORMAL,
+					field:    token.field,
+				}
+				n.position = token.position
+				array = append(array, n)
+				continue
+			}
+
+			array = append(array, new_var)
 		}
 	}
 
@@ -519,8 +583,6 @@ func (parser *parser) parse_paragraph(exit_upon ast_type) []ast_data {
 
 		}
 	}*/
-
-	// @todo if any scope contains var_enum, replace all var_anon with var_enum
 
 	return array
 }
@@ -645,7 +707,8 @@ func (parser *parser) parse_variable() *ast_variable {
 						new_var.modifier = LOWER
 					case "title", "t":
 						new_var.modifier = TITLE
-				// @todo
+					case "raw", "r":
+						new_var.modifier = RAW_SUB
 					/*case "expand", "e":
 						new_var.modifier = EXPAND
 					case "expand_all", "ea":
@@ -700,6 +763,80 @@ func (parser *parser) eat_comment() {
 
 		is_escaped = false
 	}
+}
+
+func (parser *parser) parse_image_settings() *image_settings {
+	settings := &image_settings{}
+
+	got_anything := false
+
+	main_loop: for {
+		parser.eat_whitespace()
+		token := parser.next()
+
+		switch token.ast_type {
+		case NUMBER:
+			a, err := strconv.ParseInt(token.field, 10, 64)
+			if err != nil {
+				panic(err) // somehow a number isn't a number, this is horrendously bad (programmer error)
+			}
+
+			if parser.peek().ast_type == WORD {
+				settings.width = uint(a)
+			} else {
+				settings.quality = int(a)
+			}
+
+			got_anything = true
+
+		case WORD:
+			field := token.field
+
+			rune, _ := utf8.DecodeRuneInString(field)
+
+			if rune == 'x' {
+				field = field[1:]
+
+				b, err := strconv.ParseInt(field, 10, 64)
+				if err != nil {
+					panic(err) // @error (this is user error)
+				}
+
+				settings.height = uint(b)
+				got_anything = true
+				continue
+			}
+
+			switch field {
+			case "png":
+				settings.format = IMG_PNG
+				got_anything = true
+			case "webp":
+				settings.format = IMG_WEB
+				got_anything = true
+			case "jpeg", "jpg":
+				settings.format = IMG_JPG
+				got_anything = true
+			default:
+				parser.errors.new_pos(PARSER_FAILURE, token.position, "image format %q is unsupported", field)
+				parser.unwind = true
+				break main_loop
+			}
+
+		default:
+			parser.step_back()
+			break main_loop
+		}
+	}
+
+	if got_anything {
+		if settings.quality == 0 {
+			settings.quality = 100
+		}
+		return settings
+	}
+
+	return nil
 }
 
 func (parser *parser) step_back() {
@@ -785,4 +922,12 @@ func immediate_decl_count(children []ast_data) int {
 		}
 	}
 	return count
+}
+
+func update_block_positions(pos *position, array []ast_data) {
+	f := array[0]
+	l := array[len(array) - 1]
+
+	pos.start = f.get_position().start
+	pos.end   = l.get_position().end
 }

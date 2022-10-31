@@ -20,12 +20,17 @@ const main_template = `/ markdown emulation
 [default] = <p>%%</p>
 
 / images
-/ ! image.jpg "some alt text in a quote"
 [!] = <img src="%1" alt="%2">
 
 / lists
 {-} = <ul>%%</ul>
 [-] = <li>%%</li>
+
+{+} = <ol>%%</ol>
+[+] = <li>%%</li>
+
+/ codeblocks
+[code] = <pre><code>%%:raw</code></pre>
 
 
 

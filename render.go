@@ -23,7 +23,9 @@ type renderer struct {
 
 type anon_entry struct {
 	anon_count int
+	position   position
 	children   []ast_data
+	raw_string string
 }
 
 func (r *renderer) get_anon() *anon_entry {
@@ -39,12 +41,13 @@ func (r *renderer) pop_anon() {
 	}
 }
 
-func (r *renderer) push_anon(content, wrapper []ast_data) {
-	stack_entry := &anon_entry{}
-
-	stack_entry.anon_count = recursive_anon_count(wrapper)
-	stack_entry.children   = content
-
+func (r *renderer) push_anon(content, wrapper []ast_data, pos position, raw_string string) {
+	stack_entry := &anon_entry{
+		anon_count: recursive_anon_count(wrapper),
+		children:   content,
+		position:   pos,
+		raw_string:   raw_string,
+	}
 	r.anon_stack = append(r.anon_stack, stack_entry)
 }
 
@@ -142,18 +145,12 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data)
 			if t, ok := spindle.templates[new_hash(entry.field)]; ok {
 				r.write_collective_to_scope(spindle, t.top_scope)
 			} else {
-				spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "failed to load template %q", entry.field)
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", entry.field)
 				r.unwind = true
 				break
 			}
 			continue
 		}
-
-		if _type == BLANK {
-			continue
-		}
-
-		return
 	}
 }
 
@@ -191,23 +188,82 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			panic("lexer type made it all the way to render")
 		}
 
-		if tc > is_formatter {
-			// buffer.WriteString(format_convert[tc]) // @todo this was naive
+		/*if tc > is_formatter {
 			continue
-		}
+		}*/
 
-		switch entry.type_check() {
+		switch tc {
+		case WHITESPACE:
+			buffer.WriteRune(' ')
+
 		case SCOPE_UNSET:
-			entry := entry.(*ast_base)
-			r.delete_scope_entry(new_hash(entry.field))
+			entry := entry.(*ast_builtin)
+			r.delete_scope_entry(entry.hash_name)
 
-		case TEMPLATE:
-			entry := entry.(*ast_base)
+		case PARTIAL:
+			entry := entry.(*ast_builtin)
 
-			t, ok := spindle.templates[new_hash(entry.field)]
+			p, ok := spindle.partials[entry.hash_name]
 
 			if !ok {
-				spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "failed to load template %q", entry.field)
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load partial %q", get_hash(entry.hash_name))
+				r.unwind = true
+				return ""
+			}
+
+			r.push_blank_scope(8)
+			buffer.WriteString(r.render_ast(spindle, page, p.content))
+			r.pop_scope()
+
+		case IMPORT:
+			entry := entry.(*ast_builtin)
+
+			t, ok := r.get_in_scope(entry.hash_name)
+
+			if !ok {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "no such template for import %q", get_hash(entry.hash_name))
+				r.unwind = true
+				return ""
+			}
+
+			find_text := r.render_ast(spindle, page, entry.children)
+
+			// check cache
+			found_file, ok := spindle.finder_cache[find_text]
+
+			// if not in cache, do a full search
+			if !ok {
+				found_file, ok = find_file_descending(spindle.file_tree, find_text)
+			}
+
+			imported_page, page_success := load_page(spindle, found_file.path)
+
+			if !page_success {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", found_file.path)
+				r.unwind = true
+				return ""
+			}
+
+			r.push_blank_scope(16)
+			r.write_collective_to_scope(spindle, imported_page.top_scope)
+
+			// @todo undefined behaviour for %% in imports
+			// we should probably disallow it but we can't know until
+			// we've parsed it
+
+			buffer.WriteString(r.render_ast(spindle, page, t.get_children()))
+
+			r.pop_scope()
+
+			spindle.finder_cache[find_text] = found_file
+
+		case TEMPLATE:
+			entry := entry.(*ast_builtin)
+
+			t, ok := spindle.templates[entry.hash_name]
+
+			if !ok {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
 				r.unwind = true
 				return ""
 			}
@@ -228,7 +284,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				r.push_blank_scope(16)
 
 				r.write_collective_to_scope(spindle, input[1:])
-				r.push_anon(input[1:], t.content)
+				r.push_anon(input[1:], t.content, t.position, t.raw_string)
 
 				buffer.WriteString(r.render_ast(spindle, page, t.content))
 				r.pop_scope()
@@ -253,7 +309,21 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					r.pop_anon()
 				}
 
-				text = r.render_ast(spindle, page, popped_anon.children)
+				if entry.modifier == RAW_SUB {
+					pos := popped_anon.position
+					raw := popped_anon.raw_string[pos.start:pos.end]
+
+					raw = reindent_text(raw)
+
+					new := []ast_data{&ast_base{
+						ast_type: RAW,
+						field:    raw,
+					}}
+
+					text = r.render_ast(spindle, page, new)
+				} else {
+					text = r.render_ast(spindle, page, popped_anon.children)
+				}
 
 			} else {
 				if found, ok := r.get_in_scope(entry.field); ok {
@@ -272,7 +342,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				text = args[n - 1]
 			}
 
-			if entry.modifier != NONE {
+			if entry.modifier > mod_active {
 				switch entry.modifier {
 				case SLUG:
 					text = make_slug(text)
@@ -298,7 +368,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 		case RES_FINDER:
 			entry := entry.(*ast_finder)
 
-			find_text := r.render_ast(spindle, page, entry.children[:1])
+			find_text := r.render_ast(spindle, page, entry.children)
 
 			// check cache
 			found_file, ok := spindle.finder_cache[find_text]
@@ -314,20 +384,41 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				switch entry.finder_type {
 				case _IMAGE:
 					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
-						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "image resource finder cannot process non-image file %q", find_text)
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "image resource finder cannot process non-image file %q", find_text)
 						r.unwind = true
 					}
+
+					if entry.image_settings != nil {
+						path = rewrite_image_path(path, entry.image_settings)
+
+						if entry.image_settings.format == 0 {
+							entry.image_settings.format = found_file.file_type
+						}
+
+						spindle.generated_images = append(spindle.generated_images, &generated_image{
+							false, found_file, entry.image_settings,
+						})
+
+					} else {
+						// if it has modifiers, only the generated image is used
+						// so we don't mark it here
+						found_file.is_used = true
+					}
+
 				case _PAGE:
 					if !(found_file.file_type > is_page && found_file.file_type < end_page) {
-						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "page resource finder cannot process non-page file %q", find_text)
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "page resource finder cannot process non-page file %q", find_text)
 						r.unwind = true
 					}
 					path = rewrite_ext(path, "") // @todo global config on pretty urls
+					found_file.is_used = true
+
 				case _STATIC:
 					if !(found_file.file_type > is_static && found_file.file_type < end_static) {
-						spindle.errors.new_pos(RENDER_FAILURE, *entry.position, "static resource finder cannot process non-static file %q", find_text)
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "static resource finder cannot process non-static file %q", find_text)
 						r.unwind = true
 					}
+					found_file.is_used = true
 				}
 
 				if spindle.server_mode {
@@ -351,11 +442,10 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					buffer.WriteString(rewrite_root(path, ""))
 				}
 
-				found_file.is_used = true
 				spindle.finder_cache[find_text] = found_file
 
 			} else {
-				spindle.errors.new_pos(RENDER_WARNING, *entry.position, "resource finder did not find file %q", find_text)
+				spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder did not find file %q", find_text)
 			}
 			continue
 
@@ -368,7 +458,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			if entry.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 				if ok {
-					r.push_anon(x, wrapper_block.get_children())
+					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
 
 					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 
@@ -402,7 +492,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					r.push_blank_scope(n + 1)
 				}
 
-				r.push_anon(x, wrapper_block.get_children())
+				r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
 
 				buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 
@@ -413,7 +503,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if entry.decl_hash != stop_hash {
-				spindle.errors.new_pos(RENDER_WARNING, *entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
+				spindle.errors.new_pos(RENDER_WARNING, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
 			}
 
 			// else:
@@ -434,7 +524,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			if the_block.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
 				if ok {
-					r.push_anon(x, wrapper_block.get_children())
+					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
 
 					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 
@@ -470,7 +560,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			if the_block.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
 				if ok {
-					r.push_anon([]ast_data{&ast_base{ast_type:NORMAL,field:sub_buffer.String()}}, wrapper_block.get_children())
+					r.push_anon([]ast_data{&ast_base{ast_type:NORMAL,field:sub_buffer.String()}}, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
 					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 				}
 			} else {
@@ -494,7 +584,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						r.push_blank_scope(n + 1)
 					}
 
-					r.push_anon(x, wrapper_block.get_children())
+					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
 
 					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 
@@ -542,4 +632,43 @@ func count_repeat_tokens(input []ast_data, hash uint32) int {
 	}
 
 	return len(input)
+}
+
+func reindent_text(input string) string {
+	input = strings.ReplaceAll(input, "\t", "    ")
+	lines := strings.Split(input, "\n")
+
+	shortest_indent := len(input)
+
+	for _, line := range lines {
+		count := 0
+
+		for _, c := range line {
+			if c != ' ' {
+				break
+			}
+			count ++
+		}
+
+		if count < shortest_indent {
+			shortest_indent = count
+		}
+	}
+
+	if shortest_indent == 0 {
+		return input
+	}
+
+	buffer := strings.Builder{}
+	buffer.Grow(len(input))
+
+	for _, line := range lines {
+		buffer.WriteString(line[shortest_indent:])
+		buffer.WriteRune('\n')
+	}
+
+	render := buffer.String()
+	render = render[:len(render) - 1] // trailing newline
+
+	return render
 }

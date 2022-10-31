@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"hash/fnv"
 	"encoding/xml"
 	// "path/filepath"
 
@@ -17,25 +16,6 @@ func _println(name ...any) {
 	fmt.Println(name...)
 }
 
-var hash_store = make(map[uint32]string, 128)
-
-func new_hash(input string) uint32 {
-	if input == "" {
-		return 0
-	}
-	hash := fnv.New32a()
-	hash.Write([]byte(input))
-	x := hash.Sum32()
-
-	hash_store[x] = input
-
-	return x
-}
-
-func get_hash(n uint32) string {
-	return hash_store[n]
-}
-
 func print_token_stream(array []*lexer_token) {
 	for _, entry := range array {
 		fmt.Println(entry)
@@ -43,7 +23,7 @@ func print_token_stream(array []*lexer_token) {
 }
 
 func (t *lexer_token) String() string {
-	return fmt.Sprintf("%-3d %s %q", t.position, t.ast_type, t.field)
+	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.ast_type, t.field)
 }
 
 func print_syntax_tree(array []ast_data, level int) {
@@ -51,9 +31,11 @@ func print_syntax_tree(array []ast_data, level int) {
 
 	for _, entry := range array {
 		_type := entry.type_check()
+		pos := entry.get_position()
 
 		fmt.Print(indent)
 		fmt.Print(_type)
+		fmt.Print(" ", pos.start, pos.end)
 
 		switch _type {
 		case NORMAL:

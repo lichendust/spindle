@@ -6,11 +6,6 @@ import (
 	"path/filepath"
 )
 
-type position struct {
-	line      uint16
-	file_path string
-}
-
 type _error interface {
 	html_string() string
 	term_string() string

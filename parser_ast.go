@@ -43,8 +43,9 @@ const (
 	STRIKE_OPEN
 	STRIKE_CLOSE
 
-	is_lexer
 	WHITESPACE
+
+	is_lexer
 	NEWLINE
 	WORD
 	IDENT
@@ -84,6 +85,9 @@ const (
 type ast_modifier uint8
 const (
 	NONE ast_modifier = iota
+	RAW_SUB
+
+	mod_active
 	SLUG
 	UNIQUE_SLUG
 	UPPER
@@ -106,9 +110,10 @@ func (t ast_type) is(comp ...ast_type) bool {
 type ast_data interface {
 	type_check() ast_type
 	get_children() []ast_data
+	get_position() *position
 }
 type ast_base_fields struct {
-	position *position
+	position position
 	children []ast_data
 }
 
@@ -123,6 +128,9 @@ func (t *ast_base) type_check() ast_type {
 }
 func (t *ast_base) get_children() []ast_data {
 	return t.children
+}
+func (t *ast_base) get_position() *position {
+	return &t.position
 }
 
 
@@ -140,7 +148,9 @@ func (t *ast_variable) type_check() ast_type {
 func (t *ast_variable) get_children() []ast_data {
 	return t.children
 }
-
+func (t *ast_variable) get_position() *position {
+	return &t.position
+}
 
 type ast_declare struct {
 	ast_base_fields
@@ -155,7 +165,9 @@ func (t *ast_declare) type_check() ast_type {
 func (t *ast_declare) get_children() []ast_data {
 	return t.children
 }
-
+func (t *ast_declare) get_position() *position {
+	return &t.position
+}
 
 type ast_block struct {
 	ast_base_fields
@@ -166,6 +178,9 @@ func (t *ast_block) type_check() ast_type {
 }
 func (t *ast_block) get_children() []ast_data {
 	return t.children
+}
+func (t *ast_block) get_position() *position {
+	return &t.position
 }
 
 type ast_token struct {
@@ -179,12 +194,15 @@ func (t *ast_token) type_check() ast_type {
 func (t *ast_token) get_children() []ast_data {
 	return t.children
 }
-
+func (t *ast_token) get_position() *position {
+	return &t.position
+}
 
 type ast_finder struct {
 	ast_base_fields
-	finder_type finder_type
-	path_type   path_type
+	finder_type    finder_type
+	path_type      path_type
+	image_settings *image_settings
 }
 func (t *ast_finder) type_check() ast_type {
 	return RES_FINDER
@@ -192,7 +210,9 @@ func (t *ast_finder) type_check() ast_type {
 func (t *ast_finder) get_children() []ast_data {
 	return t.children
 }
-
+func (t *ast_finder) get_position() *position {
+	return &t.position
+}
 
 type ast_for struct {
 	ast_base_fields
@@ -204,7 +224,9 @@ func (t *ast_for) type_check() ast_type {
 func (t *ast_for) get_children() []ast_data {
 	return t.children
 }
-
+func (t *ast_for) get_position() *position {
+	return &t.position
+}
 
 type ast_if struct {
 	ast_base_fields
@@ -215,6 +237,25 @@ func (t *ast_if) type_check() ast_type {
 }
 func (t *ast_if) get_children() []ast_data {
 	return t.children
+}
+func (t *ast_if) get_position() *position {
+	return &t.position
+}
+
+
+type ast_builtin struct {
+	ast_base_fields
+	ast_type  ast_type
+	hash_name uint32
+}
+func (t *ast_builtin) type_check() ast_type {
+	return t.ast_type
+}
+func (t *ast_builtin) get_children() []ast_data {
+	return t.children
+}
+func (t *ast_builtin) get_position() *position {
+	return &t.position
 }
 
 

@@ -10,8 +10,13 @@ type spindle struct {
 
 	errors       *error_handler
 	file_tree    *disk_object
+
 	templates    map[uint32]*template_object
+	partials     map[uint32]*partial_object
+
 	finder_cache map[string]*disk_object
+
+	generated_images []*generated_image
 }
 
 func main() {

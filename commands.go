@@ -46,8 +46,10 @@ func command_build(config *config) {
 		spindle.file_tree = data
 	}
 
-	spindle.templates    = load_all_templates(spindle)
-	spindle.finder_cache = make(map[string]*disk_object, 64)
+	spindle.templates        = load_all_templates(spindle)
+	spindle.partials         = load_all_partials(spindle)
+	spindle.finder_cache     = make(map[string]*disk_object, 64)
+	spindle.generated_images = make([]*generated_image, 0, 32)
 
 	make_dir(public_path)
 
@@ -64,6 +66,7 @@ func command_build(config *config) {
 	}
 
 	found_file.is_used = true
+
 
 	for {
 		done := build_pages(spindle, spindle.file_tree)
@@ -93,30 +96,50 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 			continue
 		}
 
-		if only_used && file.is_used && file.is_built {
+		if only_used && !file.is_used {
+			continue
+		}
+		if file.is_built {
 			continue
 		}
 
 		has_changes   = true
 		file.is_built = true
 
+		if file.file_type > is_image && file.file_type < end_image {
+			path := rewrite_root(file.path, public_path)
+			make_dir(filepath.Dir(path))
+			copy_file(file.path, path)
+			continue
+		}
+
 		switch file.file_type {
 		case MARKUP:
 			page, ok := load_page(spindle, file.path)
 			if !ok {
-				panic("failed to load page") // this should be impossible, so i'm leaving it so it'll catch me out if it ever happens
+				panic("failed to load page")
 			}
 
 			assembled   := render_syntax_tree(spindle, page)
-			output_path := rewrite_ext(rewrite_root(file.path, public_path), ".html")
+			output_path := rewrite_public(file.path, ".html")
 
-			// assembled = format_html(assembled)
+			make_dir(filepath.Dir(output_path))
+
+			assembled = format_html(assembled)
 
 			if !write_file(output_path, assembled) {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
 				break main_loop
 			}
 		}
+	}
+
+	for _, image := range spindle.generated_images {
+		if image.is_built {
+			continue
+		}
+		resize_image(spindle, image.original, image.settings) // @error
+		image.is_built = true
 	}
 
 	return has_changes

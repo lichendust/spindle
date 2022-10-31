@@ -2,9 +2,16 @@ package main
 
 import "unicode/utf8"
 
+type position struct {
+	line       int
+	start      int
+	end        int
+	file_path  string
+}
+
 type lexer_token struct {
 	ast_type   ast_type
-	position   uint16
+	position   position
 	field      string
 }
 
@@ -30,20 +37,26 @@ var rune_match = map[rune]ast_type {
 	'×':  MULTIPLY,
 }
 
-func lex_blob(input string) []*lexer_token {
+func lex_blob(path, input string) []*lexer_token {
 	array   := make([]*lexer_token, 0, 512)
-	line_no := uint16(1)
+	line_no := 1
+
+	start := 0
+	end   := 0
 
 	for {
 		i := eat_spaces(input) // ignores newlines
 
+
 		if i > 0 {
+			end += i
 			array = append(array, &lexer_token {
 				ast_type: WHITESPACE,
-				position: line_no,
+				position: position{line_no, start, end, path},
 				field: input[:i],
 			})
 			input = input[i:]
+			start = end
 			continue
 		}
 
@@ -58,24 +71,28 @@ func lex_blob(input string) []*lexer_token {
 		}
 
 		if result, ok := rune_match[rune]; ok {
-			input = input[width:]
+			end += width
 			array = append(array, &lexer_token {
 				ast_type: result,
-				position: line_no,
+				position: position{line_no, start, end, path},
 				field: string(rune),
 			})
+			input = input[width:]
+			start = end
 			continue
 		}
 
 		number := extract_number(input)
 
 		if n := len(number); n > 0 {
-			input = input[n:]
+			end += len(number)
 			array = append(array, &lexer_token {
 				ast_type: NUMBER,
-				position: line_no,
+				position: position{line_no, start, end, path},
 				field: number,
 			})
+			input = input[n:]
+			start = end
 			continue
 		}
 
@@ -85,23 +102,27 @@ func lex_blob(input string) []*lexer_token {
 		// if the ident is different to the word
 		// then the ident is the winner
 		if n := len(ident); n != len(word) {
-			input = input[n:]
+			end += n
 			array = append(array, &lexer_token {
 				ast_type: IDENT,
-				position: line_no,
+				position: position{line_no, start, end, path},
 				field: ident,
 			})
+			input = input[n:]
+			start = end
 			continue
 		}
 
 		// otherwise it's the word, we use that instead
 		if n := len(word); n > 0 {
-			input = input[n:]
+			end += n
 			array = append(array, &lexer_token {
 				ast_type: WORD,
-				position: line_no,
+				position: position{line_no, start, end, path},
 				field: word,
 			})
+			input = input[n:]
+			start = end
 			continue
 		}
 
@@ -109,20 +130,22 @@ func lex_blob(input string) []*lexer_token {
 		// try for a token (such as ###)
 		non_word := extract_repeated_rune(input)
 
-		if len(non_word) > 0 {
+		if n := len(non_word); n > 0 {
 			the_type := NON_WORD
 
-			// these are the only formatter char that gets repeated
 			if non_word[0] == '*' {
-				the_type = ASTERISK
+				the_type = ASTERISK // @todo
 			}
 
-			input = input[len(non_word):]
+			end += n
+
 			array = append(array, &lexer_token {
-				ast_type: the_type,
-				position: line_no,
-				field:    non_word,
+				ast_type:   the_type,
+				position: position{line_no, start, end, path},
+				field:      non_word,
 			})
+			input = input[n:]
+			start = end
 			continue
 		}
 
@@ -152,7 +175,7 @@ func lex_blob(input string) []*lexer_token {
 
 	array = append(array, &lexer_token {
 		ast_type: EOF,
-		position: line_no,
+		position: position{line_no, start, end, path},
 	})
 
 	return array
