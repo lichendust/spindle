@@ -336,7 +336,13 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				} else if !is_brace && inner_text.ast_type.is(WORD, IDENT) {
 					the_decl.ast_type = DECL_BLOCK
-					the_decl.field = new_hash(inner_text.field)
+
+					parser.step_back()
+					field, taxonomy, subname := parser.parse_variable_ident()
+
+					the_decl.field    = field
+					the_decl.taxonomy = taxonomy
+					the_decl.subname  = subname
 
 				} else {
 					isnt_valid = true
