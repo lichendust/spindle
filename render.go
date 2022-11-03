@@ -4,15 +4,15 @@ import "fmt"
 import "strings"
 
 func render_syntax_tree(spindle *spindle, page *page_object) string {
-	scope_stack := make([]map[uint32]*ast_declare, 4)
-	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 16))
+	scope_stack := make([]map[uint32]*ast_declare, 0, 4)
+	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
 
-	renderer := &renderer{
+	r := &renderer{
 		anon_stack:  make([]*anon_entry, 0, 4),
 		scope_stack: scope_stack,
 	}
 
-	return renderer.render_ast(spindle, page, page.content)
+	return r.render_ast(spindle, page, page.content)
 }
 
 type renderer struct {
@@ -66,8 +66,12 @@ func (r *renderer) write_to_scope(field uint32, entry *ast_declare) {
 	r.scope_stack[len(r.scope_stack) - 1][field] = entry
 }
 
-func (r *renderer) push_blank_scope(alloc int) {
+func (r *renderer) push_blank_scope(alloc int) bool {
+	if alloc == 0 {
+		return false
+	}
 	r.scope_stack = append(r.scope_stack, make(map[uint32]*ast_declare, alloc))
+	return true
 }
 
 func (r *renderer) pop_scope() {
@@ -141,11 +145,11 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data)
 		}
 
 		if _type == TEMPLATE {
-			entry := entry.(*ast_base)
-			if t, ok := spindle.templates[new_hash(entry.field)]; ok {
+			entry := entry.(*ast_builtin)
+			if t, ok := spindle.templates[entry.hash_name]; ok {
 				r.write_collective_to_scope(spindle, t.top_scope)
 			} else {
-				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", entry.field)
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
 				r.unwind = true
 				break
 			}
@@ -211,9 +215,10 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				return ""
 			}
 
-			r.push_blank_scope(8)
+			did_push := r.push_blank_scope(immediate_decl_count(p.content))
 			buffer.WriteString(r.render_ast(spindle, page, p.content))
-			r.pop_scope()
+
+			if did_push { r.pop_scope() }
 
 		case IMPORT:
 			entry := entry.(*ast_builtin)
@@ -233,7 +238,20 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			// if not in cache, do a full search
 			if !ok {
-				found_file, ok = find_file_descending(spindle.file_tree, find_text)
+				found_file, ok = find_file(spindle.file_tree, find_text)
+			}
+
+			// @todo
+			/*if found_file.is_draft {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "imported page %q is draft!", found_file.path)
+				continue
+			}*/
+
+			// @todo this block is messy, clean it up
+
+			if !ok {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", find_text)
+				continue
 			}
 
 			imported_page, page_success := load_page(spindle, found_file.path)
@@ -244,8 +262,9 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				return ""
 			}
 
-			r.push_blank_scope(16)
+			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
 			r.write_collective_to_scope(spindle, imported_page.top_scope)
+			r.push_string_on_scope(new_hash("path"), find_text)
 
 			// @todo undefined behaviour for %% in imports
 			// we should probably disallow it but we can't know until
@@ -281,14 +300,16 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 				// we also reverse the order in which the
 				// top-level scope is applied
-				r.push_blank_scope(16)
+				did_push := r.push_blank_scope(immediate_decl_count(t.content))
 
 				r.write_collective_to_scope(spindle, input[1:])
 				r.push_anon(input[1:], t.content, t.position, t.raw_string)
 
 				buffer.WriteString(r.render_ast(spindle, page, t.content))
-				r.pop_scope()
 
+				if did_push {
+					r.pop_scope()
+				}
 				return buffer.String() // hard exit
 			}
 
@@ -370,12 +391,17 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			find_text := r.render_ast(spindle, page, entry.children)
 
+			if is_ext_url(find_text) {
+				buffer.WriteString(find_text)
+				continue
+			}
+
 			// check cache
 			found_file, ok := spindle.finder_cache[find_text]
 
 			// if not in cache, do a full search
 			if !ok {
-				found_file, ok = find_file_descending(spindle.file_tree, find_text)
+				found_file, ok = find_file(spindle.file_tree, find_text)
 			}
 
 			if ok {
@@ -391,13 +417,15 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					if entry.image_settings != nil {
 						path = rewrite_image_path(path, entry.image_settings)
 
-						if entry.image_settings.format == 0 {
-							entry.image_settings.format = found_file.file_type
+						settings := *entry.image_settings
+
+						if settings.format == 0 {
+							settings.format = found_file.file_type
 						}
 
-						spindle.generated_images = append(spindle.generated_images, &generated_image{
-							false, found_file, entry.image_settings,
-						})
+						spindle.generated_images[new_hash(find_text)] = &generated_image{
+							false, found_file, &settings,
+						}
 
 					} else {
 						// if it has modifiers, only the generated image is used
@@ -453,23 +481,30 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			entry := entry.(*ast_block)
 
 			x := entry.get_children()
-			r.push_blank_scope(8)
 
 			if entry.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 				if ok {
-					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
+					children := wrapper_block.get_children()
 
-					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+					did_push := r.push_blank_scope(immediate_decl_count(children))
+					r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-					r.pop_scope()
+					buffer.WriteString(r.render_ast(spindle, page, children))
+
+					if did_push {
+						r.pop_scope()
+					}
 					continue
 				}
 			}
 
 			// else:
+			did_push := r.push_blank_scope(immediate_decl_count(x))
 			buffer.WriteString(r.render_ast(spindle, page, x))
-			r.pop_scope()
+			if did_push {
+				r.pop_scope()
+			}
 
 		case TOKEN:
 			entry := entry.(*ast_token)
@@ -486,20 +521,27 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 
 			if ok {
-				n := immediate_decl_count(wrapper_block.get_children())
+				children := wrapper_block.get_children()
 
-				if n > 0 {
-					r.push_blank_scope(n + 1)
-				}
+				did_push := r.push_blank_scope(immediate_decl_count(children))
+				r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-				r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
+				buffer.WriteString(r.render_ast(spindle, page, children))
 
-				buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
-
-				if n > 0 {
+				if did_push {
 					r.pop_scope()
 				}
 				continue
+			} else {
+				if len(x) == 0 {
+					wrapper_block, ok := r.get_in_scope(default_hash)
+					if ok {
+						children := wrapper_block.get_children()
+						r.push_anon(x, children, *entry.get_position(), entry.orig_field)
+						buffer.WriteString(r.render_ast(spindle, page, children))
+						continue
+					}
+				}
 			}
 
 			if entry.decl_hash != stop_hash {
@@ -519,23 +561,28 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			the_block := entry.get_children()[0].(*ast_block)
 
 			x := the_block.get_children()
-			r.push_blank_scope(8)
 
 			if the_block.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
 				if ok {
-					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
+					children := wrapper_block.get_children()
 
-					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
+					did_push := r.push_blank_scope(immediate_decl_count(children))
+					r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-					r.pop_scope()
+					buffer.WriteString(r.render_ast(spindle, page, children))
+
+					if did_push {
+						r.pop_scope()
+					}
 					continue
 				}
 			}
 
 			// else:
+			did_push := r.push_blank_scope(immediate_decl_count(x))
 			buffer.WriteString(r.render_ast(spindle, page, x))
-			r.pop_scope()
+			if did_push { r.pop_scope() }
 
 		case CONTROL_FOR:
 			entry := entry.(*ast_for)
@@ -547,7 +594,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			the_block := entry.get_children()[0].(*ast_block)
 
-			r.push_blank_scope(12)
+			did_push := r.push_blank_scope(immediate_decl_count(the_block.get_children()))
 
 			sub_buffer := strings.Builder{}
 			sub_buffer.Grow(512)
@@ -568,7 +615,10 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			sub_buffer.Reset()
-			r.pop_scope()
+
+			if did_push {
+				r.pop_scope()
+			}
 
 		case NORMAL:
 			entry := entry.(*ast_base)
@@ -578,19 +628,14 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			if len(x) > 0 {
 				wrapper_block, ok := r.get_in_scope(default_hash)
 				if ok {
-					n := immediate_decl_count(wrapper_block.get_children())
+					children := wrapper_block.get_children()
+					did_push := r.push_blank_scope(immediate_decl_count(children))
 
-					if n > 0 {
-						r.push_blank_scope(n + 1)
-					}
+					r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-					r.push_anon(x, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
+					buffer.WriteString(r.render_ast(spindle, page, children))
 
-					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
-
-					if n > 0 {
-						r.pop_scope()
-					}
+					if did_push { r.pop_scope() }
 					continue
 				}
 
@@ -616,7 +661,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 	return buffer.String()
 }
 
-func count_repeat_tokens(input []ast_data, hash uint32) int {
+/*func count_repeat_tokens(input []ast_data, hash uint32) int {
 	for i, forward_check := range input {
 		t := forward_check.type_check()
 
@@ -632,43 +677,4 @@ func count_repeat_tokens(input []ast_data, hash uint32) int {
 	}
 
 	return len(input)
-}
-
-func reindent_text(input string) string {
-	input = strings.ReplaceAll(input, "\t", "    ")
-	lines := strings.Split(input, "\n")
-
-	shortest_indent := len(input)
-
-	for _, line := range lines {
-		count := 0
-
-		for _, c := range line {
-			if c != ' ' {
-				break
-			}
-			count ++
-		}
-
-		if count < shortest_indent {
-			shortest_indent = count
-		}
-	}
-
-	if shortest_indent == 0 {
-		return input
-	}
-
-	buffer := strings.Builder{}
-	buffer.Grow(len(input))
-
-	for _, line := range lines {
-		buffer.WriteString(line[shortest_indent:])
-		buffer.WriteRune('\n')
-	}
-
-	render := buffer.String()
-	render = render[:len(render) - 1] // trailing newline
-
-	return render
-}
+}*/

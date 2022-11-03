@@ -9,14 +9,16 @@ import (
 type parser struct {
 	index  int
 	unwind bool
+	allow_anon bool
 	errors *error_handler
 	array  []*lexer_token
 }
 
-func parse_stream(errors *error_handler, array []*lexer_token) []ast_data {
+func parse_stream(errors *error_handler, array []*lexer_token, allow_anon bool) []ast_data {
 	parser := parser {
-		array:    array,
-		errors:   errors,
+		array:      array,
+		allow_anon: allow_anon,
+		errors:     errors,
 	}
 	return parser.parse_block(0)
 }
@@ -74,7 +76,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 		if token.ast_type > is_non_word {
 			word, count := parser.get_non_word(token)
 
-			if p := parser.peek(); p != nil && p.ast_type == WHITESPACE {
+			if p := parser.peek(); p != nil && p.ast_type.is(WHITESPACE, NEWLINE) {
 				new_tok := &ast_token{
 					decl_hash:  new_hash(word),
 					orig_field: word,
@@ -83,8 +85,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				parser.eat_whitespace()
 				new_tok.children = parser.parse_paragraph(NULL)
 				new_tok.position = token.position
-
-				update_block_positions(&new_tok.position, new_tok.children)
 
 				array = append(array, new_tok)
 				continue
@@ -183,7 +183,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_if.children = parser.parse_block(1)
 				the_if.position = token.position
 
-				update_block_positions(&the_if.position, the_if.children)
 
 				the_if.position.end += 1 // the closing brace
 
@@ -216,7 +215,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_for.children = parser.parse_block(1)
 				the_for.position = token.position
 
-				update_block_positions(&the_for.position, the_for.children)
 
 				the_for.position.end += 1 // the closing brace
 
@@ -229,6 +227,22 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 			x := parser.peek_whitespace()
 
+			needs_raw := false
+
+			if x.ast_type == WORD && x.field == "raw" {
+				parser.next()
+				parser.eat_whitespace()
+				parser.next()
+
+				if n := parser.peek_whitespace(); n.ast_type == BRACE_OPEN {
+					needs_raw = true
+				} else {
+					parser.step_backn(2)
+				}
+
+				x = parser.peek_whitespace()
+			}
+
 			if x.ast_type == BRACE_OPEN {
 				parser.next()
 				parser.eat_whitespace()
@@ -238,15 +252,25 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					decl_hash: new_hash(token.field),
 				}
 
+				if needs_raw {
+					x := parser.parse_raw_block()
+
+					the_block.children = []ast_data{x}
+
+					// @todo update positions, etc.
+					array = append(array, the_block)
+					continue
+				}
+
 				the_block.children = parser.parse_block(0)
 				the_block.position = token.position
 
-				update_block_positions(&the_block.position, the_block.children)
 
 				the_block.position.end += 1 // the closing brace
 
 				array = append(array, the_block)
 				continue
+
 			} else if x.ast_type == EQUALS {
 				parser.next()
 				parser.eat_whitespace()
@@ -275,7 +299,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						new_block.children = parser.parse_block(0)
 						new_block.position = x.position
 
-						update_block_positions(&new_block.position, new_block.children)
 
 						new_block.position.end += 1 // the closing brace
 
@@ -286,7 +309,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						parser.step_backn(2)
 						parser.eat_whitespace()
 						the_decl.children = parser.parse_paragraph(NULL)
-						update_block_positions(&the_decl.position, the_decl.children)
 					}
 				}
 
@@ -296,9 +318,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 			// if not, we're a a normal line,
 			// so we just continue past the switch
-			if taxonomy == 0 {
-				parser.step_back()
-			} else {
+			if taxonomy > 0 {
 				parser.step_backn(2)
 			}
 
@@ -309,7 +329,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_block.children = parser.parse_block(0)
 				the_block.position = token.position
 
-				update_block_positions(&the_block.position, the_block.children)
 
 				the_block.position.end += 1 // the closing brace
 
@@ -363,13 +382,16 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				}
 			}
 
-			parser.eat_whitespace()
-
 			{
-				equals := parser.next()
+				did_any := parser.eat_whitespace()
+				equals  := parser.next()
 
 				if equals.ast_type != EQUALS {
-					parser.step_backn(4)
+					n := 3
+					if did_any {
+						n = 4
+					}
+					parser.step_backn(n)
 					break
 				}
 			}
@@ -401,7 +423,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					new_block.children = parser.parse_block(0)
 					new_block.position = x.position
 
-					update_block_positions(&new_block.position, new_block.children)
 
 					new_block.position.end += 1 // the closing brace
 
@@ -418,7 +439,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_decl.children = parser.parse_paragraph(NULL)
 			}
 
-			update_block_positions(&the_decl.position, the_decl.children)
 
 			array = append(array, the_decl)
 			continue
@@ -433,7 +453,6 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			the_para.position = token.position
 			the_para.children = parser.parse_paragraph(NULL)
 
-			update_block_positions(&the_para.position, the_para.children)
 
 			// @todo sanitise any escaped special characters that fall down here
 
@@ -576,7 +595,6 @@ func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 			}
 
 			new_var := parser.parse_variable()
-			new_var.position = token.position
 
 			if new_var == nil {
 				n := &ast_base{
@@ -588,6 +606,7 @@ func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 				continue
 			}
 
+			new_var.position = token.position
 			array = append(array, new_var)
 		}
 	}
@@ -681,7 +700,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.taxonomy = taxonomy
 		new_var.subname  = subname
 
-	} else if a.ast_type == NUMBER {
+	} else if parser.allow_anon && a.ast_type == NUMBER {
 		parser.next()
 		the_type = VAR_ENUM
 
@@ -693,7 +712,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.field   = base_hash
 		new_var.subname = uint32(n)
 
-	} else if a.ast_type == PERCENT {
+	} else if parser.allow_anon && a.ast_type == PERCENT {
 		parser.next()
 		the_type      = VAR_ANON
 		new_var.field = base_hash // just a %
@@ -720,18 +739,20 @@ func (parser *parser) parse_variable() *ast_variable {
 					new_var.modifier = SLUG
 				case "unique_slug", "uslug", "us":
 					new_var.modifier = UNIQUE_SLUG
-					case "upper", "u":
-						new_var.modifier = UPPER
-					case "lower", "l":
-						new_var.modifier = LOWER
-					case "title", "t":
-						new_var.modifier = TITLE
-					case "raw", "r":
-						new_var.modifier = RAW_SUB
-					/*case "expand", "e":
-						new_var.modifier = EXPAND
-					case "expand_all", "ea":
-						new_var.modifier = EXPAND_ALL*/
+				case "upper", "u":
+					new_var.modifier = UPPER
+				case "lower", "l":
+					new_var.modifier = LOWER
+				case "title", "t":
+					new_var.modifier = TITLE
+				/*case "raw", "r":
+					new_var.modifier = RAW_SUB*/
+				/*case "expand", "e":
+					new_var.modifier = EXPAND
+				case "expand_all", "ea":
+					new_var.modifier = EXPAND_ALL*/
+				default:
+					parser.errors.new_pos(PARSER_WARNING, b.position, "unknown variable modifier %q", b.field)
 				}
 			} else {
 				parser.step_back() // revert the colon
@@ -781,6 +802,69 @@ func (parser *parser) eat_comment() {
 		}
 
 		is_escaped = false
+	}
+}
+
+func (parser *parser) parse_raw_block() ast_data {
+	buffer := strings.Builder{}
+	buffer.Grow(512)
+
+	brace_balance := 1
+	is_escaped := false
+
+	main_loop: for i, token := range parser.array[parser.index:] {
+		if token.ast_type == ESCAPE {
+			is_escaped = true
+			continue
+		}
+
+		switch token.ast_type {
+		case ANGLE_OPEN:
+			buffer.WriteString("&lt;")
+			continue
+
+		case ANGLE_CLOSE:
+			buffer.WriteString("&gt;")
+			continue
+
+		case AMPERSAND:
+			if len(parser.array) - 1 > parser.index + i + 1 {
+				if parser.array[parser.index + i + 1].ast_type != WORD {
+					buffer.WriteString("&amp;")
+					continue
+				}
+			}
+
+		// @todo add double + single quotes
+
+		case BRACE_OPEN:
+			if !is_escaped {
+				brace_balance++
+			}
+		case BRACE_CLOSE:
+			if !is_escaped {
+				brace_balance--
+			}
+		case EOF:
+			parser.index += i + 1
+			break main_loop
+		}
+
+		if brace_balance <= 0 {
+			parser.index += i + 1
+			break main_loop
+		}
+
+		buffer.WriteString(token.field)
+
+		is_escaped = false
+	}
+
+	str := reindent_text(buffer.String())
+
+	return &ast_base{
+		ast_type: RAW,
+		field:    str,
 	}
 }
 
@@ -903,14 +987,19 @@ func (parser *parser) peek_whitespace() *lexer_token {
 	return parser.array[parser.index + index]
 }
 
-func (parser *parser) eat_whitespace() {
+func (parser *parser) eat_whitespace() bool {
+	did_any := false
+
 	for _, token := range parser.array[parser.index:] {
 		if token.ast_type == WHITESPACE {
+			did_any = true
 			parser.index++
 			continue
 		}
 		break
 	}
+
+	return did_any
 }
 
 func recursive_anon_count(children []ast_data) int {
@@ -943,10 +1032,95 @@ func immediate_decl_count(children []ast_data) int {
 	return count
 }
 
-func update_block_positions(pos *position, array []ast_data) {
-	f := array[0]
-	l := array[len(array) - 1]
+func reindent_text(input string) string {
+	input = strings.ReplaceAll(input, "\t", "    ")
+	lines := strings.Split(input, "\n")
 
-	pos.start = f.get_position().start
-	pos.end   = l.get_position().end
+	shortest_indent := len(input)
+
+	for i, c := range input {
+		if c != '\n' {
+			input = input[i:]
+			break
+		}
+	}
+
+	for _, line := range lines {
+		count := 0
+
+		if len(line) == 0 {
+			continue
+		}
+
+		for _, c := range line {
+			if c != ' ' {
+				break
+			}
+			count ++
+		}
+
+		if count < shortest_indent {
+			shortest_indent = count
+		}
+	}
+
+	if shortest_indent == 0 {
+		return input
+	}
+
+	buffer := strings.Builder{}
+	buffer.Grow(len(input))
+
+	for _, line := range lines {
+		if len(line) == 0 {
+			buffer.WriteRune('\n')
+			continue
+		}
+		buffer.WriteString(line[shortest_indent:])
+		buffer.WriteRune('\n')
+	}
+
+	render := buffer.String()
+
+	for i, c := range input {
+		if c != '\n' {
+			input = input[i:]
+			break
+		}
+	}
+
+	// not utf8 aware, but should be fine
+	// because we're only interested in a
+	// single-width char
+	for i := len(render) - 1; i >= 0; i-- {
+		c := render[i]
+		if c != '\n' {
+			render = render[:i + 1]
+			break
+		}
+	}
+
+	return render
+}
+
+// @todo extremely primitive
+func is_ext_url(input string) bool {
+	for {
+		if len(input) == 0 {
+			break
+		}
+		r, width := utf8.DecodeRuneInString(input)
+		input = input[width:]
+
+		if r == ':' {
+			a, w := utf8.DecodeRuneInString(input)
+			input = input[w:]
+			b, _ := utf8.DecodeRuneInString(input)
+
+			if a == b && a == '/' {
+				return true
+			}
+		}
+	}
+	return false
 }

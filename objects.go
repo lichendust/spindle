@@ -6,7 +6,7 @@ import (
 )
 
 type page_object struct {
-	page_id      uint32
+	// page_id      uint32
 	page_path    string
 	content      []ast_data
 	top_scope    []ast_data
@@ -52,12 +52,12 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree := parse_stream(spindle.errors, token_stream)
+	syntax_tree := parse_stream(spindle.errors, token_stream, false)
 	// print_syntax_tree(syntax_tree, 0)
 
-	if spindle.errors.has_failures {
+	/*if spindle.errors.has_failures {
 		return nil, false
-	}
+	}*/
 
 	p := &page_object{
 		page_path:    full_path,
@@ -67,9 +67,6 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 		slug_tracker: make(map[string]uint, 4),
 		position:     position{0,0,0,full_path},
 	}
-
-	update_block_positions(&p.position, p.content)
-
 	return p, true
 }
 
@@ -81,7 +78,7 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	}
 
 	token_stream := lex_blob(full_path, blob)
-	syntax_tree  := parse_stream(spindle.errors, token_stream)
+	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
@@ -92,9 +89,6 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 		raw_string:    blob,
 		position:      position{0,0,0,full_path},
 	}
-
-	update_block_positions(&t.position, t.content)
-
 	return t, true
 }
 
@@ -113,6 +107,10 @@ func load_all_templates(spindle *spindle) map[uint32]*template_object {
 		}
 
 		path = filepath.ToSlash(path)
+
+		if is_draft(path) {
+			return nil
+		}
 
 		name := filepath.Base(path)
 		ext  := filepath.Ext(name)
@@ -140,7 +138,7 @@ func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
 	}
 
 	token_stream := lex_blob(full_path, blob)
-	syntax_tree  := parse_stream(spindle.errors, token_stream)
+	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &partial_object{
@@ -167,6 +165,10 @@ func load_all_partials(spindle *spindle) map[uint32]*partial_object {
 		}
 
 		path = filepath.ToSlash(path)
+
+		if is_draft(path) {
+			return nil
+		}
 
 		name := filepath.Base(path)
 		ext  := filepath.Ext(name)

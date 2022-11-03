@@ -5,6 +5,7 @@ package main
 import (
 	"fmt"
 	"io"
+	"sort"
 	"strings"
 	"encoding/xml"
 	// "path/filepath"
@@ -73,7 +74,7 @@ func print_file_tree(array []*disk_object, level int) {
 
 func (d *disk_object) String() string {
 	// return fmt.Sprint(d.file_type, " ", filepath.Base(d.path))
-	return fmt.Sprint(d.file_type, " ", d.path, " ", d.is_used)
+	return fmt.Sprint(d.file_type, " ", d.path, " ", d.is_used, " ", d.is_built)
 }
 
 // this is a *bad* implementation of HTML
@@ -104,4 +105,32 @@ func validate_html(input string) bool {
 
 func format_html(input string) string {
 	return gohtml.Format(input)
+}
+
+var has_printed_scope = make(map[string]bool, 10)
+
+func print_scope_stack(location string, scope_stack []map[uint32]*ast_declare) {
+	if has_printed_scope[location] {
+		return
+	}
+
+	fmt.Println("\n\n", location)
+
+	for i, level := range scope_stack {
+		array := make([]string, 0, len(level))
+
+		for id, _ := range level {
+			array = append(array, get_hash(id))
+		}
+
+		fmt.Printf("[level %d]\n", i)
+
+		sort.Strings(array)
+
+		for _, entry := range array {
+			fmt.Println(entry)
+		}
+	}
+
+	has_printed_scope[location] = true
 }

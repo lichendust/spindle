@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"strings"
-	"path/filepath"
 )
 
 type _error interface {
@@ -100,15 +99,7 @@ func (e *error_handler) new_pos(kind error_type, pos position, message string, s
 		e.has_failures = true
 	}
 
-	file := ""
-
-	if !strings.Contains(file, "index") {
-		file = filepath.Base(pos.file_path)
-	} else {
-		file = pos.file_path
-	}
-
-	e.all_errors = append(e.all_errors, &spindle_pos_error {
+	e.all_errors = append(e.all_errors, &spindle_pos_error{
 		kind,
 		pos,
 		fmt.Sprintf(message, subst...),

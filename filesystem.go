@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 	"io/fs"
+	"strconv"
 	"unicode"
 	"path/filepath"
 )
@@ -54,12 +55,13 @@ type disk_object struct {
 	is_used   bool
 	is_built  bool
 	is_draft  bool
+	modtime   time.Time
 	path      string
 	parent    *disk_object
 	children  []*disk_object
 }
 
-func get_template_path(name string) string {
+/*func get_template_path(name string) string {
 	return filepath.Join(template_path, name) + extension
 }
 
@@ -69,7 +71,7 @@ func get_partial_path(name string) string {
 
 func get_script_path(name string) string {
 	return filepath.Join(script_path, name) + extension
-}
+}*/
 
 func new_file_tree() []*disk_object {
 	return make([]*disk_object, 0, 32)
@@ -125,10 +127,16 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 			return filepath.SkipDir
 		}
 
+		info, err := file.Info()
+		if err != nil {
+			return nil
+		}
+
 		the_file := &disk_object{
 			file_type: STATIC,
 			is_used:   false,
 			is_draft:  is_draft(path),
+			modtime:   info.ModTime(),
 			path:      path,
 			parent:    parent,
 		}
@@ -170,72 +178,38 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 	return array, true
 }
 
-func find_file(file_tree *disk_object, start_location *disk_object, path string) (*disk_object, bool) {
-	if path[0] == '/' {
-		if x, ok := find_file_descending(file_tree, path[1:]); ok {
-			return x, true
-		}
-	}
-
-	return find_file_ascending(start_location, path)
-}
-
-func find_file_ascending(start_location *disk_object, path string) (*disk_object, bool) {
+func find_file(start_location *disk_object, target string) (*disk_object, bool) {
 	for _, entry := range start_location.children {
 		if entry.file_type == DIRECTORY {
 			continue
 		}
 
-		diff := len(entry.path) - len(path)
-		if diff < 0 {
+		check := entry.path
+
+		if e := filepath.Ext(check); e == extension {
+			check = check[:len(check) - len(extension)]
+		}
+
+		diff := len(check) - len(target)
+		if diff <= 0 {
 			continue
 		}
 
-		if diff == 0 && entry.path == path {
-			return entry, true
-		}
-
-		leven := levenshtein_distance(entry.path, path)
+		leven := levenshtein_distance(check, target)
 		if leven <= diff {
-			return entry, true
-		}
-	}
+			b_target := filepath.Base(target)
+			b_check  := filepath.Base(check)
 
-	for _, entry := range start_location.children {
-		if entry.file_type == DIRECTORY {
-			if x, ok := find_file_descending(entry, path); ok {
-				return x, true
+			if len(b_target) != len(b_check) || b_target[0] != b_check[0] {
+				continue
 			}
-		}
-	}
-
-	if start_location.parent == nil {
-		return nil, false
-	}
-
-	return find_file_ascending(start_location.parent, path)
-}
-
-func find_file_descending(start_location *disk_object, path string) (*disk_object, bool) {
-	for _, entry := range start_location.children {
-		if entry.file_type == DIRECTORY {
-			continue
-		}
-
-		diff := len(entry.path) - len(path)
-		if diff < 0 {
-			continue
-		}
-
-		leven := levenshtein_distance(entry.path, path)
-		if leven <= diff {
 			return entry, true
 		}
 	}
 
 	for _, entry := range start_location.children {
 		if entry.file_type == DIRECTORY {
-			if x, ok := find_file_descending(entry, path); ok {
+			if x, ok := find_file(entry, target); ok {
 				return x, true
 			}
 		}
@@ -244,7 +218,7 @@ func find_file_descending(start_location *disk_object, path string) (*disk_objec
 	return nil, false
 }
 
-func file_has_changes(path string, last_run time.Time) bool {
+/*func file_has_changes(path string, last_run time.Time) bool {
 	f, err := os.Open(path)
 	if err != nil {
 		panic(path)
@@ -262,9 +236,9 @@ func file_has_changes(path string, last_run time.Time) bool {
 	}
 
 	return false
-}
+}*/
 
-func folder_has_changes(root_path string, last_run time.Time) bool {
+/*func folder_has_changes(root_path string, last_run time.Time) bool {
 	first := false
 	has_changes := false
 
@@ -289,7 +263,7 @@ func folder_has_changes(root_path string, last_run time.Time) bool {
 	}
 
 	return has_changes
-}
+}*/
 
 func load_file(source_file string) (string, bool) {
 	content, err := os.ReadFile(source_file)
@@ -302,20 +276,12 @@ func load_file(source_file string) (string, bool) {
 
 func write_file(path, content string) bool {
 	err := os.WriteFile(path, []byte(content), 0777)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func make_dir(path string) bool {
 	err := os.MkdirAll(path, os.ModeDir|0777)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 // path tools
@@ -401,6 +367,32 @@ func copy_file(source_path, target_path string) {
 
 	_, err = io.Copy(destination, source)
 	if err != nil {
+		panic(err)
+	}
+}
+
+const last_build = "config/.last_build"
+
+func read_time() time.Time {
+	content, err := os.ReadFile(last_build)
+
+	if err != nil {
+		return time.Unix(0, 0)
+	}
+
+	i, err := strconv.ParseInt(string(content), 10, 64)
+
+	if err != nil {
+		return time.Unix(0, 0)
+	}
+
+	return time.Unix(i, 0)
+}
+
+func save_time() {
+	the_time := []byte(strconv.FormatInt(time.Now().Unix(), 10))
+
+	if err := os.WriteFile(last_build, the_time, 0777); err != nil {
 		panic(err)
 	}
 }

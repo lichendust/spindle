@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"fmt"
+	"time"
 )
 
 type config struct {
@@ -11,11 +12,21 @@ type config struct {
 	path    string
 
 	default_path_type path_type
+
+	built_last time.Time
+
+	build_drafts    bool
+	build_recent    bool
+	build_only_used bool
 }
 
 func get_arguments() (*config, bool) {
 	args   := os.Args[1:]
 	config := &config{}
+
+	config.built_last = read_time()
+
+	config.build_only_used = true
 
 	counter    := 0
 	has_errors := false
@@ -74,8 +85,6 @@ func get_arguments() (*config, bool) {
 
 		switch a {
 		case "":
-			break
-
 		case "version":
 			config.command = VERSION
 			return config, true
@@ -83,6 +92,12 @@ func get_arguments() (*config, bool) {
 		case "help", "h":
 			config.command = HELP
 			return config, true
+
+		case "only-new", "n":
+			config.build_recent = true
+
+		case "all", "a":
+			config.build_only_used = false
 
 		default:
 			fmt.Fprintf(os.Stderr, "args: %q flag is unknown\n", a)

@@ -17,8 +17,6 @@ import (
 	web_decoder "github.com/kolesa-team/go-webp/decoder"
 )
 
-const default_quality = 100
-
 type image_settings struct {
 	width   uint
 	height  uint
@@ -57,7 +55,7 @@ func resize_image(spindle *spindle, incoming_file *disk_object, settings *image_
 
 	output_image := source_image
 
-	if settings.width > 0 && settings.height > 0 {
+	if settings.width > 0 || settings.height > 0 {
 		output_image = resize.Thumbnail(settings.width, settings.height, source_image, resize.MitchellNetravali)
 	}
 
@@ -119,7 +117,7 @@ func rewrite_image_path(path string, settings *image_settings) string {
 	default:      ext = filepath.Ext(path)
 	}
 
-	if settings.width > 0 && settings.height > 0 {
+	if settings.width > 0 || settings.height > 0 {
 		return rewrite_ext(path, fmt.Sprintf("_%dx%d%s", settings.width, settings.height, ext))
 	}
 

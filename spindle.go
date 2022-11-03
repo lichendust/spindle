@@ -16,7 +16,7 @@ type spindle struct {
 
 	finder_cache map[string]*disk_object
 
-	generated_images []*generated_image
+	generated_images map[uint32]*generated_image
 }
 
 func main() {
