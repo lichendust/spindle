@@ -9,16 +9,14 @@ import (
 type parser struct {
 	index  int
 	unwind bool
-	allow_anon bool
 	errors *error_handler
 	array  []*lexer_token
 }
 
-func parse_stream(errors *error_handler, array []*lexer_token, allow_anon bool) []ast_data {
+func parse_stream(errors *error_handler, array []*lexer_token) []ast_data {
 	parser := parser {
-		array:      array,
-		allow_anon: allow_anon,
-		errors:     errors,
+		array:  array,
+		errors: errors,
 	}
 	return parser.parse_block(0)
 }
@@ -289,7 +287,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				if x.ast_type.is(WORD, IDENT) {
 					parser.next()
-					parser.eat_whitespace()
+					did_eat := parser.eat_whitespace()
 
 					if parser.peek().ast_type == BRACE_OPEN {
 						parser.next()
@@ -299,17 +297,23 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						new_block.children = parser.parse_block(0)
 						new_block.position = x.position
 
-
 						new_block.position.end += 1 // the closing brace
 
 						the_decl.children = []ast_data{new_block}
 						the_decl.position = new_block.position
 
 					} else {
-						parser.step_backn(2)
+						if did_eat {
+							parser.step_backn(2)
+						} else {
+							parser.step_back()
+						}
+
 						parser.eat_whitespace()
 						the_decl.children = parser.parse_paragraph(NULL)
 					}
+				} else {
+					the_decl.children = parser.parse_paragraph(NULL)
 				}
 
 				array = append(array, the_decl)
@@ -555,7 +559,17 @@ func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 					case "page":   the_finder.finder_type = _PAGE
 					case "image":  the_finder.finder_type = _IMAGE
 					case "static": the_finder.finder_type = _STATIC
-					default: // @error
+					}
+
+					if the_finder.finder_type == _NO_FINDER {
+						parser.step_backn(2)
+						n := &ast_base{
+							ast_type: NORMAL,
+							field:    token.field,
+						}
+						n.position = token.position
+						array = append(array, n)
+						continue
 					}
 
 					if parser.peek().ast_type == COLON {
@@ -700,7 +714,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.taxonomy = taxonomy
 		new_var.subname  = subname
 
-	} else if parser.allow_anon && a.ast_type == NUMBER {
+	} else if a.ast_type == NUMBER {
 		parser.next()
 		the_type = VAR_ENUM
 
@@ -712,7 +726,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.field   = base_hash
 		new_var.subname = uint32(n)
 
-	} else if parser.allow_anon && a.ast_type == PERCENT {
+	} else if a.ast_type == PERCENT {
 		parser.next()
 		the_type      = VAR_ANON
 		new_var.field = base_hash // just a %
@@ -912,13 +926,13 @@ func (parser *parser) parse_image_settings() *image_settings {
 
 			switch field {
 			case "png":
-				settings.format = IMG_PNG
+				settings.file_type = IMG_PNG
 				got_anything = true
 			case "webp":
-				settings.format = IMG_WEB
+				settings.file_type = IMG_WEB
 				got_anything = true
 			case "jpeg", "jpg":
-				settings.format = IMG_JPG
+				settings.file_type = IMG_JPG
 				got_anything = true
 			default:
 				parser.errors.new_pos(PARSER_FAILURE, token.position, "image format %q is unsupported", field)
@@ -1082,9 +1096,9 @@ func reindent_text(input string) string {
 
 	render := buffer.String()
 
-	for i, c := range input {
+	for i, c := range render {
 		if c != '\n' {
-			input = input[i:]
+			render = render[i:]
 			break
 		}
 	}

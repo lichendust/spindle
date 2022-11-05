@@ -139,12 +139,11 @@ func extract_ident(input string) string {
 	if unicode.IsNumber(the_rune) {
 		return ""
 	}
-/*
-	@todo this should be here
+
 	if !(the_rune == '_' || unicode.IsLetter(the_rune)) {
 		return ""
 	}
-*/
+
 	for i, c := range input {
 		if !(c == '_' || unicode.IsLetter(c) || unicode.IsNumber(c)) {
 			return input[:i]
@@ -230,12 +229,13 @@ func unix_args(input string) []string {
 
 // levenshtein implementation taken from
 // https://github.com/agnivade/levenshtein [MIT]
-const alloc_threshold = 32
 
 // Works on runes (Unicode code points) but does not normalize
 // the input strings. See https://blog.golang.org/normalization
 // and the golang.org/x/text/unicode/norm package.
 func levenshtein_distance(a, b string) int {
+	const alloc_threshold = 32
+
 	if len(a) == 0 {
 		return utf8.RuneCountInString(b)
 	}
@@ -246,10 +246,6 @@ func levenshtein_distance(a, b string) int {
 		return 0
 	}
 
-	// We need to convert to []rune if the strings are non-ASCII.
-	// This could be avoided by using utf8.RuneCountInString
-	// and then doing some juggling with rune indices,
-	// but leads to far more bounds checks. It is a reasonable trade-off.
 	string_one := []rune(a)
 	string_two := []rune(b)
 
@@ -261,29 +257,20 @@ func levenshtein_distance(a, b string) int {
 	len_one := len(string_one)
 	len_two := len(string_two)
 
-	// Init the row.
 	var x []uint16
 	if len_one + 1 > alloc_threshold {
 		x = make([]uint16, len_one + 1)
 	} else {
-		// We make a small optimization here for small strings.
-		// Because a slice of constant length is effectively an array,
-		// it does not allocate. So we can re-slice it to the right length
-		// as long as it is below a desired threshold.
 		x = make([]uint16, alloc_threshold)
 		x = x[:len_one + 1]
 	}
 
-	// we start from 1 because index 0 is already 0.
 	for i := 1; i < len(x); i++ {
 		x[i] = uint16(i)
 	}
 
-	// make a dummy bounds check to prevent the 2 bounds check down below.
-	// The one inside the loop is particularly costly.
 	_ = x[len_one]
 
-	// fill in the rest
 	for i := 1; i <= len_two; i++ {
 		prev := uint16(i)
 		for j := 1; j <= len_one; j++ {

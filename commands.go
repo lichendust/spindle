@@ -16,9 +16,9 @@ const (
 )
 
 func command_init(config *config) {
-	if config.path != "" {
-		make_dir(config.path)
-		os.Chdir(config.path)
+	if config.output_path != "" {
+		make_dir(config.output_path)
+		os.Chdir(config.output_path)
 	}
 
 	make_dir(template_path)
@@ -34,11 +34,6 @@ func command_build(config *config) {
 	spindle := &spindle{}
 	spindle.config = config
 	spindle.errors = new_error_handler()
-
-	new_hash("default")
-
-	config.domain = "https://qxoko.io/"
-	config.default_path_type = ROOTED
 
 	if data, ok := load_file_tree(); ok {
 		spindle.file_tree = data
@@ -59,8 +54,6 @@ func command_build(config *config) {
 
 	found_file.is_used = true
 
-	// _println("[used files]") 
-
 	for {
 		done := build_pages(spindle, spindle.file_tree)
 
@@ -72,8 +65,6 @@ func command_build(config *config) {
 		}
 	}
 
-	// _println("\n[generated]")
-
 	for _, image := range spindle.generated_images {
 		if image.is_built {
 			continue
@@ -81,20 +72,20 @@ func command_build(config *config) {
 		if image.original.is_draft && !spindle.config.build_drafts {
 			continue
 		}
-		if spindle.config.build_recent && !image.original.modtime.After(spindle.config.built_last) {
-			continue
+
+		output_path := make_generated_image_path(spindle, image)
+		make_dir(filepath.Dir(output_path))
+
+		ok := copy_generated_image(image, output_path)
+		if !ok {
+			spindle.errors.new(FAILURE, "%q could failed to be generated", output_path)
 		}
 
-		// _println("× ", format_index(rewrite_image_path(image.original.path, image.settings)))
-
-		resize_image(spindle, image.original, image.settings) // @error
 		image.is_built = true
 	}
 
 	if spindle.errors.has_errors() {
 		fmt.Fprintln(os.Stderr, spindle.errors.render_term_errors())
-	} else {
-		save_time() // don't save built_last if there are any errors
 	}
 
 	// print_file_tree(spindle.file_tree.children, 0)
@@ -125,18 +116,10 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 		is_done = false
 		file.is_built = true
 
+		output_path := make_general_file_path(spindle, file)
+		make_dir(filepath.Dir(output_path))
+
 		switch file.file_type {
-		default:
-			if spindle.config.build_recent && !file.modtime.After(spindle.config.built_last) {
-				continue
-			}
-
-			// _println(format_index(file.path))
-
-			path := rewrite_root(file.path, public_path)
-			make_dir(filepath.Dir(path))
-			copy_file(file.path, path)
-
 		case MARKUP:
 			page, ok := load_page(spindle, file.path)
 			if !ok {
@@ -145,22 +128,19 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 
 			assembled := render_syntax_tree(spindle, page)
 
-			if spindle.config.build_recent && !file.modtime.After(spindle.config.built_last) {
-				continue
-			}
-
-			// _println(format_index(file.path))
-
-			output_path := rewrite_public(file.path, ".html")
-
-			make_dir(filepath.Dir(output_path))
-
-			assembled = format_html(assembled)
-
 			if !write_file(output_path, assembled) {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
 				break main_loop
 			}
+
+		case SCSS:
+			copy_scss(file, output_path)
+
+		case CSS, JAVASCRIPT:
+			copy_minify(file, output_path)
+
+		default:
+			copy_file(file, output_path)
 		}
 	}
 

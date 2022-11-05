@@ -43,6 +43,10 @@ func print_syntax_tree(array []ast_data, level int) {
 			cast := entry.(*ast_base)
 			fmt.Print(" ", cast.field)
 
+		case DECL, DECL_TOKEN, DECL_BLOCK:
+			cast := entry.(*ast_declare)
+			fmt.Print(" ", get_hash(cast.field))
+
 		case VAR, VAR_ENUM, VAR_ANON:
 			cast := entry.(*ast_variable)
 			fmt.Print(" ", get_hash(cast.field))

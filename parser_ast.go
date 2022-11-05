@@ -261,7 +261,8 @@ func (t *ast_builtin) get_position() *position {
 
 type finder_type uint8
 const (
-	_PAGE finder_type = iota
+	_NO_FINDER finder_type = iota
+	_PAGE
 	_IMAGE
 	_STATIC
 )

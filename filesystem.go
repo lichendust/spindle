@@ -3,10 +3,7 @@ package main
 import (
 	"os"
 	"io"
-	"time"
 	"io/fs"
-	"strconv"
-	"unicode"
 	"path/filepath"
 )
 
@@ -16,6 +13,7 @@ const (
 	source_path = "source"
 	public_path = "public"
 	config_path = "config"
+	config_file_path = "config/spindle.toml"
 
 	template_path = config_path + "/templates"
 	partial_path  = config_path + "/partials"
@@ -49,13 +47,64 @@ const (
 	end_static
 )
 
+func to_file_type(input string) file_type {
+	switch filepath.Ext(input) {
+	case extension:
+		return MARKUP
+	case ".md":
+		return MARKDOWN
+	case ".html":
+		return HTML
+	case ".css":
+		return CSS
+	case ".scss":
+		return SCSS
+	case ".js":
+		return JAVASCRIPT
+	case ".png":
+		return IMG_PNG
+	case ".jpg", ".jpeg":
+		return IMG_JPG
+	case ".tif", ".tiff":
+		return IMG_TIF
+	case ".webp":
+		return IMG_WEB
+	}
+	return STATIC
+}
+
+func ext_for_file_type(file_type file_type) string {
+	switch file_type {
+	case MARKUP:
+		return ".html"
+	case MARKDOWN:
+		return ".html"
+	case HTML:
+		return ".html"
+	case CSS:
+		return ".css"
+	case SCSS:
+		return ".css"
+	case JAVASCRIPT:
+		return ".js"
+	case IMG_PNG:
+		return ".png"
+	case IMG_JPG:
+		return ".jpg"
+	case IMG_TIF:
+		return ".tif"
+	case IMG_WEB:
+		return ".webp"
+	}
+	return ""
+}
+
 type disk_object struct {
 	file_type file_type
 	hash_name uint32
 	is_used   bool
 	is_built  bool
 	is_draft  bool
-	modtime   time.Time
 	path      string
 	parent    *disk_object
 	children  []*disk_object
@@ -95,6 +144,16 @@ func load_file_tree() (*disk_object, bool) {
 	return f, true
 }
 
+func hash_base_name(file *disk_object) uint32 {
+	base := filepath.Base(file.path)
+
+	if x := file.file_type; x > is_page && x < end_page {
+		base = base[:len(base) - len(filepath.Ext(base))]
+	}
+
+	return new_hash(base)
+}
+
 func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 	array := new_file_tree()
 
@@ -112,12 +171,13 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 		if file.IsDir() {
 			the_file := &disk_object{
 				file_type: DIRECTORY,
-				hash_name: new_hash(filepath.Base(path)),
 				is_used:   false,
 				is_draft:  is_draft(path),
 				path:      path,
 				parent:    parent,
 			}
+
+			the_file.hash_name = hash_base_name(the_file)
 
 			if x, ok := recurse_directories(the_file); ok {
 				the_file.children = x
@@ -127,46 +187,16 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 			return filepath.SkipDir
 		}
 
-		info, err := file.Info()
-		if err != nil {
-			return nil
-		}
-
 		the_file := &disk_object{
 			file_type: STATIC,
 			is_used:   false,
 			is_draft:  is_draft(path),
-			modtime:   info.ModTime(),
 			path:      path,
 			parent:    parent,
 		}
 
-		ext := filepath.Ext(path)
-
-		switch ext {
-		case ".x":
-			the_file.file_type = MARKUP
-		case ".md":
-			the_file.file_type = MARKDOWN
-		case ".html":
-			the_file.file_type = HTML
-		case ".css":
-			the_file.file_type = CSS
-		case ".scss":
-			the_file.file_type = SCSS
-		case ".js":
-			the_file.file_type = JAVASCRIPT
-		case ".png":
-			the_file.file_type = IMG_PNG
-		case ".jpg", ".jpeg":
-			the_file.file_type = IMG_JPG
-		case ".tif", ".tiff":
-			the_file.file_type = IMG_TIF
-		case ".webp":
-			the_file.file_type = IMG_WEB
-		}
-
-		the_file.hash_name = new_hash(filepath.Base(path))
+		the_file.file_type = to_file_type(path)
+		the_file.hash_name = hash_base_name(the_file)
 
 		array = append(array, the_file)
 		return nil
@@ -180,14 +210,10 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 
 func find_file(start_location *disk_object, target string) (*disk_object, bool) {
 	for _, entry := range start_location.children {
-		if entry.file_type == DIRECTORY {
-			continue
-		}
-
 		check := entry.path
 
-		if e := filepath.Ext(check); e == extension {
-			check = check[:len(check) - len(extension)]
+		if x := entry.file_type; x > is_page && x < end_page {
+			check = check[:len(check) - len(filepath.Ext(check))]
 		}
 
 		diff := len(check) - len(target)
@@ -203,6 +229,16 @@ func find_file(start_location *disk_object, target string) (*disk_object, bool) 
 			if len(b_target) != len(b_check) || b_target[0] != b_check[0] {
 				continue
 			}
+
+			if entry.file_type == DIRECTORY {
+				for _, child := range entry.children {
+					if child.hash_name == index_hash {
+						return child, true
+					}
+				}
+				return nil, false
+			}
+
 			return entry, true
 		}
 	}
@@ -280,89 +316,21 @@ func write_file(path, content string) bool {
 }
 
 func make_dir(path string) bool {
-	err := os.MkdirAll(path, os.ModeDir|0777)
+	err := os.MkdirAll(path, os.ModeDir | 0777)
 	return err == nil
 }
 
-// path tools
-func is_draft(input string) bool {
-	if input[0] == '_' {
-		return true
-	}
-
-	x := len(input) - 1
-
-	for i, c := range input {
-		if (c == '/' || c == '\\') && i < x && input[i + 1] == '_' {
-			return true
-		}
-	}
-
-	return false
-}
-
-// removes the root of the path, replacing it with new_root
-func rewrite_root(target, new_root string) string {
-	if target[0] == '/' {
-		target = target[1:]
-	}
-
-	for i, c := range target {
-		if c == '/' {
-			target = target[i + 1:]
-			break
-		}
-	}
-
-	return filepath.ToSlash(filepath.Join(new_root, target))
-}
-
-// replaces the extension of the file
-func rewrite_ext(target, new_ext string) string {
-	target = target[:len(target) - len(filepath.Ext(target))]
-	return target + new_ext
-}
-
-// shorthand path rewriter for a large number of output files
-func rewrite_public(target, new_ext string) string {
-	return rewrite_ext(rewrite_root(target, public_path), new_ext)
-}
-
-func filepath_relative(a, b string) (string, bool) {
-	a = a[:len(a) - len(filepath.Base(a))]
-
-	path, err := filepath.Rel(a, b)
-
-	if err != nil {
-		return "", false
-	}
-	return filepath.ToSlash(path), true
-}
-
-// validates user input to make sure you're not typing something insane
-func is_valid_path(input string) bool {
-	for _, c := range input {
-		if !(unicode.IsLetter(c) || unicode.IsNumber(c) || c == '.' || c == '/' || c == '\\') {
-			return false
-		}
-	}
-
-	return true
-}
-
-func copy_file(source_path, target_path string) {
-	source, err := os.Open(source_path)
+func copy_file(file *disk_object, output_path string) {
+	source, err := os.Open(file.path)
 	if err != nil {
 		panic(err) // @error
 	}
-
 	defer source.Close()
 
-	destination, err := os.OpenFile(target_path, os.O_CREATE|os.O_WRONLY, 0777)
+	destination, err := os.OpenFile(output_path, os.O_CREATE|os.O_WRONLY, 0777)
 	if err != nil {
 		panic(err)
 	}
-
 	defer destination.Close()
 
 	_, err = io.Copy(destination, source)
@@ -371,7 +339,7 @@ func copy_file(source_path, target_path string) {
 	}
 }
 
-const last_build = "config/.last_build"
+/*const last_build = "config/.last_build"
 
 func read_time() time.Time {
 	content, err := os.ReadFile(last_build)
@@ -395,4 +363,4 @@ func save_time() {
 	if err := os.WriteFile(last_build, the_time, 0777); err != nil {
 		panic(err)
 	}
-}
+}*/

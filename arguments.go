@@ -3,28 +3,81 @@ package main
 import (
 	"os"
 	"fmt"
-	"time"
+	"strings"
+
+	"github.com/BurntSushi/toml"
 )
 
 type config struct {
 	command uint8
 	domain  string
-	path    string
 
-	default_path_type path_type
-
-	built_last time.Time
+	default_path_mode path_type
 
 	build_drafts    bool
-	build_recent    bool
 	build_only_used bool
+
+	output_path string
+
+	inline []*regex_entry
+}
+
+type TOMLConfig struct {
+	Domain            string          `toml:"domain"`
+	Default_Path_Mode string          `toml:"default_path_mode"`
+	Build_Path        string          `toml:"build_path"`
+	Inline            []*Regex_Config `toml:"inline"`
+}
+
+func load_config() (*config, bool) {
+	blob, ok := load_file(config_file_path)
+	if !ok {
+		return nil, false // @error
+	}
+
+	var conf TOMLConfig
+	_, err := toml.Decode(blob, &conf)
+	if err != nil {
+		return nil, false // @error
+	}
+
+	output := config{}
+
+	if x, ok := process_regex_array(conf.Inline); ok {
+		output.inline = x
+	} else {
+		return nil, false // @error
+	}
+
+	switch strings.ToLower(conf.Default_Path_Mode) {
+	case "relative":
+		output.default_path_mode = RELATIVE
+	case "absolute":
+		output.default_path_mode = ABSOLUTE
+	case "root", "rooted":
+		output.default_path_mode = ROOTED
+	default:
+		panic("not a valid path mode in config")
+	}
+
+	if conf.Build_Path == "" {
+		output.output_path = public_path
+ 	} else {
+		output.output_path = conf.Build_Path
+ 	}
+
+	output.domain      = conf.Domain
+
+	return &output, true
 }
 
 func get_arguments() (*config, bool) {
-	args   := os.Args[1:]
-	config := &config{}
+	args := os.Args[1:]
 
-	config.built_last = read_time()
+	config, ok := load_config()
+	if !ok {
+		panic("failed to load config")
+	}
 
 	config.build_only_used = true
 
@@ -66,7 +119,7 @@ func get_arguments() (*config, bool) {
 					return nil, false
 				}
 
-				config.path = path
+				config.output_path = path
 				return config, true
 
 			case "help":
@@ -92,9 +145,6 @@ func get_arguments() (*config, bool) {
 		case "help", "h":
 			config.command = HELP
 			return config, true
-
-		case "only-new", "n":
-			config.build_recent = true
 
 		case "all", "a":
 			config.build_only_used = false

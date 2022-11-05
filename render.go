@@ -357,10 +357,15 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				n    := int(entry.subname)
 
 				if n > len(args) {
-					panic("overflow on var_enum")
+					spindle.errors.new_pos(
+						RENDER_WARNING, popped_anon.position,
+						"this line only supplies %d arguments\n    template variable at %s — line %d has requested %d arguments\n    output may be unexpected",
+						len(args), entry.position.file_path, entry.position.line, n,
+					)
+					text = ""
+				} else {
+					text = args[n - 1]
 				}
-
-				text = args[n - 1]
 			}
 
 			if entry.modifier > mod_active {
@@ -405,7 +410,15 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if ok {
-				path := found_file.path
+				if !spindle.config.build_drafts && found_file.is_draft {
+					spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder links draft %q: becomes link to missing resource when built", found_file.path)
+				}
+
+				the_url := ""
+
+				if entry.path_type == NO_PATH_TYPE {
+					entry.path_type = spindle.config.default_path_mode
+				}
 
 				switch entry.finder_type {
 				case _IMAGE:
@@ -415,19 +428,20 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					}
 
 					if entry.image_settings != nil {
-						path = rewrite_image_path(path, entry.image_settings)
-
 						settings := *entry.image_settings
-
-						if settings.format == 0 {
-							settings.format = found_file.file_type
+						if settings.file_type == 0 {
+							settings.file_type = found_file.file_type
 						}
 
-						spindle.generated_images[new_hash(find_text)] = &generated_image{
+						the_url = make_generated_image_url(spindle, found_file, &settings, entry.path_type, page.page_path)
+
+						spindle.generated_images[new_hash(found_file.path)] = &generated_image{
 							false, found_file, &settings,
 						}
 
 					} else {
+						the_url = make_general_url(spindle, found_file, entry.path_type, page.page_path)
+
 						// if it has modifiers, only the generated image is used
 						// so we don't mark it here
 						found_file.is_used = true
@@ -438,7 +452,8 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "page resource finder cannot process non-page file %q", find_text)
 						r.unwind = true
 					}
-					path = rewrite_ext(path, "") // @todo global config on pretty urls
+
+					the_url = make_page_url(spindle, found_file, entry.path_type, page.page_path)
 					found_file.is_used = true
 
 				case _STATIC:
@@ -446,29 +461,12 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "static resource finder cannot process non-static file %q", find_text)
 						r.unwind = true
 					}
+
+					the_url = make_general_url(spindle, found_file, entry.path_type, page.page_path)
 					found_file.is_used = true
 				}
 
-				if spindle.server_mode {
-					entry.path_type = ROOTED
-				} else if entry.path_type == NO_PATH_TYPE {
-					entry.path_type = spindle.config.default_path_type
-				}
-
-				switch entry.path_type {
-				case ROOTED:
-					buffer.WriteRune('/')
-					buffer.WriteString(rewrite_root(path, ""))
-
-				case RELATIVE:
-					if path, ok := filepath_relative(page.page_path, path); ok {
-						buffer.WriteString(path)
-					}
-
-				case ABSOLUTE:
-					buffer.WriteString(spindle.config.domain)
-					buffer.WriteString(rewrite_root(path, ""))
-				}
+				buffer.WriteString(the_url)
 
 				spindle.finder_cache[find_text] = found_file
 
@@ -526,7 +524,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				did_push := r.push_blank_scope(immediate_decl_count(children))
 				r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-				buffer.WriteString(r.render_ast(spindle, page, children))
+				buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 
 				if did_push {
 					r.pop_scope()
@@ -538,7 +536,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					if ok {
 						children := wrapper_block.get_children()
 						r.push_anon(x, children, *entry.get_position(), entry.orig_field)
-						buffer.WriteString(r.render_ast(spindle, page, children))
+						buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 						continue
 					}
 				}
@@ -549,7 +547,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			// else:
-			buffer.WriteString(r.render_ast(spindle, page, x))
+			buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, x)))
 
 		case CONTROL_IF:
 			entry := entry.(*ast_if)
@@ -633,7 +631,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 					r.push_anon(x, children, *entry.get_position(), page.raw_string)
 
-					buffer.WriteString(r.render_ast(spindle, page, children))
+					buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 
 					if did_push { r.pop_scope() }
 					continue
@@ -660,21 +658,3 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 	return buffer.String()
 }
-
-/*func count_repeat_tokens(input []ast_data, hash uint32) int {
-	for i, forward_check := range input {
-		t := forward_check.type_check()
-
-		if t != TOKEN {
-			return i
-		}
-
-		x := forward_check.(*ast_token)
-
-		if x.decl_hash != hash {
-			return i
-		}
-	}
-
-	return len(input)
-}*/

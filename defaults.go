@@ -5,6 +5,7 @@ const (
 	base_hash    uint32 = 537692064  // "%"
 	it_hash      uint32 = 1194886160 // "it"
 	stop_hash    uint32 = 722245873  // "."
+	index_hash   uint32 = 151693739  // "index"
 )
 
 const main_template = `/ markdown emulation

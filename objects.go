@@ -52,7 +52,7 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree := parse_stream(spindle.errors, token_stream, false)
+	syntax_tree := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	/*if spindle.errors.has_failures {
@@ -78,7 +78,7 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	}
 
 	token_stream := lex_blob(full_path, blob)
-	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
+	syntax_tree  := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
@@ -138,7 +138,7 @@ func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
 	}
 
 	token_stream := lex_blob(full_path, blob)
-	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
+	syntax_tree  := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &partial_object{
