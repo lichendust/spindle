@@ -41,8 +41,12 @@ type gen_page struct {
 }
 
 func load_page(spindle *spindle, full_path string) (*page_object, bool) {
-	if p, ok := spindle.pages[full_path]; ok {
-		return p, true
+	cache_path := full_path[:len(full_path) - len(filepath.Ext(full_path))]
+
+	if !spindle.server_mode {
+		if p, ok := spindle.pages[cache_path]; ok {
+			return p, true
+		}
 	}
 
 	blob, ok := load_file(full_path)
@@ -54,7 +58,7 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree := parse_stream(spindle.errors, token_stream)
+	syntax_tree := parse_stream(spindle.errors, token_stream, false)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &page_object{
@@ -66,7 +70,9 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	p.top_scope = arrange_top_scope(syntax_tree)
 	p.position  = position{0,0,0,full_path}
 
-	spindle.pages[full_path] = p
+	if !spindle.server_mode {
+		spindle.pages[cache_path] = p
+	}
 
 	return p, true
 }
@@ -81,7 +87,7 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree  := parse_stream(spindle.errors, token_stream)
+	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
@@ -144,7 +150,7 @@ func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree  := parse_stream(spindle.errors, token_stream)
+	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &partial_object{

@@ -4,6 +4,7 @@ import (
 	"os"
 	"io"
 	"io/fs"
+	"time"
 	"path/filepath"
 )
 
@@ -89,6 +90,7 @@ func ext_for_file_type(file_type file_type) string {
 type disk_object struct {
 	file_type file_type
 	hash_name uint32
+	hash_url  uint32
 	is_used   bool
 	is_built  bool
 	is_draft  bool
@@ -113,20 +115,19 @@ func new_file_tree() []*disk_object {
 	return make([]*disk_object, 0, 32)
 }
 
-func load_file_tree() (*disk_object, bool) {
+func load_file_tree(spindle *spindle) (*disk_object, bool) {
 	f := &disk_object{
 		file_type: ROOT,
 		is_used:   true,
 		path:      source_path,
 	}
 
-	x, ok := recurse_directories(f)
-
+	children, ok := recurse_directories(spindle, f)
 	if !ok {
 		return nil, false
 	}
 
-	f.children = x
+	f.children = children
 
 	return f, true
 }
@@ -141,7 +142,7 @@ func hash_base_name(file *disk_object) uint32 {
 	return new_hash(base)
 }
 
-func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
+func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object, bool) {
 	array := new_file_tree()
 
 	err := filepath.WalkDir(parent.path, func(path string, file fs.DirEntry, err error) error {
@@ -166,7 +167,7 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 
 			the_file.hash_name = hash_base_name(the_file)
 
-			if x, ok := recurse_directories(the_file); ok {
+			if x, ok := recurse_directories(spindle, the_file); ok {
 				the_file.children = x
 			}
 
@@ -185,6 +186,12 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 		the_file.file_type = to_file_type(path)
 		the_file.hash_name = hash_base_name(the_file)
 
+		if x := the_file.file_type; x > is_page && x < end_page {
+			the_file.hash_url = new_hash(make_page_url(spindle, the_file, ROOTED, ""))
+		} else {
+			the_file.hash_url = new_hash(make_general_url(spindle, the_file, ROOTED, ""))
+		}
+
 		array = append(array, the_file)
 		return nil
 	})
@@ -193,6 +200,22 @@ func recurse_directories(parent *disk_object) ([]*disk_object, bool) {
 	}
 
 	return array, true
+}
+
+func find_file_hash(start_location *disk_object, target uint32) (*disk_object, bool) {
+	for _, entry := range start_location.children {
+		if entry.file_type == DIRECTORY {
+			if x, ok := find_file_hash(entry, target); ok {
+				return x, true
+			}
+			continue
+		}
+		if entry.hash_url == target {
+			return entry, true
+		}
+	}
+
+	return nil, false
 }
 
 func find_file(start_location *disk_object, target string) (*disk_object, bool) {
@@ -261,7 +284,7 @@ func find_file(start_location *disk_object, target string) (*disk_object, bool) 
 	return false
 }*/
 
-/*func folder_has_changes(root_path string, last_run time.Time) bool {
+func folder_has_changes(root_path string, last_run time.Time) bool {
 	first := false
 	has_changes := false
 
@@ -277,6 +300,7 @@ func find_file(start_location *disk_object, target string) (*disk_object, bool) 
 
 		if info.ModTime().After(last_run) {
 			has_changes = true
+			return filepath.SkipDir
 		}
 
 		return nil
@@ -286,7 +310,7 @@ func find_file(start_location *disk_object, target string) (*disk_object, bool) 
 	}
 
 	return has_changes
-}*/
+}
 
 func load_file(source_file string) (string, bool) {
 	content, err := os.ReadFile(source_file)

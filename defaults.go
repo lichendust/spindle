@@ -21,6 +21,9 @@ const (
 	it_hash      uint32 = 1194886160 // "it"
 	stop_hash    uint32 = 722245873  // "."
 	index_hash   uint32 = 151693739  // "index"
+
+	is_server_hash     uint32 = 3014801206 // "spindle.is_server"
+	reload_script_hash uint32 = 2807780945 // "spindle.reload_script"
 )
 
 const main_template = `/ markdown emulation
@@ -58,6 +61,11 @@ const main_template = `/ markdown emulation
 	<title>%title</title>
 	/ <script type="text/javascript" src="" defer></script>
 	/ <link rel="stylesheet" type="text/css" href=""/>
+
+	/ this allows you to hotload pages during local development
+	if %spindle.is_server {
+		. %spindle.reload_script
+	}
 </head>
 <body>%%</body>
 </html>`

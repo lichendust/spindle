@@ -45,22 +45,33 @@ func make_general_url(spindle *spindle, file *disk_object, path_type path_type, 
 	output_path := rewrite_by_path_type(path_type, spindle.config.domain, current_location, file.path)
 	output_path = rewrite_ext(output_path, ext_for_file_type(file.file_type))
 
-	if file.is_draft {
+	if spindle.build_drafts && file.is_draft {
 		output_path = undraft_path(output_path)
 	}
 	return output_path
 }
 
 func make_page_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
-	if spindle.server_mode {
-		return rewrite_by_path_type(ROOTED, spindle.config.domain, current_location, file.path)
+	output_path := rewrite_ext(file.path, "")
+
+	if strings.HasSuffix(output_path, "index") {
+		if len(output_path) == 5 {
+			output_path = "/"
+		} else {
+			output_path = output_path[:len(output_path) - 6]
+		}
 	}
 
-	output_path := rewrite_by_path_type(path_type, spindle.config.domain, current_location, file.path)
-	if file.is_draft {
-		output_path = undraft_path(output_path)
+	if spindle.server_mode {
+		output_path = rewrite_by_path_type(ROOTED, spindle.domain, current_location, output_path)
+	} else {
+		output_path = rewrite_by_path_type(path_type, spindle.domain, current_location, output_path)
+
+		if spindle.build_drafts && file.is_draft {
+			output_path = undraft_path(output_path)
+		}
 	}
-	output_path = rewrite_ext(output_path, "")
+
 	return output_path
 }
 
@@ -70,41 +81,11 @@ func make_generated_image_url(spindle *spindle, file *disk_object, s *image_sett
 	}
 
 	output_path := rewrite_by_path_type(path_type, spindle.config.domain, current_location, file.path)
-	new_ext := ext_for_file_type(s.file_type)
-	hash    := s.make_hash()
+	new_ext     := ext_for_file_type(s.file_type)
+	hash        := s.make_hash()
 
 	return rewrite_ext(output_path, fmt.Sprintf("_%d%s", hash, new_ext))
 }
-
-/*func make_public_file_path(spindle *spindle, file *disk_object) string {
-	output_path := ""
-
-	new_ext := ext_for_file_type(file.file_type)
-	if new_ext == "" {
-		output_path = rewrite_root(file.path, public_path)
-	} else {
-		output_path = rewrite_ext(rewrite_root(file.path, public_path), new_ext)
-	}
-
-	return output_path
-}
-
-func make_public_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
-	path := make_public_file_path(spindle, file)
-
-	if spindle.server_mode {
-		path_type = ROOTED
-	} else {
-		if is_draft(path) {
-			path = undraft_path(path)
-		}
-		if path_type == NO_PATH_TYPE {
-			path_type = spindle.config.default_path_mode
-		}
-	}
-
-	return rewrite_by_path_type(path_type, spindle.config.domain, current_location, path)
-}*/
 
 func rewrite_by_path_type(path_type path_type, domain, current_location, target_location string) string {
 	buffer := strings.Builder{}

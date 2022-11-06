@@ -37,12 +37,13 @@ func main() {
 
 	spindle := spindle{}
 	spindle.config = config
+	spindle.errors = new_error_handler()
 
 	switch config.command {
 	case BUILD:
 		command_build(&spindle)
-	/*case SERVE:
+	case SERVE:
 		spindle.server_mode = true
-		command_serve(&spindle)*/
+		command_serve(&spindle)
 	}
 }

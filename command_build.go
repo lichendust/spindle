@@ -7,9 +7,7 @@ import (
 )
 
 func command_build(spindle *spindle) {
-	spindle.errors = new_error_handler()
-
-	if data, ok := load_file_tree(); ok {
+	if data, ok := load_file_tree(spindle); ok {
 		spindle.file_tree = data
 	}
 

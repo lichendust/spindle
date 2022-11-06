@@ -244,7 +244,7 @@ type ast_builtin struct {
 	ast_base_fields
 	ast_type  ast_type
 	hash_name uint32
-	target    string
+	// target    string
 }
 func (t *ast_builtin) type_check() ast_type {
 	return t.ast_type

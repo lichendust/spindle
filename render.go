@@ -13,6 +13,9 @@ func render_syntax_tree(spindle *spindle, page *page_object, import_condition ui
 		scope_stack:      scope_stack,
 	}
 
+	r.push_string_on_scope(is_server_hash, "") // just has to exist
+	r.push_string_on_scope(reload_script_hash, reload_script)
+
 	return r.render_ast(spindle, page, page.content)
 }
 
@@ -337,6 +340,11 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			text := ""
 
 			if entry.ast_type.is(VAR_ANON, VAR_ENUM) {
+				if popped_anon == nil {
+					_println(entry.position)
+					panic("popped anon was missing!")
+				}
+
 				popped_anon.anon_count -= 1
 
 				if popped_anon.anon_count <= 0 {

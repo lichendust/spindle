@@ -13,12 +13,12 @@ type parser struct {
 	array  []*lexer_token
 }
 
-func parse_stream(errors *error_handler, array []*lexer_token) []ast_data {
+func parse_stream(errors *error_handler, array []*lexer_token, allow_anon bool) []ast_data {
 	parser := parser {
 		array:  array,
 		errors: errors,
 	}
-	return parser.parse_block(0)
+	return parser.parse_block(0, allow_anon)
 }
 
 func (parser *parser) get_non_word(token *lexer_token) (string, int) {
@@ -43,7 +43,7 @@ func (parser *parser) get_non_word(token *lexer_token) (string, int) {
 	return strings.Repeat(token.field, count + 1), count
 }
 
-func (parser *parser) parse_block(max_depth int) []ast_data {
+func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 	if parser.unwind {
 		return []ast_data{}
 	}
@@ -81,7 +81,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				}
 
 				parser.eat_whitespace()
-				new_tok.children = parser.parse_paragraph(NULL)
+				new_tok.children = parser.parse_paragraph(allow_anon, NULL)
 				new_tok.position = token.position
 
 				array = append(array, new_tok)
@@ -128,7 +128,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			parser.eat_whitespace()
 
 			if the_type == IMPORT {
-				x := parser.parse_paragraph(WHITESPACE)
+				x := parser.parse_paragraph(allow_anon, WHITESPACE)
 
 				if len(x) == 0 {
 					panic("no children")
@@ -178,7 +178,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				parser.eat_whitespace()
 
-				the_if.children = parser.parse_block(1)
+				the_if.children = parser.parse_block(1, allow_anon)
 				the_if.position = token.position
 
 
@@ -192,7 +192,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				the_for := &ast_for{}
 				parser.eat_whitespace()
 
-				x := parser.parse_paragraph(WHITESPACE)
+				x := parser.parse_paragraph(allow_anon, WHITESPACE)
 
 				if len(x) == 0 {
 					parser.step_back()
@@ -210,7 +210,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 
 				parser.eat_whitespace()
 
-				the_for.children = parser.parse_block(1)
+				the_for.children = parser.parse_block(1, allow_anon)
 				the_for.position = token.position
 
 
@@ -260,7 +260,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					continue
 				}
 
-				the_block.children = parser.parse_block(0)
+				the_block.children = parser.parse_block(0, allow_anon)
 				the_block.position = token.position
 
 
@@ -294,7 +294,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						new_block := &ast_block{
 							decl_hash: new_hash(x.field),
 						}
-						new_block.children = parser.parse_block(0)
+						new_block.children = parser.parse_block(0, true)
 						new_block.position = x.position
 
 						new_block.position.end += 1 // the closing brace
@@ -310,10 +310,10 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 						}
 
 						parser.eat_whitespace()
-						the_decl.children = parser.parse_paragraph(NULL)
+						the_decl.children = parser.parse_paragraph(true, NULL)
 					}
 				} else {
-					the_decl.children = parser.parse_paragraph(NULL)
+					the_decl.children = parser.parse_paragraph(true, NULL)
 				}
 
 				array = append(array, the_decl)
@@ -330,7 +330,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 			if p := parser.peek(); p.ast_type.is(WHITESPACE, NEWLINE) {
 				the_block := &ast_block{}
 
-				the_block.children = parser.parse_block(0)
+				the_block.children = parser.parse_block(0, allow_anon)
 				the_block.position = token.position
 
 
@@ -424,7 +424,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					new_block := &ast_block{
 						decl_hash: new_hash(x.field),
 					}
-					new_block.children = parser.parse_block(0)
+					new_block.children = parser.parse_block(0, allow_anon)
 					new_block.position = x.position
 
 
@@ -434,13 +434,13 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 					the_decl.position.start = new_block.position.start
 				} else {
 					parser.step_backn(2)
-					the_decl.children = parser.parse_paragraph(NULL)
+					the_decl.children = parser.parse_paragraph(allow_anon, NULL)
 				}
 			} else if x.ast_type == BRACE_OPEN {
 				parser.next()
-				the_decl.children = parser.parse_block(0)
+				the_decl.children = parser.parse_block(0, allow_anon)
 			} else {
-				the_decl.children = parser.parse_paragraph(NULL)
+				the_decl.children = parser.parse_paragraph(allow_anon, NULL)
 			}
 
 
@@ -455,7 +455,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 				ast_type: NORMAL,
 			}
 			the_para.position = token.position
-			the_para.children = parser.parse_paragraph(NULL)
+			the_para.children = parser.parse_paragraph(allow_anon, NULL)
 
 
 			// @todo sanitise any escaped special characters that fall down here
@@ -471,7 +471,7 @@ func (parser *parser) parse_block(max_depth int) []ast_data {
 	return array
 }
 
-func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
+func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []ast_data {
 	if parser.unwind {
 		return []ast_data{}
 	}
@@ -583,7 +583,7 @@ func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 
 				{
 					parser.eat_whitespace()
-					the_finder.children = parser.parse_paragraph(WHITESPACE, BRACE_CLOSE)
+					the_finder.children = parser.parse_paragraph(allow_anon, WHITESPACE, BRACE_CLOSE)
 					// @error error if more than one child
 
 					parser.eat_whitespace()
@@ -608,7 +608,7 @@ func (parser *parser) parse_paragraph(exit_upon ...ast_type) []ast_data {
 				continue
 			}
 
-			new_var := parser.parse_variable()
+			new_var := parser.parse_variable(allow_anon)
 
 			if new_var == nil {
 				n := &ast_base{
@@ -659,7 +659,7 @@ func (parser *parser) parse_if() []ast_data {
 			})
 
 		case PERCENT:
-			new_var := parser.parse_variable()
+			new_var := parser.parse_variable(false)
 
 			if new_var == nil {
 				panic("bad thing in if")
@@ -700,7 +700,7 @@ func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
 	return new_hash(a.field), 0, 0
 }
 
-func (parser *parser) parse_variable() *ast_variable {
+func (parser *parser) parse_variable(allow_anon bool) *ast_variable {
 	new_var := &ast_variable{}
 
 	a := parser.peek()
@@ -714,7 +714,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.taxonomy = taxonomy
 		new_var.subname  = subname
 
-	} else if a.ast_type == NUMBER {
+	} else if allow_anon && a.ast_type == NUMBER {
 		parser.next()
 		the_type = VAR_ENUM
 
@@ -726,7 +726,7 @@ func (parser *parser) parse_variable() *ast_variable {
 		new_var.field   = base_hash
 		new_var.subname = uint32(n)
 
-	} else if a.ast_type == PERCENT {
+	} else if allow_anon && a.ast_type == PERCENT {
 		parser.next()
 		the_type      = VAR_ANON
 		new_var.field = base_hash // just a %
