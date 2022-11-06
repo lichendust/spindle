@@ -1046,6 +1046,18 @@ func immediate_decl_count(children []ast_data) int {
 	return count
 }
 
+func arrange_top_scope(content []ast_data) []ast_data {
+	array := make([]ast_data, 0, 8)
+
+	for _, entry := range content {
+		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK, TEMPLATE) {
+			array = append(array, entry)
+		}
+	}
+
+	return array
+}
+
 func reindent_text(input string) string {
 	input = strings.ReplaceAll(input, "\t", "    ")
 	lines := strings.Split(input, "\n")

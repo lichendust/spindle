@@ -24,7 +24,7 @@ func make_general_file_path(spindle *spindle, file *disk_object) string {
 	return output_path
 }
 
-func make_generated_image_path(spindle *spindle, the_image *generated_image) string {
+func make_generated_image_path(spindle *spindle, the_image *gen_image) string {
 	public_path := spindle.config.output_path
 	file_path   := the_image.original.path
 	s           := the_image.settings

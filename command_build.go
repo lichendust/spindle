@@ -3,46 +3,23 @@ package main
 import (
 	"os"
 	"fmt"
-	"strings"
 	"path/filepath"
 )
 
-const (
-	VERSION uint8 = iota
-	HELP
-	INIT
-	BUILD
-	SERVE
-)
-
-func command_init(config *config) {
-	if config.output_path != "" {
-		make_dir(config.output_path)
-		os.Chdir(config.output_path)
-	}
-
-	make_dir(template_path)
-	make_dir(partial_path)
-	make_dir(script_path)
-	make_dir(source_path)
-
-	write_file(filepath.Join(config_path, "main.x"),  main_template)
-	write_file(filepath.Join(source_path, "index.x"), index_template)
-}
-
-func command_build(config *config) {
-	spindle := &spindle{}
-	spindle.config = config
+func command_build(spindle *spindle) {
 	spindle.errors = new_error_handler()
 
 	if data, ok := load_file_tree(); ok {
 		spindle.file_tree = data
 	}
 
-	spindle.templates        = load_all_templates(spindle)
-	spindle.partials         = load_all_partials(spindle)
-	spindle.finder_cache     = make(map[string]*disk_object, 64)
-	spindle.generated_images = make(map[uint32]*generated_image, 32)
+	spindle.templates    = load_all_templates(spindle)
+	spindle.partials     = load_all_partials(spindle)
+
+	spindle.pages        = make(map[string]*page_object, 64)
+	spindle.finder_cache = make(map[string]*disk_object, 64)
+	spindle.gen_images   = make(map[uint32]*gen_image, 32)
+	spindle.gen_pages    = make(map[string]*gen_page, 32)
 
 	make_dir(public_path)
 
@@ -65,10 +42,7 @@ func command_build(config *config) {
 		}
 	}
 
-	for _, image := range spindle.generated_images {
-		if image.is_built {
-			continue
-		}
+	for _, image := range spindle.gen_images {
 		if image.original.is_draft && !spindle.config.build_drafts {
 			continue
 		}
@@ -87,8 +61,6 @@ func command_build(config *config) {
 	if spindle.errors.has_errors() {
 		fmt.Fprintln(os.Stderr, spindle.errors.render_term_errors())
 	}
-
-	// print_file_tree(spindle.file_tree.children, 0)
 }
 
 func build_pages(spindle *spindle, file *disk_object) bool {
@@ -126,7 +98,7 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 				panic("failed to load page " + file.path)
 			}
 
-			assembled := render_syntax_tree(spindle, page)
+			assembled := render_syntax_tree(spindle, page, 0)
 
 			if !write_file(output_path, assembled) {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
@@ -147,9 +119,9 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 	return is_done
 }
 
-func format_index(input string) string {
+/*func format_index(input string) string {
 	if !strings.Contains(input, "index") {
 		return filepath.Base(input)
 	}
 	return input
-}
+}*/

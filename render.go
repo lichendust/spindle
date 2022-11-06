@@ -3,29 +3,30 @@ package main
 import "fmt"
 import "strings"
 
-func render_syntax_tree(spindle *spindle, page *page_object) string {
+func render_syntax_tree(spindle *spindle, page *page_object, import_condition uint32) string {
 	scope_stack := make([]map[uint32]*ast_declare, 0, 4)
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
 
 	r := &renderer{
-		anon_stack:  make([]*anon_entry, 0, 4),
-		scope_stack: scope_stack,
+		import_condition: import_condition,
+		anon_stack:       make([]*anon_entry, 0, 4),
+		scope_stack:      scope_stack,
 	}
 
 	return r.render_ast(spindle, page, page.content)
 }
 
 type renderer struct {
-	unwind      bool
-	anon_stack  []*anon_entry
-	scope_stack []map[uint32]*ast_declare
+	unwind           bool
+	import_condition uint32
+	anon_stack       []*anon_entry
+	scope_stack      []map[uint32]*ast_declare
 }
 
 type anon_entry struct {
 	anon_count int
 	position   position
 	children   []ast_data
-	raw_string string
 }
 
 func (r *renderer) get_anon() *anon_entry {
@@ -41,12 +42,11 @@ func (r *renderer) pop_anon() {
 	}
 }
 
-func (r *renderer) push_anon(content, wrapper []ast_data, pos position, raw_string string) {
+func (r *renderer) push_anon(content, wrapper []ast_data, pos position) {
 	stack_entry := &anon_entry{
 		anon_count: recursive_anon_count(wrapper),
 		children:   content,
 		position:   pos,
-		raw_string:   raw_string,
 	}
 	r.anon_stack = append(r.anon_stack, stack_entry)
 }
@@ -241,20 +241,33 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				found_file, ok = find_file(spindle.file_tree, find_text)
 			}
 
-			// @todo
-			/*if found_file.is_draft {
-				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "imported page %q is draft!", found_file.path)
-				continue
-			}*/
-
-			// @todo this block is messy, clean it up
-
-			if !ok {
-				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", find_text)
-				continue
+			if ok {
+				if !spindle.config.build_drafts && found_file.is_draft {
+					spindle.errors.new_pos(RENDER_WARNING, entry.position, "imported page %q is draft!", found_file.path)
+				}
+			} else {
+				spindle.errors.new_pos(RENDER_WARNING, entry.position, "didn't find page %q in import", find_text)
 			}
 
-			imported_page, page_success := load_page(spindle, found_file.path)
+			imported_page, page_success := load_page(spindle, found_file.path) // @todo cache
+
+			if r.import_condition > 0 {
+				has_match := false
+
+				for _, entry := range imported_page.top_scope {
+					if entry.type_check() != TEMPLATE {
+						entry := entry.(*ast_declare)
+						if entry.field == r.import_condition {
+							has_match = true
+							break
+						}
+					}
+				}
+
+				if !has_match {
+					continue
+				}
+			}
 
 			if !page_success {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", found_file.path)
@@ -303,7 +316,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				did_push := r.push_blank_scope(immediate_decl_count(t.content))
 
 				r.write_collective_to_scope(spindle, input[1:])
-				r.push_anon(input[1:], t.content, t.position, t.raw_string)
+				r.push_anon(input[1:], t.content, t.position)
 
 				buffer.WriteString(r.render_ast(spindle, page, t.content))
 
@@ -330,21 +343,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					r.pop_anon()
 				}
 
-				if entry.modifier == RAW_SUB {
-					pos := popped_anon.position
-					raw := popped_anon.raw_string[pos.start:pos.end]
-
-					raw = reindent_text(raw)
-
-					new := []ast_data{&ast_base{
-						ast_type: RAW,
-						field:    raw,
-					}}
-
-					text = r.render_ast(spindle, page, new)
-				} else {
-					text = r.render_ast(spindle, page, popped_anon.children)
-				}
+				text = r.render_ast(spindle, page, popped_anon.children)
 
 			} else {
 				if found, ok := r.get_in_scope(entry.field); ok {
@@ -368,7 +367,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				}
 			}
 
-			if entry.modifier > mod_active {
+			if entry.modifier > NONE {
 				switch entry.modifier {
 				case SLUG:
 					text = make_slug(text)
@@ -435,8 +434,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 						the_url = make_generated_image_url(spindle, found_file, &settings, entry.path_type, page.page_path)
 
-						spindle.generated_images[new_hash(found_file.path)] = &generated_image{
-							false, found_file, &settings,
+						{
+							hash := new_hash(the_url)
+							if _, ok := spindle.gen_images[hash]; !ok {
+								spindle.gen_images[hash] = &gen_image{
+									false, found_file, &settings,
+								}
+							}
 						}
 
 					} else {
@@ -486,7 +490,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					children := wrapper_block.get_children()
 
 					did_push := r.push_blank_scope(immediate_decl_count(children))
-					r.push_anon(x, children, *entry.get_position(), page.raw_string)
+					r.push_anon(x, children, *entry.get_position())
 
 					buffer.WriteString(r.render_ast(spindle, page, children))
 
@@ -522,7 +526,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				children := wrapper_block.get_children()
 
 				did_push := r.push_blank_scope(immediate_decl_count(children))
-				r.push_anon(x, children, *entry.get_position(), page.raw_string)
+				r.push_anon(x, children, *entry.get_position())
 
 				buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 
@@ -535,7 +539,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					wrapper_block, ok := r.get_in_scope(default_hash)
 					if ok {
 						children := wrapper_block.get_children()
-						r.push_anon(x, children, *entry.get_position(), entry.orig_field)
+						r.push_anon(x, children, *entry.get_position())
 						buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 						continue
 					}
@@ -566,7 +570,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					children := wrapper_block.get_children()
 
 					did_push := r.push_blank_scope(immediate_decl_count(children))
-					r.push_anon(x, children, *entry.get_position(), page.raw_string)
+					r.push_anon(x, children, *entry.get_position())
 
 					buffer.WriteString(r.render_ast(spindle, page, children))
 
@@ -605,7 +609,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			if the_block.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(the_block.decl_hash)
 				if ok {
-					r.push_anon([]ast_data{&ast_base{ast_type:NORMAL,field:sub_buffer.String()}}, wrapper_block.get_children(), *entry.get_position(), page.raw_string)
+					r.push_anon([]ast_data{&ast_base{ast_type:NORMAL,field:sub_buffer.String()}}, wrapper_block.get_children(), *entry.get_position())
 					buffer.WriteString(r.render_ast(spindle, page, wrapper_block.get_children()))
 				}
 			} else {
@@ -629,7 +633,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					children := wrapper_block.get_children()
 					did_push := r.push_blank_scope(immediate_decl_count(children))
 
-					r.push_anon(x, children, *entry.get_position(), page.raw_string)
+					r.push_anon(x, children, *entry.get_position())
 
 					buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
 

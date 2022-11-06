@@ -27,7 +27,7 @@ func (s *image_settings) make_hash() uint32 {
 	return new_hash(fmt.Sprintf("%d%d%d%d", s.width, s.height, s.quality, s.file_type))
 }
 
-func copy_generated_image(the_image *generated_image, output_path string) bool {
+func copy_generated_image(the_image *gen_image, output_path string) bool {
 	var source_image image.Image
 
 	incoming_file := the_image.original

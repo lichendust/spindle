@@ -29,16 +29,16 @@ type TOMLConfig struct {
 	Inline            []*Regex_Config `toml:"inline"`
 }
 
-func load_config() (*config, bool) {
+func load_config() (config, bool) {
 	blob, ok := load_file(config_file_path)
 	if !ok {
-		return nil, false // @error
+		return config{}, false // @error
 	}
 
 	var conf TOMLConfig
 	_, err := toml.Decode(blob, &conf)
 	if err != nil {
-		return nil, false // @error
+		return config{}, false // @error
 	}
 
 	output := config{}
@@ -46,7 +46,7 @@ func load_config() (*config, bool) {
 	if x, ok := process_regex_array(conf.Inline); ok {
 		output.inline = x
 	} else {
-		return nil, false // @error
+		return config{}, false // @error
 	}
 
 	switch strings.ToLower(conf.Default_Path_Mode) {
@@ -66,12 +66,12 @@ func load_config() (*config, bool) {
 		output.output_path = conf.Build_Path
  	}
 
-	output.domain      = conf.Domain
+	output.domain = conf.Domain
 
-	return &output, true
+	return output, true
 }
 
-func get_arguments() (*config, bool) {
+func get_arguments() (config, bool) {
 	args := os.Args[1:]
 
 	config, ok := load_config()
@@ -116,7 +116,7 @@ func get_arguments() (*config, bool) {
 
 				if !is_valid_path(path) {
 					// @error
-					return nil, false
+					return config, false
 				}
 
 				config.output_path = path

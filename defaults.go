@@ -1,5 +1,20 @@
 package main
 
+// filepaths
+const (
+	extension = ".x"
+
+	source_path = "source"
+	public_path = "public"
+	config_path = "config"
+	config_file_path = "config/spindle.toml"
+
+	template_path = config_path + "/templates"
+	partial_path  = config_path + "/partials"
+	script_path   = config_path + "/scripts"
+)
+
+// hashes
 const (
 	default_hash uint32 = 2470140894 // "default"
 	base_hash    uint32 = 537692064  // "%"

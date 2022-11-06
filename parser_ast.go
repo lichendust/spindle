@@ -85,9 +85,6 @@ const (
 type ast_modifier uint8
 const (
 	NONE ast_modifier = iota
-	RAW_SUB
-
-	mod_active
 	SLUG
 	UNIQUE_SLUG
 	UPPER
@@ -247,6 +244,7 @@ type ast_builtin struct {
 	ast_base_fields
 	ast_type  ast_type
 	hash_name uint32
+	target    string
 }
 func (t *ast_builtin) type_check() ast_type {
 	return t.ast_type

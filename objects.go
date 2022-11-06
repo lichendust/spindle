@@ -5,44 +5,46 @@ import (
 	"path/filepath"
 )
 
+type markup struct {
+	content   []ast_data
+	top_scope []ast_data
+	position  position
+}
+
 type page_object struct {
+	markup
 	// page_id      uint32
-	page_path    string
-	content      []ast_data
-	top_scope    []ast_data
 	slug_tracker map[string]uint
-	raw_string   string
-	position     position
+	page_path    string
 }
 
 type template_object struct {
+	markup
 	has_body      bool
 	template_path string
-	content       []ast_data
-	top_scope     []ast_data
-	raw_string    string
-	position      position
 }
 
 type partial_object struct {
+	markup
 	partial_path string
-	content      []ast_data
-	raw_string   string
 }
 
-func arrange_top_scope(content []ast_data) []ast_data {
-	array := make([]ast_data, 0, 8)
+type gen_image struct {
+	is_built bool
+	original *disk_object
+	settings *image_settings
+}
 
-	for _, entry := range content {
-		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK, TEMPLATE) {
-			array = append(array, entry)
-		}
-	}
-
-	return array
+type gen_page struct {
+	is_built bool
+	original *disk_object
 }
 
 func load_page(spindle *spindle, full_path string) (*page_object, bool) {
+	if p, ok := spindle.pages[full_path]; ok {
+		return p, true
+	}
+
 	blob, ok := load_file(full_path)
 
 	if !ok {
@@ -55,18 +57,17 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	syntax_tree := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
-	/*if spindle.errors.has_failures {
-		return nil, false
-	}*/
-
 	p := &page_object{
 		page_path:    full_path,
-		content:      syntax_tree,
-		top_scope:    arrange_top_scope(syntax_tree),
-		raw_string:   blob,
 		slug_tracker: make(map[string]uint, 4),
-		position:     position{0,0,0,full_path},
 	}
+
+	p.content   = syntax_tree
+	p.top_scope = arrange_top_scope(syntax_tree)
+	p.position  = position{0,0,0,full_path}
+
+	spindle.pages[full_path] = p
+
 	return p, true
 }
 
@@ -78,17 +79,20 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	}
 
 	token_stream := lex_blob(full_path, blob)
+	// print_token_stream(token_stream)
+
 	syntax_tree  := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
-		content:       syntax_tree,
-		template_path: full_path,
-		top_scope:     arrange_top_scope(syntax_tree),
 		has_body:      recursive_anon_count(syntax_tree) > 0,
-		raw_string:    blob,
-		position:      position{0,0,0,full_path},
+		template_path: full_path,
 	}
+
+	t.content   = syntax_tree
+	t.top_scope = arrange_top_scope(syntax_tree)
+	t.position  = position{0,0,0,full_path}
+
 	return t, true
 }
 
@@ -138,14 +142,16 @@ func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
 	}
 
 	token_stream := lex_blob(full_path, blob)
+	// print_token_stream(token_stream)
+
 	syntax_tree  := parse_stream(spindle.errors, token_stream)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &partial_object{
 		partial_path: full_path,
-		content:      syntax_tree,
-		raw_string:   blob,
 	}
+
+	p.content = syntax_tree
 
 	return p, true
 }

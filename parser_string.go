@@ -86,20 +86,18 @@ func _() {
 	// Re-run the stringer command to generate them again.
 	var x [1]struct{}
 	_ = x[NONE-0]
-	_ = x[RAW_SUB-1]
-	_ = x[mod_active-2]
-	_ = x[SLUG-3]
-	_ = x[UNIQUE_SLUG-4]
-	_ = x[UPPER-5]
-	_ = x[LOWER-6]
-	_ = x[TITLE-7]
-	_ = x[EXPAND-8]
-	_ = x[EXPAND_ALL-9]
+	_ = x[SLUG-1]
+	_ = x[UNIQUE_SLUG-2]
+	_ = x[UPPER-3]
+	_ = x[LOWER-4]
+	_ = x[TITLE-5]
+	_ = x[EXPAND-6]
+	_ = x[EXPAND_ALL-7]
 }
 
-const _ast_modifier_name = "NONERAW_SUBmod_activeSLUGUNIQUE_SLUGUPPERLOWERTITLEEXPANDEXPAND_ALL"
+const _ast_modifier_name = "NONESLUGUNIQUE_SLUGUPPERLOWERTITLEEXPANDEXPAND_ALL"
 
-var _ast_modifier_index = [...]uint8{0, 4, 11, 21, 25, 36, 41, 46, 51, 57, 67}
+var _ast_modifier_index = [...]uint8{0, 4, 8, 19, 24, 29, 34, 40, 50}
 
 func (i ast_modifier) String() string {
 	if i >= ast_modifier(len(_ast_modifier_index)-1) {

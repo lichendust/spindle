@@ -7,19 +7,6 @@ import (
 	"path/filepath"
 )
 
-const (
-	extension   = ".x"
-
-	source_path = "source"
-	public_path = "public"
-	config_path = "config"
-	config_file_path = "config/spindle.toml"
-
-	template_path = config_path + "/templates"
-	partial_path  = config_path + "/partials"
-	script_path   = config_path + "/scripts"
-)
-
 type file_type uint8
 const (
 	DIRECTORY file_type = iota
