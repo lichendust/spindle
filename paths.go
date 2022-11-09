@@ -12,9 +12,9 @@ func make_general_file_path(spindle *spindle, file *disk_object) string {
 
 	new_ext := ext_for_file_type(file.file_type)
 	if new_ext == "" {
-		output_path = rewrite_root(file.path, spindle.config.output_path)
+		output_path = rewrite_root(file.path, spindle.output_path)
 	} else {
-		output_path = rewrite_ext(rewrite_root(file.path, spindle.config.output_path), new_ext)
+		output_path = rewrite_ext(rewrite_root(file.path, spindle.output_path), new_ext)
 	}
 
 	if file.is_draft {
@@ -25,7 +25,7 @@ func make_general_file_path(spindle *spindle, file *disk_object) string {
 }
 
 func make_generated_image_path(spindle *spindle, the_image *gen_image) string {
-	public_path := spindle.config.output_path
+	public_path := spindle.output_path
 	file_path   := the_image.original.path
 	s           := the_image.settings
 
@@ -39,10 +39,10 @@ func make_generated_image_path(spindle *spindle, the_image *gen_image) string {
 
 func make_general_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
 	if spindle.server_mode {
-		return rewrite_by_path_type(ROOTED, spindle.config.domain, current_location, file.path)
+		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
 
-	output_path := rewrite_by_path_type(path_type, spindle.config.domain, current_location, file.path)
+	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, file.path)
 	output_path = rewrite_ext(output_path, ext_for_file_type(file.file_type))
 
 	if spindle.build_drafts && file.is_draft {
@@ -52,15 +52,7 @@ func make_general_url(spindle *spindle, file *disk_object, path_type path_type, 
 }
 
 func make_page_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
-	output_path := rewrite_ext(file.path, "")
-
-	if strings.HasSuffix(output_path, "index") {
-		if len(output_path) == 5 {
-			output_path = "/"
-		} else {
-			output_path = output_path[:len(output_path) - 6]
-		}
-	}
+	output_path := file.path
 
 	if spindle.server_mode {
 		output_path = rewrite_by_path_type(ROOTED, spindle.domain, current_location, output_path)
@@ -72,15 +64,33 @@ func make_page_url(spindle *spindle, file *disk_object, path_type path_type, cur
 		}
 	}
 
+	// @todo relative paths are totally scuffed
+
+	output_path = rewrite_ext(output_path, "")
+
+	if filepath.Base(output_path) == "index" {
+		if len(output_path) == 6 {
+			output_path = "/"
+		} else if len(output_path) < 6 {
+
+		} else {
+			output_path = output_path[:len(output_path) - 6]
+
+			if output_path == ".." {
+				output_path = "../"
+			}
+		}
+	}
+
 	return output_path
 }
 
 func make_generated_image_url(spindle *spindle, file *disk_object, s *image_settings, path_type path_type, current_location string) string {
 	if spindle.server_mode {
-		return rewrite_by_path_type(ROOTED, spindle.config.domain, current_location, file.path)
+		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
 
-	output_path := rewrite_by_path_type(path_type, spindle.config.domain, current_location, file.path)
+	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, file.path)
 	new_ext     := ext_for_file_type(s.file_type)
 	hash        := s.make_hash()
 

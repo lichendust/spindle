@@ -294,7 +294,7 @@ func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 						new_block := &ast_block{
 							decl_hash: new_hash(x.field),
 						}
-						new_block.children = parser.parse_block(0, true)
+						new_block.children = parser.parse_block(0, allow_anon)
 						new_block.position = x.position
 
 						new_block.position.end += 1 // the closing brace
@@ -310,10 +310,10 @@ func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 						}
 
 						parser.eat_whitespace()
-						the_decl.children = parser.parse_paragraph(true, NULL)
+						the_decl.children = parser.parse_paragraph(allow_anon, NULL)
 					}
 				} else {
-					the_decl.children = parser.parse_paragraph(true, NULL)
+					the_decl.children = parser.parse_paragraph(allow_anon, NULL)
 				}
 
 				array = append(array, the_decl)
@@ -424,7 +424,7 @@ func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 					new_block := &ast_block{
 						decl_hash: new_hash(x.field),
 					}
-					new_block.children = parser.parse_block(0, allow_anon)
+					new_block.children = parser.parse_block(0, true)
 					new_block.position = x.position
 
 
@@ -434,15 +434,14 @@ func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 					the_decl.position.start = new_block.position.start
 				} else {
 					parser.step_backn(2)
-					the_decl.children = parser.parse_paragraph(allow_anon, NULL)
+					the_decl.children = parser.parse_paragraph(true, NULL)
 				}
 			} else if x.ast_type == BRACE_OPEN {
 				parser.next()
-				the_decl.children = parser.parse_block(0, allow_anon)
+				the_decl.children = parser.parse_block(0, true)
 			} else {
-				the_decl.children = parser.parse_paragraph(allow_anon, NULL)
+				the_decl.children = parser.parse_paragraph(true, NULL)
 			}
-
 
 			array = append(array, the_decl)
 			continue
@@ -478,6 +477,11 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 
 	array := make([]ast_data, 0, 32)
 
+	const alloc = 256
+
+	buffer := strings.Builder{}
+	buffer.Grow(alloc)
+
 	for {
 		token := parser.next()
 
@@ -494,22 +498,24 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 
 		switch token.ast_type {
 		default:
-			n := &ast_base{
+			buffer.WriteString(token.field)
+			/*n := &ast_base{
 				ast_type: NORMAL,
 				field:    token.field,
 			}
 			n.position = token.position
-			array = append(array, n)
+			array = append(array, n)*/
 
 		case WHITESPACE:
-			n := &ast_base{
+			buffer.WriteRune(' ')
+			/*n := &ast_base{
 				ast_type: WHITESPACE,
 				field:    token.field,
 			}
 			n.position = token.position
-			array = append(array, n)
+			array = append(array, n)*/
 
-		case ASTERISK:
+		/*case ASTERISK:
 			open := parser.prev().ast_type.is(WHITESPACE, NEWLINE)
 
 			x := parser.peek()
@@ -542,7 +548,7 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 			the_formatter.position = token.position
 
 			array = append(array, the_formatter)
-			continue
+			continue*/
 
 		case PERCENT:
 			if parser.peek().ast_type == BRACE_OPEN {
@@ -604,6 +610,16 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 					}
 				}
 
+				if buffer.Len() > 0 {
+					n := &ast_base{
+						ast_type: NORMAL,
+						field:    buffer.String(),
+					}
+					array = append(array, n)
+					buffer.Reset()
+					buffer.Grow(alloc)
+				}
+
 				array = append(array, the_finder)
 				continue
 			}
@@ -611,13 +627,18 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 			new_var := parser.parse_variable(allow_anon)
 
 			if new_var == nil {
+				buffer.WriteString(token.field)
+				continue
+			}
+
+			if buffer.Len() > 0 {
 				n := &ast_base{
 					ast_type: NORMAL,
-					field:    token.field,
+					field:    buffer.String(),
 				}
-				n.position = token.position
 				array = append(array, n)
-				continue
+				buffer.Reset()
+				buffer.Grow(alloc)
 			}
 
 			new_var.position = token.position
@@ -625,12 +646,14 @@ func (parser *parser) parse_paragraph(allow_anon bool, exit_upon ...ast_type) []
 		}
 	}
 
-	// rebalancer
-	/*{
-		for _, entry := range array {
-
+	if buffer.Len() > 0 {
+		n := &ast_base{
+			ast_type: NORMAL,
+			field:    buffer.String(),
 		}
-	}*/
+		array = append(array, n)
+		buffer.Reset()
+	}
 
 	return array
 }

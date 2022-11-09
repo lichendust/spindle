@@ -11,9 +11,9 @@ import (
 	lib_jpg "image/jpeg"
 	lib_tif "golang.org/x/image/tiff"
 
-	lib_web "github.com/kolesa-team/go-webp/webp"
-	web_encoder "github.com/kolesa-team/go-webp/encoder"
-	web_decoder "github.com/kolesa-team/go-webp/decoder"
+	// lib_web "github.com/kolesa-team/go-webp/webp"
+	// web_encoder "github.com/kolesa-team/go-webp/encoder"
+	// web_decoder "github.com/kolesa-team/go-webp/decoder"
 )
 
 type image_settings struct {
@@ -48,8 +48,8 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 			source_image, img_err = lib_tif.Decode(source_file)
 		case IMG_PNG:
 			source_image, img_err = lib_png.Decode(source_file)
-		case IMG_WEB:
-			source_image, img_err = lib_web.Decode(source_file, &web_decoder.Options{})
+		/*case IMG_WEB:
+			source_image, img_err = lib_web.Decode(source_file, &web_decoder.Options{})*/
 		}
 
 		if img_err != nil {
@@ -89,7 +89,7 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 			panic(err)
 		}
 
-	case IMG_WEB:
+	/*case IMG_WEB:
 		output_file, err := os.Create(output_path)
 		if err != nil {
 			panic(err)
@@ -103,7 +103,7 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 		err = lib_web.Encode(output_file, output_image, options)
 		if err != nil {
 			panic(err)
-		}
+		}*/
 	}
 
 	return true

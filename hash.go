@@ -2,7 +2,7 @@ package main
 
 import "hash/fnv"
 
-var hash_store = make(map[uint32]string, 128)
+var hash_store = make(map[uint32]string, 256)
 
 func new_hash(input string) uint32 {
 	if input == "" {

@@ -1,6 +1,6 @@
 package main
 
-//go:generate stringer -type=ast_type,ast_modifier,file_type -output=parser_string.go
+import "fmt"
 
 const title = "Spindle 0.4.0"
 
@@ -30,6 +30,12 @@ func main() {
 	}
 
 	switch config.command {
+	case HELP:
+		fmt.Println(title)
+		return
+	case VERSION:
+		fmt.Println(title)
+		return
 	case INIT:
 		command_init(&config)
 		return

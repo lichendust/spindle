@@ -94,28 +94,22 @@ func command_serve(spindle *spindle) {
 	// monitor files for changes
 	last_run := time.Now()
 
-	for range time.Tick(time.Second / 10) {
-		if folder_has_changes(partial_path, last_run) {
-			spindle.partials = load_all_partials(spindle)
-			send_reload(the_hub)
-			last_run = time.Now()
-			continue
-		}
-		if folder_has_changes(template_path, last_run) {
-			spindle.templates = load_all_templates(spindle)
-			send_reload(the_hub)
-			last_run = time.Now()
-			continue
-		}
-
+	for range time.Tick(time.Second) {
 		if folder_has_changes(source_path, last_run) {
 			if data, ok := load_file_tree(spindle); ok {
 				spindle.file_tree = data
 				send_reload(the_hub)
 			}
+			last_run = time.Now()
+		} else if folder_has_changes(template_path, last_run) {
+			spindle.templates = load_all_templates(spindle)
+			last_run = time.Now()
+			send_reload(the_hub)
+		} else if folder_has_changes(partial_path, last_run) {
+			spindle.partials = load_all_partials(spindle)
+			last_run = time.Now()
+			send_reload(the_hub)
 		}
-
-		last_run = time.Now()
 	}
 }
 

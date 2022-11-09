@@ -95,21 +95,9 @@ type disk_object struct {
 	is_built  bool
 	is_draft  bool
 	path      string
-	parent    *disk_object
+	// parent    *disk_object
 	children  []*disk_object
 }
-
-/*func get_template_path(name string) string {
-	return filepath.Join(template_path, name) + extension
-}
-
-func get_partial_path(name string) string {
-	return filepath.Join(partial_path, name) + extension
-}
-
-func get_script_path(name string) string {
-	return filepath.Join(script_path, name) + extension
-}*/
 
 func new_file_tree() []*disk_object {
 	return make([]*disk_object, 0, 32)
@@ -162,7 +150,6 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 				is_used:   false,
 				is_draft:  is_draft(path),
 				path:      path,
-				parent:    parent,
 			}
 
 			the_file.hash_name = hash_base_name(the_file)
@@ -180,7 +167,6 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 			is_used:   false,
 			is_draft:  is_draft(path),
 			path:      path,
-			parent:    parent,
 		}
 
 		the_file.file_type = to_file_type(path)
@@ -300,12 +286,14 @@ func folder_has_changes(root_path string, last_run time.Time) bool {
 
 		if info.ModTime().After(last_run) {
 			has_changes = true
-			return filepath.SkipDir
+			// random error that Walk would never return to exit early
+			// why they don't just provide one like SkipDir is beyond me
+			return io.EOF
 		}
 
 		return nil
 	})
-	if err != nil {
+	if err != io.EOF {
 		return false
 	}
 

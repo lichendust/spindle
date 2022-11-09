@@ -41,7 +41,7 @@ func command_build(spindle *spindle) {
 	}
 
 	for _, image := range spindle.gen_images {
-		if image.original.is_draft && !spindle.config.build_drafts {
+		if image.original.is_draft && !spindle.build_drafts {
 			continue
 		}
 
@@ -76,10 +76,10 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 		if file.is_built {
 			continue
 		}
-		if file.is_draft && !spindle.config.build_drafts {
+		if file.is_draft && !spindle.build_drafts {
 			continue
 		}
-		if spindle.config.build_only_used && !file.is_used {
+		if spindle.build_only_used && !file.is_used {
 			continue
 		}
 
@@ -103,8 +103,8 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 				break main_loop
 			}
 
-		case SCSS:
-			copy_scss(file, output_path)
+		/*case SCSS:
+			copy_scss(file, output_path)*/
 
 		case CSS, JAVASCRIPT:
 			copy_minify(file, output_path)

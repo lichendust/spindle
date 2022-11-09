@@ -151,6 +151,13 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data)
 			entry := entry.(*ast_builtin)
 			if t, ok := spindle.templates[entry.hash_name]; ok {
 				r.write_collective_to_scope(spindle, t.top_scope)
+			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
+				x := t.get_children()
+
+				if len(x) == 1 && x[0].type_check() == BLOCK {
+					r.write_collective_to_scope(spindle, x[0].get_children())
+				}
+
 			} else {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
 				r.unwind = true
@@ -245,7 +252,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if ok {
-				if !spindle.config.build_drafts && found_file.is_draft {
+				if !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "imported page %q is draft!", found_file.path)
 				}
 			} else {
@@ -295,44 +302,50 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 		case TEMPLATE:
 			entry := entry.(*ast_builtin)
 
-			t, ok := spindle.templates[entry.hash_name]
+			if t, ok := spindle.templates[entry.hash_name]; ok {
+				// if first in page / block
+				if t.has_body && index == 1 {
+					// if this happens we completely break flow,
+					// swapping the entire input for the template
+					// and return the rendered string immediately
+					// to the caller level above
 
-			if !ok {
+					// we're treating the template body as a
+					// block-template declaration and abdicating
+					// responsibility on this pass
+
+					// we also reverse the order in which the
+					// top-level scope is applied
+					did_push := r.push_blank_scope(immediate_decl_count(t.content))
+
+					r.write_collective_to_scope(spindle, input[1:])
+					r.push_anon(input[1:], t.content, t.position)
+
+					buffer.WriteString(r.render_ast(spindle, page, t.content))
+
+					if did_push {
+						r.pop_scope()
+					}
+					return buffer.String() // hard exit
+				}
+
+				// if we're not the first, we just pull in the
+				// declarations from the template to be used from
+				// here on out in this scope
+				r.write_collective_to_scope(spindle, t.top_scope)
+
+			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
+				x := t.get_children()
+
+				if len(x) == 1 && x[0].type_check() == BLOCK {
+					r.write_collective_to_scope(spindle, x[0].get_children())
+				}
+
+			} else {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
 				r.unwind = true
-				return ""
+				break
 			}
-
-			// if template is the first thing in the block/page
-			if t.has_body && index == 1 {
-				// if this happens we completely break flow,
-				// swapping the entire input for the template
-				// and return the rendered string immediately
-				// to the caller level above
-
-				// we're treating the template body as a
-				// block-template declaration and abdicating
-				// responsibility on this pass
-
-				// we also reverse the order in which the
-				// top-level scope is applied
-				did_push := r.push_blank_scope(immediate_decl_count(t.content))
-
-				r.write_collective_to_scope(spindle, input[1:])
-				r.push_anon(input[1:], t.content, t.position)
-
-				buffer.WriteString(r.render_ast(spindle, page, t.content))
-
-				if did_push {
-					r.pop_scope()
-				}
-				return buffer.String() // hard exit
-			}
-
-			// if we're not the first, we just pull in the
-			// declarations from the template to be used from
-			// here on out in this scope
-			r.write_collective_to_scope(spindle, t.top_scope)
 
 		case VAR, VAR_ENUM, VAR_ANON:
 			entry := entry.(*ast_variable)
@@ -417,14 +430,14 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if ok {
-				if !spindle.config.build_drafts && found_file.is_draft {
+				if !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder links draft %q: becomes link to missing resource when built", found_file.path)
 				}
 
 				the_url := ""
 
 				if entry.path_type == NO_PATH_TYPE {
-					entry.path_type = spindle.config.default_path_mode
+					entry.path_type = spindle.default_path_mode
 				}
 
 				switch entry.finder_type {
@@ -536,7 +549,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				did_push := r.push_blank_scope(immediate_decl_count(children))
 				r.push_anon(x, children, *entry.get_position())
 
-				buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
+				buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
 
 				if did_push {
 					r.pop_scope()
@@ -548,7 +561,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					if ok {
 						children := wrapper_block.get_children()
 						r.push_anon(x, children, *entry.get_position())
-						buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
+						buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
 						continue
 					}
 				}
@@ -559,7 +572,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			// else:
-			buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, x)))
+			buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, x)))
 
 		case CONTROL_IF:
 			entry := entry.(*ast_if)
@@ -643,7 +656,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 					r.push_anon(x, children, *entry.get_position())
 
-					buffer.WriteString(apply_regex_array(spindle.config.inline, r.render_ast(spindle, page, children)))
+					buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
 
 					if did_push { r.pop_scope() }
 					continue

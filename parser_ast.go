@@ -1,5 +1,7 @@
 package main
 
+//go:generate stringer -type=ast_type,ast_modifier,file_type -output=parser_string.go
+
 type ast_type uint8
 const (
 	NULL ast_type = iota

@@ -87,7 +87,7 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	syntax_tree  := parse_stream(spindle.errors, token_stream, true)
+	syntax_tree := parse_stream(spindle.errors, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
