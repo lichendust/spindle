@@ -93,12 +93,6 @@ func (parser *parser) parse_block(max_depth int, allow_anon bool) []ast_data {
 
 		switch token.ast_type {
 		case WHITESPACE:
-			whitespace := &ast_base{
-				ast_type: WHITESPACE,
-				field:    token.field,
-			}
-			whitespace.position = token.position
-			array = append(array, whitespace)
 			continue
 
 		case FORWARD_SLASH:
@@ -951,9 +945,9 @@ func (parser *parser) parse_image_settings() *image_settings {
 			case "png":
 				settings.file_type = IMG_PNG
 				got_anything = true
-			case "webp":
+			/*case "webp":
 				settings.file_type = IMG_WEB
-				got_anything = true
+				got_anything = true*/
 			case "jpeg", "jpg":
 				settings.file_type = IMG_JPG
 				got_anything = true

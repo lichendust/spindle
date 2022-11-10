@@ -135,7 +135,7 @@ func (e *error_handler) render_html_errors() string {
 		buffer.WriteString(the_error.html_string())
 	}
 
-	return fmt.Sprintf(t_error_page, title, buffer.String())
+	return fmt.Sprintf(t_error_page, buffer.String())
 }
 
 func (e *error_handler) render_term_errors() string {
@@ -152,62 +152,75 @@ func (e *error_handler) render_term_errors() string {
 	return strings.TrimSpace(buffer.String())
 }
 
+const t_error_page_not_found = `<html>` + t_error_head + `<body>
+<h1>` + title + `</h1>
+<main>
+	<section><p><b>Page not found...</b></p></section>
+</main>
+<aside>
+	<p><b>Resources</b></p>
+	<ul>
+		<li><a href="/_spindle/manual">Manual</a></li>
+		<li><a href="https://github.com/qxoko/spindle">GitHub</a></li>
+	</ul>
+</aside>
+<br clear="all">
+</body></html>`
+
+const t_error_head = `<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1">
+	<title>Spindle</title>
+	<style type="text/css">
+		body {
+			font-family: Atkinson Hyperlegible, Helvetica, Arial, sans-serif;
+			margin: 5ex;
+			font-size: 1.2rem;
+		}
+		tt {
+			font-family: DM Mono, SF Mono, Roboto Mono, Source Code Pro, Fira Code, monospace;
+		}
+		.space {
+			margin-bottom: 1ex;
+		}
+		code {
+			background: #eee;
+			padding: .2ex .5ex;
+		}
+		ul { padding-left: 2ex }
+		p  { padding: 0; margin: 0 }
+		a  { color: black }
+		a:hover {
+			color: white;
+			background: black;
+		}
+		main {
+			float: left;
+			width: 60ex;
+			margin-right: 2vw;
+			margin-bottom: 4vh;
+		}
+		aside {
+			float: left;
+			max-width: 24ex;
+		}
+		section:not(:first-child) {
+			margin-top: 1rem;
+		}
+	</style>` + reload_script + `</head>`
+
 const t_error_page = `<!DOCTYPE html>
-<html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1">
-		<title>Spindle</title>
-		<style type="text/css">
-			body {
-				font-family: Atkinson Hyperlegible, Helvetica, Arial, sans-serif;
-				margin: 5ex;
-				font-size: 1.2rem;
-			}
-			tt {
-				font-family: DM Mono, SF Mono, Roboto Mono, Source Code Pro, Fira Code, monospace;
-			}
-			.space {
-				margin-bottom: 1ex;
-			}
-			code {
-				background: #eee;
-				padding: .2ex .5ex;
-			}
-			ul { padding-left: 2ex }
-			p  { padding: 0; margin: 0 }
-			a  { color: black }
-			a:hover {
-				color: white;
-				background: black;
-			}
-			main {
-				float: left;
-				width: 60ex;
-				margin-right: 2vw;
-				margin-bottom: 4vh;
-			}
-			aside {
-				float: left;
-				max-width: 24ex;
-			}
-			section:not(:first-child) {
-				margin-top: 1rem;
-			}
-		</style>
-	</head>
-	<body>
-		<h1>%s</h1>
-		<main>
-			%s
-		</main>
-		<aside>
-			<p><b>Resources</b></p>
-			<ul>
-				<li><a href="/_spindle/manual">Manual</a></li>
-				<li><a href="https://github.com/qxoko/spindle">GitHub</a></li>
-			</ul>
-		</aside>
-		<br clear="all">
-	</body>
-</html>`
+<html>` + t_error_head + `<body>
+	<h1>` + title + `</h1>
+	<main>
+		%s
+	</main>
+	<aside>
+		<p><b>Resources</b></p>
+		<ul>
+			<li><a href="/_spindle/manual">Manual</a></li>
+			<li><a href="https://github.com/qxoko/spindle">GitHub</a></li>
+		</ul>
+	</aside>
+	<br clear="all">
+</body></html>`

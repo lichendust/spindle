@@ -54,11 +54,15 @@ func (r *renderer) push_anon(content, wrapper []ast_data, pos position) {
 	r.anon_stack = append(r.anon_stack, stack_entry)
 }
 
-func (r *renderer) get_in_scope(value uint32) (ast_data, bool) {
+func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 	for i := len(r.scope_stack) - 1; i >= 0; i-- {
 		level := r.scope_stack[i]
 
 		if x, ok := level[value]; ok {
+			if x.ast_type == DECL_REJECT {
+				break
+			}
+
 			return x, true
 		}
 	}
@@ -82,13 +86,9 @@ func (r *renderer) pop_scope() {
 }
 
 func (r *renderer) delete_scope_entry(value uint32) {
-	for i := len(r.scope_stack) - 1; i >= 0; i-- {
-		level := r.scope_stack[i]
-		if _, ok := level[value]; ok {
-			delete(level, value)
-			break
-		}
-	}
+	x := &ast_declare{ast_type:DECL_REJECT}
+	r.write_to_scope(value,     x)
+	r.write_to_scope(value + 1, x)
 }
 
 func (r *renderer) push_string_on_scope(ident uint32, text string) {
@@ -213,6 +213,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 		case SCOPE_UNSET:
 			entry := entry.(*ast_builtin)
 			r.delete_scope_entry(entry.hash_name)
+			r.delete_scope_entry(entry.hash_name + 1)
 
 		case PARTIAL:
 			entry := entry.(*ast_builtin)
@@ -252,7 +253,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if ok {
-				if !spindle.build_drafts && found_file.is_draft {
+				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "imported page %q is draft!", found_file.path)
 				}
 			} else {
@@ -430,7 +431,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if ok {
-				if !spindle.build_drafts && found_file.is_draft {
+				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder links draft %q: becomes link to missing resource when built", found_file.path)
 				}
 
@@ -530,49 +531,85 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 		case TOKEN:
+			// @todo optimisation needed to stop looking up
+			//  everything we need 800 times
+
 			entry := entry.(*ast_token)
-
-			/*_, has_group := r.get_in_scope(entry.decl_hash + 1)
-
-			if has_group {
-				n := count_repeat_tokens(input[index:], entry.decl_hash)
-				index += n
-			}*/
 
 			x := entry.get_children()
 
+			did_push := false
 			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 
 			if ok {
-				children := wrapper_block.get_children()
-
-				did_push := r.push_blank_scope(immediate_decl_count(children))
-				r.push_anon(x, children, *entry.get_position())
-
-				buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
-
-				if did_push {
-					r.pop_scope()
-				}
-				continue
+				did_push = r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
 			} else {
 				if len(x) == 0 {
 					wrapper_block, ok := r.get_in_scope(default_hash)
 					if ok {
 						children := wrapper_block.get_children()
+						did_push := r.push_blank_scope(immediate_decl_count(children))
 						r.push_anon(x, children, *entry.get_position())
 						buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
+						if did_push {
+							r.pop_scope()
+						}
 						continue
 					}
+				} else {
+					if entry.decl_hash != stop_hash {
+						spindle.errors.new_pos(RENDER_WARNING, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
+					}
+
+					buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, x)))
+					continue
 				}
 			}
 
-			if entry.decl_hash != stop_hash {
-				spindle.errors.new_pos(RENDER_WARNING, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
+			// @todo scopes won't expand from the wrapper
+			group_block, has_group := r.get_in_scope(entry.decl_hash + 1)
+			if has_group {
+				sub_buffer := strings.Builder{}
+				sub_buffer.Grow(512)
+
+				index-- // step back one to get the original again
+
+				for _, sub := range input[index:] {
+					if sub.type_check() == TOKEN {
+						sub := sub.(*ast_token)
+						if sub.decl_hash == entry.decl_hash {
+							children := wrapper_block.get_children()
+							r.push_anon(sub.get_children(), children, *entry.get_position())
+							sub_buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
+							index++
+							continue
+						}
+					}
+					break
+				}
+
+				rendered_block := sub_buffer.String()
+				sub_buffer.Reset()
+				new_inner := []ast_data{&ast_base{ ast_type: NORMAL, field: rendered_block }}
+
+				r.push_anon(new_inner, group_block.get_children(), *entry.get_position())
+
+				// expand here
+				buffer.WriteString(r.render_ast(spindle, page, group_block.get_children()))
+
+				if did_push {
+					r.pop_scope()
+				}
+				continue
 			}
 
-			// else:
-			buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, x)))
+			children := wrapper_block.get_children()
+			r.push_anon(x, children, *entry.get_position())
+			buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
+
+			if did_push {
+				r.pop_scope()
+			}
 
 		case CONTROL_IF:
 			entry := entry.(*ast_if)

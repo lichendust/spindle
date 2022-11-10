@@ -19,6 +19,7 @@ const (
 	DECL
 	DECL_BLOCK
 	DECL_TOKEN
+	DECL_REJECT // temp scope blocking
 
 	VAR
 	VAR_ENUM

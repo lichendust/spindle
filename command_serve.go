@@ -37,6 +37,11 @@ func command_serve(spindle *spindle) {
 	spindle.partials  = load_all_partials(spindle)
 	spindle.templates = load_all_templates(spindle)
 
+	if spindle.errors.has_errors() {
+		_println(spindle.errors.render_term_errors())
+		return
+	}
+
 	if data, ok := load_file_tree(spindle); ok {
 		spindle.file_tree = data
 	}
@@ -56,15 +61,22 @@ func command_serve(spindle *spindle) {
 		found_file, ok := find_file_hash(spindle.file_tree, new_hash(r.URL.Path))
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(t_error_page_not_found))
 			return
 		}
+
+		w.Header().Add("Cache-Control", "no-cache")
 
 		if found_file.file_type == MARKUP {
 			page, ok := load_page(spindle, found_file.path)
 			if ok {
 				assembled := render_syntax_tree(spindle, page, 0)
 
-				w.Header().Add("Cache-Control", "no-cache")
+				if spindle.errors.has_errors() {
+					assembled = spindle.errors.render_html_errors()
+					spindle.errors.reset()
+				}
+
 				w.WriteHeader(http.StatusOK)
 				w.Write([]byte(assembled))
 				return

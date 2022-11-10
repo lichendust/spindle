@@ -50,7 +50,6 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	}
 
 	blob, ok := load_file(full_path)
-
 	if !ok {
 		return nil, false
 	}
