@@ -508,7 +508,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if entry.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
-				if ok {
+				if ok && wrapper_block.ast_type == DECL_BLOCK {
 					children := wrapper_block.get_children()
 
 					did_push := r.push_blank_scope(immediate_decl_count(children))
@@ -541,7 +541,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			did_push := false
 			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 
-			if ok {
+			if ok && wrapper_block.ast_type == DECL_TOKEN {
 				did_push = r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
 			} else {
 				if len(x) == 0 {
@@ -568,6 +568,8 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			// @todo scopes won't expand from the wrapper
 			group_block, has_group := r.get_in_scope(entry.decl_hash + 1)
+
+			// this can only be DECL_TOKEN from the parser, so we don't check
 			if has_group {
 				sub_buffer := strings.Builder{}
 				sub_buffer.Grow(512)
