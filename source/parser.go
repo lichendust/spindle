@@ -52,7 +52,7 @@ func make_string_decl(id uint32, text string) *ast_declare {
 			field:    text,
 		},
 	}
-	return declf
+	return decl
 }
 
 func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_depth int, is_support bool) []ast_data {

@@ -6,5 +6,5 @@ set -e
 
 platform=$(uname)
 
-go build -tags debug -o build_v2/spindle
+go build -tags debug -o build_v2/spindle ./source
 echo "${platform,,} debug"
