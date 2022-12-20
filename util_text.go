@@ -41,6 +41,18 @@ func make_slug(source string) string {
 	return buffer.String()
 }
 
+func truncate(input string, l int) string {
+	counter := 0
+	for i := range input {
+		counter++
+		if counter >= l {
+			input = input[:i]
+			break
+		}
+	}
+	return input + "..."
+}
+
 // https://www.grammarly.com/blog/capitalization-in-the-titles/
 // @todo complete this
 var short_words = map[string]bool {

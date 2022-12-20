@@ -48,23 +48,24 @@ func make_general_url(spindle *spindle, file *disk_object, path_type path_type, 
 	if spindle.build_drafts && file.is_draft {
 		output_path = undraft_path(output_path)
 	}
+
 	return output_path
 }
 
-func make_page_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
-	output_path := file.path
-
+func make_page_url(spindle *spindle, file *anon_file_info, path_type path_type, current_location string) string {
 	if spindle.server_mode {
-		output_path = rewrite_by_path_type(ROOTED, spindle.domain, current_location, output_path)
-	} else {
-		output_path = rewrite_by_path_type(path_type, spindle.domain, current_location, output_path)
-
-		if spindle.build_drafts && file.is_draft {
-			output_path = undraft_path(output_path)
-		}
+		return _make_page_url(spindle, ROOTED, file.is_draft, file.path, current_location)
 	}
 
-	// @todo relative paths are totally scuffed
+	return _make_page_url(spindle, path_type, file.is_draft, file.path, current_location)
+}
+
+func _make_page_url(spindle *spindle, path_type path_type, is_draft bool, path, current_location string) string {
+	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, path)
+
+	if spindle.build_drafts && is_draft {
+		output_path = undraft_path(output_path)
+	}
 
 	output_path = rewrite_ext(output_path, "")
 

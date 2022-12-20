@@ -35,6 +35,7 @@ var rune_match = map[rune]ast_type {
 	':':  COLON,
 	'+':  PLUS,
 	'×':  MULTIPLY,
+	'$':  DOLLAR,
 }
 
 func lex_blob(path, input string) []*lexer_token {

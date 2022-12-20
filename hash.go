@@ -13,7 +13,9 @@ func new_hash(input string) uint32 {
 	hash.Write([]byte(input))
 	x := hash.Sum32()
 
-	hash_store[x] = input
+	if _, ok := hash_store[x]; !ok {
+		hash_store[x] = input
+	}
 
 	return x
 }

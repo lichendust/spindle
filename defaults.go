@@ -22,6 +22,10 @@ const (
 	stop_hash    uint32 = 722245873  // "."
 	index_hash   uint32 = 151693739  // "index"
 
+	import_hash  uint32 = 288002260 // "import"
+
+	url_hash           uint32 = 4233404181 // "spindle.url"
+	canonical_hash     uint32 = 421032728  // "spindle.url_canonical"
 	is_server_hash     uint32 = 3014801206 // "spindle.is_server"
 	reload_script_hash uint32 = 2807780945 // "spindle.reload_script"
 )

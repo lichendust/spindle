@@ -13,8 +13,10 @@ func render_syntax_tree(spindle *spindle, page *page_object, import_condition ui
 		scope_stack:      scope_stack,
 	}
 
-	r.push_string_on_scope(is_server_hash, "") // just has to exist
-	r.push_string_on_scope(reload_script_hash, reload_script)
+	if spindle.server_mode {
+		r.push_string_to_scope(is_server_hash, "") // just has to exist
+		r.push_string_to_scope(reload_script_hash, reload_script)
+	}
 
 	return r.render_ast(spindle, page, page.content)
 }
@@ -62,7 +64,6 @@ func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 			if x.ast_type == DECL_REJECT {
 				break
 			}
-
 			return x, true
 		}
 	}
@@ -91,7 +92,7 @@ func (r *renderer) delete_scope_entry(value uint32) {
 	r.write_to_scope(value + 1, x)
 }
 
-func (r *renderer) push_string_on_scope(ident uint32, text string) {
+func (r *renderer) push_string_to_scope(ident uint32, text string) {
 	decl := &ast_declare {
 		ast_type: DECL,
 		field:    ident,
@@ -137,7 +138,7 @@ func (r *renderer) evaluate_if(entry *ast_if) bool {
 	return result
 }
 
-func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data) {
+func (r *renderer) write_collective_to_scope(spindle *spindle, page *page_object, input []ast_data) {
 	for _, entry := range input {
 		_type := entry.type_check()
 
@@ -149,13 +150,14 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, input []ast_data)
 
 		if _type == TEMPLATE {
 			entry := entry.(*ast_builtin)
+
 			if t, ok := spindle.templates[entry.hash_name]; ok {
-				r.write_collective_to_scope(spindle, t.top_scope)
+				r.write_collective_to_scope(spindle, page, t.top_scope)
 			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
 				x := t.get_children()
 
 				if len(x) == 1 && x[0].type_check() == BLOCK {
-					r.write_collective_to_scope(spindle, x[0].get_children())
+					r.write_collective_to_scope(spindle, page, x[0].get_children())
 				}
 
 			} else {
@@ -210,6 +212,26 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 		case WHITESPACE:
 			buffer.WriteRune(' ')
 
+		case SCRIPT:
+			entry := entry.(*ast_script)
+
+			x := get_hash(entry.hash_name) // @todo aaaaaaaaaaaaaaaaaaargh gross
+
+			blob, ok := load_file("config/scripts/" + x + ".js")
+			if !ok {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load script %q", x) // get_hash(entry.hash_name))
+				r.unwind = true
+				return ""
+			}
+
+			args := unix_args(r.render_ast(spindle, page, entry.children))
+
+			if res, ok := r.script_call(spindle, page, entry.position.line, blob, args...); ok {
+				buffer.WriteString(res)
+			} else {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to execute script %q", x) // get_hash(entry.hash_name))
+			}
+
 		case SCOPE_UNSET:
 			entry := entry.(*ast_builtin)
 			r.delete_scope_entry(entry.hash_name)
@@ -258,6 +280,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				}
 			} else {
 				spindle.errors.new_pos(RENDER_WARNING, entry.position, "didn't find page %q in import", find_text)
+				continue
 			}
 
 			imported_page, page_success := load_page(spindle, found_file.path) // @todo cache
@@ -287,8 +310,8 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
-			r.write_collective_to_scope(spindle, imported_page.top_scope)
-			r.push_string_on_scope(new_hash("path"), find_text)
+			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
+			r.push_string_to_scope(new_hash("path"), find_text)
 
 			// @todo undefined behaviour for %% in imports
 			// we should probably disallow it but we can't know until
@@ -305,7 +328,9 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if t, ok := spindle.templates[entry.hash_name]; ok {
 				// if first in page / block
-				if t.has_body && index == 1 {
+				// this means before any content has been discovered
+				// only declarations can come before this
+				if t.has_body && buffer.Len() == 0 {
 					// if this happens we completely break flow,
 					// swapping the entire input for the template
 					// and return the rendered string immediately
@@ -319,8 +344,11 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					// top-level scope is applied
 					did_push := r.push_blank_scope(immediate_decl_count(t.content))
 
-					r.write_collective_to_scope(spindle, input[1:])
-					r.push_anon(input[1:], t.content, t.position)
+					// with the change to using buffer.len instead of index == 1
+					// we now slice off by the index because everything above is
+					// already on scope — it's... _funky_... but it works.
+					r.write_collective_to_scope(spindle, page, input[index:])
+					r.push_anon(input[index:], t.content, t.position)
 
 					buffer.WriteString(r.render_ast(spindle, page, t.content))
 
@@ -333,13 +361,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				// if we're not the first, we just pull in the
 				// declarations from the template to be used from
 				// here on out in this scope
-				r.write_collective_to_scope(spindle, t.top_scope)
+				r.write_collective_to_scope(spindle, page, t.top_scope)
 
 			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
 				x := t.get_children()
 
 				if len(x) == 1 && x[0].type_check() == BLOCK {
-					r.write_collective_to_scope(spindle, x[0].get_children())
+					r.write_collective_to_scope(spindle, page, x[0].get_children())
 				}
 
 			} else {
@@ -380,7 +408,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				if n > len(args) {
 					spindle.errors.new_pos(
 						RENDER_WARNING, popped_anon.position,
-						"this line only supplies %d arguments\n    template variable at %s — line %d has requested %d arguments\n    output may be unexpected",
+						"input token only supplies %d arguments\n    %s — line %d\n    needs %d arguments.",
 						len(args), entry.position.file_path, entry.position.line, n,
 					)
 					text = ""
@@ -390,24 +418,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			if entry.modifier > NONE {
-				switch entry.modifier {
-				case SLUG:
-					text = make_slug(text)
-				case UNIQUE_SLUG:
-					text = make_slug(text)
-					if n, ok := page.slug_tracker[text]; ok {
-						page.slug_tracker[text] = n + 1
-						text = fmt.Sprintf("%s-%d", text, n)
-					} else {
-						page.slug_tracker[text] = 1
-					}
-				case TITLE:
-					text = make_title(text)
-				case UPPER:
-					text = strings.ToUpper(text)
-				case LOWER:
-					text = strings.ToLower(text)
-				}
+				text = apply_modifier(page.slug_tracker, text, entry.modifier)
 			}
 
 			buffer.WriteString(text)
@@ -432,7 +443,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if ok {
 				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
-					spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder links draft %q: becomes link to missing resource when built", found_file.path)
+					spindle.errors.new_pos(RENDER_WARNING, entry.position, "%q is a draft", found_file.path)
 				}
 
 				the_url := ""
@@ -444,7 +455,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				switch entry.finder_type {
 				case _IMAGE:
 					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
-						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "image resource finder cannot process non-image file %q", find_text)
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "resource finder cannot handle non-image %q", find_text)
 						r.unwind = true
 					}
 
@@ -479,7 +490,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						r.unwind = true
 					}
 
-					the_url = make_page_url(spindle, found_file, entry.path_type, page.page_path)
+					the_url = make_page_url(spindle, &found_file.anon_file_info, entry.path_type, page.page_path)
 					found_file.is_used = true
 
 				case _STATIC:
@@ -661,8 +672,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			sub_buffer := strings.Builder{}
 			sub_buffer.Grow(512)
 
-			for _, t := range array {
-				r.push_string_on_scope(it_hash, t)
+			for i, t := range array {
+				r.push_string_to_scope(it_hash, t)
+
+				if i == len(array) - 1 {
+					r.push_string_to_scope(1787721130, "") // "end" @todo
+				}
+
 				sub_buffer.WriteString(r.render_ast(spindle, page, the_block.get_children()))
 			}
 
@@ -721,4 +737,26 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 	}
 
 	return buffer.String()
+}
+
+func apply_modifier(slugs map[string]uint, text string, modifier ast_modifier) string {
+	switch modifier {
+	case SLUG:
+		text = make_slug(text)
+	case UNIQUE_SLUG:
+		text = make_slug(text)
+		if n, ok := slugs[text]; ok {
+			slugs[text] = n + 1
+			text = fmt.Sprintf("%s-%d", text, n)
+		} else {
+			slugs[text] = 1
+		}
+	case TITLE:
+		text = make_title(text)
+	case UPPER:
+		text = strings.ToUpper(text)
+	case LOWER:
+		text = strings.ToLower(text)
+	}
+	return text
 }

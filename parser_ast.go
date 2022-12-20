@@ -15,6 +15,7 @@ const (
 	PARTIAL
 	TEMPLATE
 	SCOPE_UNSET
+	SCRIPT
 
 	DECL
 	DECL_BLOCK
@@ -67,6 +68,7 @@ const (
 	COLON
 	TILDE
 	EOF
+	DOLLAR
 
 	is_non_word
 	NON_WORD
@@ -108,7 +110,7 @@ func (t ast_type) is(comp ...ast_type) bool {
 
 // base token data structure
 type ast_data interface {
-	type_check() ast_type
+	type_check()   ast_type
 	get_children() []ast_data
 	get_position() *position
 }
@@ -158,6 +160,7 @@ type ast_declare struct {
 	field      uint32
 	taxonomy   uint32
 	subname    uint32
+	immediate  bool
 }
 func (t *ast_declare) type_check() ast_type {
 	return t.ast_type
@@ -256,6 +259,21 @@ func (t *ast_builtin) get_children() []ast_data {
 	return t.children
 }
 func (t *ast_builtin) get_position() *position {
+	return &t.position
+}
+
+
+type ast_script struct {
+	ast_base_fields
+	hash_name uint32
+}
+func (t *ast_script) type_check() ast_type {
+	return SCRIPT
+}
+func (t *ast_script) get_children() []ast_data {
+	return t.children
+}
+func (t *ast_script) get_position() *position {
 	return &t.position
 }
 

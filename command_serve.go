@@ -2,6 +2,8 @@ package main
 
 import (
 	"time"
+	"runtime"
+	"os/exec"
 	"net/http"
 	// "path/filepath"
 
@@ -11,8 +13,8 @@ import (
 const serve_port     = ":3011"
 const reload_address = "/_spindle/reload"
 
-/*func open_browser(path, port string) {
-	url := sprint("http://localhost%s/%s", port, path)
+func open_browser(port string) {
+	const url = "http://localhost" + serve_port
 
 	var err error
 
@@ -25,7 +27,10 @@ const reload_address = "/_spindle/reload"
 	if err != nil {
 		panic(err)
 	}
-}*/
+
+	_println(title)
+	_println("\n   ", url)
+}
 
 func command_serve(spindle *spindle) {
 	the_server := http.NewServeMux()
@@ -61,11 +66,10 @@ func command_serve(spindle *spindle) {
 		found_file, ok := find_file_hash(spindle.file_tree, new_hash(r.URL.Path))
 		if !ok {
 			w.WriteHeader(http.StatusNotFound)
+			w.Header().Add("Cache-Control", "no-cache")
 			w.Write([]byte(t_error_page_not_found))
 			return
 		}
-
-		w.Header().Add("Cache-Control", "no-cache")
 
 		if found_file.file_type == MARKUP {
 			page, ok := load_page(spindle, found_file.path)
@@ -73,11 +77,12 @@ func command_serve(spindle *spindle) {
 				assembled := render_syntax_tree(spindle, page, 0)
 
 				if spindle.errors.has_errors() {
-					assembled = spindle.errors.render_html_errors()
+					assembled = spindle.errors.render_html_page()
 					spindle.errors.reset()
 				}
 
 				w.WriteHeader(http.StatusOK)
+				w.Header().Add("Cache-Control", "no-cache")
 				w.Write([]byte(assembled))
 				return
 			} else {
@@ -86,6 +91,7 @@ func command_serve(spindle *spindle) {
 			}
 		}
 
+		w.Header().Add("Cache-Control", "no-cache")
 		http.ServeFile(w, r, found_file.path)
 	})
 	the_server.HandleFunc(reload_address, func(w http.ResponseWriter, r *http.Request) {
@@ -100,8 +106,7 @@ func command_serve(spindle *spindle) {
 		}
 	}()
 
-	// print_server_info(serve_port)
-	// open_browser("/", serve_port)
+	open_browser(serve_port)
 
 	// monitor files for changes
 	last_run := time.Now()
@@ -157,7 +162,7 @@ func command_serve(spindle *spindle) {
 	}()
 
 	// print_server_info(check_port)
-	// open_browser("/", check_port)
+	open_browser("/", check_port)
 
 	for range time.Tick(time.Second * 2) {}
 }*/

@@ -87,14 +87,18 @@ func ext_for_file_type(file_type file_type) string {
 	return ""
 }
 
+type anon_file_info struct {
+	is_draft bool
+	path     string
+}
+
 type disk_object struct {
+	anon_file_info
 	file_type file_type
 	hash_name uint32
 	hash_url  uint32
 	is_used   bool
 	is_built  bool
-	is_draft  bool
-	path      string
 	// parent    *disk_object
 	children  []*disk_object
 }
@@ -107,8 +111,9 @@ func load_file_tree(spindle *spindle) (*disk_object, bool) {
 	f := &disk_object{
 		file_type: ROOT,
 		is_used:   true,
-		path:      source_path,
 	}
+
+	f.path = source_path
 
 	children, ok := recurse_directories(spindle, f)
 	if !ok {
@@ -148,9 +153,10 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 			the_file := &disk_object{
 				file_type: DIRECTORY,
 				is_used:   false,
-				is_draft:  is_draft(path),
-				path:      path,
 			}
+
+			the_file.path     = path
+			the_file.is_draft = is_draft(path)
 
 			the_file.hash_name = hash_base_name(the_file)
 
@@ -165,15 +171,16 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 		the_file := &disk_object{
 			file_type: STATIC,
 			is_used:   false,
-			is_draft:  is_draft(path),
-			path:      path,
 		}
+
+		the_file.path     = path
+		the_file.is_draft = is_draft(path)
 
 		the_file.file_type = to_file_type(path)
 		the_file.hash_name = hash_base_name(the_file)
 
 		if x := the_file.file_type; x > is_page && x < end_page {
-			the_file.hash_url = new_hash(make_page_url(spindle, the_file, ROOTED, ""))
+			the_file.hash_url = new_hash(make_page_url(spindle, &the_file.anon_file_info, ROOTED, ""))
 		} else {
 			the_file.hash_url = new_hash(make_general_url(spindle, the_file, ROOTED, ""))
 		}
@@ -204,38 +211,53 @@ func find_file_hash(start_location *disk_object, target uint32) (*disk_object, b
 	return nil, false
 }
 
+func find_depthless_file(entry *disk_object, target string) (*disk_object, bool) {
+	check := entry.path
+
+	if x := entry.file_type; x > is_page && x < end_page {
+		check = check[:len(check) - len(filepath.Ext(check))]
+	}
+
+	diff := len(check) - len(target)
+	if diff <= 0 {
+		return nil, false
+	}
+
+	leven := levenshtein_distance(check, target)
+	if leven <= diff {
+		b_target := filepath.Base(target)
+		b_check  := filepath.Base(check)
+
+		if len(b_target) != len(b_check) || b_target[0] != b_check[0] {
+			return nil, false
+		}
+
+		if entry.file_type == DIRECTORY {
+			// if directory only has one friend
+			// send that back
+			if len(entry.children) == 1 {
+				return entry.children[0], true
+			}
+
+			// else look for "index"
+			for _, child := range entry.children {
+				if child.hash_name == index_hash {
+					return child, true
+				}
+			}
+			return nil, false
+		}
+
+		return entry, true
+	}
+
+	return nil, false
+}
+
 func find_file(start_location *disk_object, target string) (*disk_object, bool) {
 	for _, entry := range start_location.children {
-		check := entry.path
-
-		if x := entry.file_type; x > is_page && x < end_page {
-			check = check[:len(check) - len(filepath.Ext(check))]
-		}
-
-		diff := len(check) - len(target)
-		if diff <= 0 {
-			continue
-		}
-
-		leven := levenshtein_distance(check, target)
-		if leven <= diff {
-			b_target := filepath.Base(target)
-			b_check  := filepath.Base(check)
-
-			if len(b_target) != len(b_check) || b_target[0] != b_check[0] {
-				continue
-			}
-
-			if entry.file_type == DIRECTORY {
-				for _, child := range entry.children {
-					if child.hash_name == index_hash {
-						return child, true
-					}
-				}
-				return nil, false
-			}
-
-			return entry, true
+		if x, ok := find_depthless_file(entry, target); ok {
+			return x, true
 		}
 	}
 

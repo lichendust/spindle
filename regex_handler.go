@@ -1,6 +1,9 @@
 package main
 
-import "regexp"
+import (
+	"regexp"
+	// "strings"
+)
 
 /*
 	To be clear, I hate this.
@@ -52,6 +55,7 @@ type Regex_Config struct {
 type regex_entry struct {
 	regexp *regexp.Regexp
 	output []byte
+	// d_hash uint32
 }
 
 func process_regex_array(array []*Regex_Config) ([]*regex_entry, bool) {
@@ -66,6 +70,7 @@ func process_regex_array(array []*Regex_Config) ([]*regex_entry, bool) {
 		output = append(output, &regex_entry{
 			regexp: re,
 			output: []byte(entry.Output),
+			// d_hash: new_hash(entry.Output),
 		})
 	}
 
@@ -85,3 +90,35 @@ func apply_regex_array(array []*regex_entry, input string) string {
 
 	return string(cast)
 }
+
+/*func _apply_regex_array(r *renderer, array []*regex_entry, input string) string {
+	if len(array) == 0 {
+		return input
+	}
+
+	// array := []*regexp.Regexp{
+	// 	regexp.MustCompile(`\[(.+?)\]\((.+?)\)`),
+	// 	regexp.MustCompile(`\*(\S(.+?)\S)\*`),
+	// }
+
+	for _, entry := range array {
+		wrapper_block, ok := r.get_in_scope(entry.d_hash)
+		if ok {
+			did_push := r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
+
+			// indexes := entry.FindAllStringSubmatchIndex(edit, -1)
+			match_groups := entry.FindAllStringSubmatch(edit, -1)
+
+			r.render_ast(spindle, page, p.content)
+
+			// @todo replace this with index call to make it _go fasta_
+			for _, match_group := range match_groups {
+				edit = strings.ReplaceAll(edit, match_group[0], match_group[1])
+			}
+
+			if did_push { r.pop_scope() }
+		}
+	}
+
+	fmt.Println(edit)
+}*/
