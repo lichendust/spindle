@@ -17,17 +17,18 @@ func command_build(spindle *spindle) {
 	spindle.pages        = make(map[string]*page_object, 64)
 	spindle.finder_cache = make(map[string]*disk_object, 64)
 	spindle.gen_images   = make(map[uint32]*gen_image, 32)
-	spindle.gen_pages    = make(map[string]*gen_page, 32)
+	spindle.gen_pages    = make(map[string]*page_object, 32)
 
 	make_dir(public_path)
 
-	found_file, ok := find_file(spindle.file_tree, "index")
-
-	if !ok {
-		panic("failed to find index")
+	if found_file, ok := find_file(spindle.file_tree, "index"); ok {
+		found_file.is_used = true
+	} else {
+		panic("need a root index!")
 	}
-
-	found_file.is_used = true
+	if found_file, ok := find_file(spindle.file_tree, "favicon.ico"); ok {
+		found_file.is_used = true
+	}
 
 	for {
 		done := build_pages(spindle, spindle.file_tree)
@@ -40,20 +41,34 @@ func command_build(spindle *spindle) {
 		}
 	}
 
-	for _, image := range spindle.gen_images {
-		if image.original.is_draft && !spindle.build_drafts {
-			continue
-		}
-
-		output_path := make_generated_image_path(spindle, image)
+	for _, page := range spindle.gen_pages {
+		output_path := tag_path(make_general_file_path(spindle, page.file), spindle.tag_path, page.import_cond)
 		make_dir(filepath.Dir(output_path))
 
-		ok := copy_generated_image(image, output_path)
-		if !ok {
-			spindle.errors.new(FAILURE, "%q could failed to be generated", output_path)
-		}
+		assembled := render_syntax_tree(spindle, page)
 
-		image.is_built = true
+		if !write_file(output_path, assembled) {
+			spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
+			break
+		}
+	}
+
+	if !spindle.skip_images {
+		for _, image := range spindle.gen_images {
+			if image.original.is_draft && !spindle.build_drafts {
+				continue
+			}
+
+			output_path := make_generated_image_path(spindle, image)
+			make_dir(filepath.Dir(output_path))
+
+			ok := copy_generated_image(image, output_path)
+			if !ok {
+				spindle.errors.new(FAILURE, "%q could failed to be generated", output_path)
+			}
+
+			image.is_built = true
+		}
 	}
 
 	if spindle.errors.has_errors() {
@@ -91,12 +106,14 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 
 		switch file.file_type {
 		case MARKUP:
-			page, ok := load_page(spindle, file.path)
+			page, ok := load_page_from_disk_object(spindle, file)
 			if !ok {
 				panic("failed to load page " + file.path)
 			}
 
-			assembled := render_syntax_tree(spindle, page, 0)
+			page.file = file // @todo put in load_page
+
+			assembled := render_syntax_tree(spindle, page)
 
 			if !write_file(output_path, assembled) {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
@@ -116,10 +133,3 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 
 	return is_done
 }
-
-/*func format_index(input string) string {
-	if !strings.Contains(input, "index") {
-		return filepath.Base(input)
-	}
-	return input
-}*/

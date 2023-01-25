@@ -12,10 +12,12 @@ type config struct {
 	command uint8
 	domain  string
 
-	default_path_mode path_type
+	path_mode path_type
 
 	build_drafts    bool
 	build_only_used bool
+	skip_images     bool
+	tag_path        string
 
 	output_path string
 
@@ -24,8 +26,9 @@ type config struct {
 
 type TOMLConfig struct {
 	Domain            string          `toml:"domain"`
-	Default_Path_Mode string          `toml:"default_path_mode"`
+	Default_Path_Mode string          `toml:"path_mode"`
 	Build_Path        string          `toml:"build_path"`
+	Tag_Path          string          `toml:"tag_path"`
 	Inline            []*Regex_Config `toml:"inline"`
 }
 
@@ -51,20 +54,25 @@ func load_config() (config, bool) {
 
 	switch strings.ToLower(conf.Default_Path_Mode) {
 	case "relative":
-		output.default_path_mode = RELATIVE
+		output.path_mode = RELATIVE
 	case "absolute":
-		output.default_path_mode = ABSOLUTE
+		output.path_mode = ABSOLUTE
 	case "root", "rooted":
-		output.default_path_mode = ROOTED
+		output.path_mode = ROOTED
 	default:
 		panic("not a valid path mode in config")
 	}
 
 	if conf.Build_Path == "" {
 		output.output_path = public_path
- 	} else {
+	} else {
 		output.output_path = conf.Build_Path
- 	}
+	}
+	if conf.Tag_Path == "" {
+		output.tag_path = "tag"
+	} else {
+		output.tag_path = conf.Tag_Path
+	}
 
 	output.domain = conf.Domain
 
@@ -148,6 +156,9 @@ func get_arguments() (config, bool) {
 
 		case "all", "a":
 			config.build_only_used = false
+
+		case "skip-images":
+			config.skip_images = true
 
 		default:
 			fmt.Fprintf(os.Stderr, "args: %q flag is unknown\n", a)

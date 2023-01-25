@@ -65,7 +65,7 @@ func (r *renderer) script_call(spindle *spindle, page *page_object, line int, ex
 			found_file.is_used = true
 
 			tc := found_file.file_type
-			dp := spindle.default_path_mode
+			dp := spindle.path_mode
 			pp := page.page_path
 
 			if tc > is_page && tc < end_page {

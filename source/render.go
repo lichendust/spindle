@@ -3,29 +3,35 @@ package main
 import "fmt"
 import "strings"
 
-func render_syntax_tree(spindle *spindle, page *page_object, import_condition uint32) string {
+type renderer struct {
+	unwind      bool
+
+	import_seek     bool
+	import_variable uint32
+
+	anon_stack  []*anon_entry
+	scope_stack []map[uint32]*ast_declare
+}
+
+func render_syntax_tree(spindle *spindle, page *page_object) string {
 	scope_stack := make([]map[uint32]*ast_declare, 0, 4)
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
 
 	r := &renderer{
-		import_condition: import_condition,
-		anon_stack:       make([]*anon_entry, 0, 4),
-		scope_stack:      scope_stack,
+		anon_stack:  make([]*anon_entry, 0, 4),
+		scope_stack: scope_stack,
 	}
 
 	if spindle.server_mode {
 		r.push_string_to_scope(is_server_hash, "") // just has to exist
 		r.push_string_to_scope(reload_script_hash, reload_script)
 	}
+	if page.import_cond != "" {
+		r.push_string_to_scope(taginator_tag_hash, page.import_cond)
+		r.push_string_to_scope(taginator_parent_hash, make_page_url(spindle, &page.file.anon_file_info, spindle.path_mode, ""))
+	}
 
 	return r.render_ast(spindle, page, page.content)
-}
-
-type renderer struct {
-	unwind           bool
-	import_condition uint32
-	anon_stack       []*anon_entry
-	scope_stack      []map[uint32]*ast_declare
 }
 
 type anon_entry struct {
@@ -106,38 +112,6 @@ func (r *renderer) push_string_to_scope(ident uint32, text string) {
 	r.write_to_scope(decl.field, decl)
 }
 
-func (r *renderer) evaluate_if(entry *ast_if) bool {
-	result  := false
-	has_not := false
-
-	for _, sub := range entry.condition_list {
-		switch sub.type_check() {
-		case OP_NOT:
-			has_not = true
-			continue
-
-		case OP_OR:
-			if result {
-				return true
-			}
-			continue
-
-		case VAR:
-			_, ok := r.get_in_scope(sub.(*ast_variable).field)
-			if has_not {
-				ok = !ok
-			}
-			result = ok
-		}
-
-		if has_not {
-			has_not = false
-		}
-	}
-
-	return result
-}
-
 func (r *renderer) write_collective_to_scope(spindle *spindle, page *page_object, input []ast_data) {
 	for _, entry := range input {
 		_type := entry.type_check()
@@ -170,6 +144,105 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, page *page_object
 	}
 }
 
+func (r *renderer) evaluate_if(entry *ast_if) bool {
+	result  := false
+	has_not := false
+
+	for _, sub := range entry.condition_list {
+		switch sub.type_check() {
+		case OP_NOT:
+			has_not = true
+			continue
+		case OP_OR:
+			if result {
+				return true
+			}
+			continue
+		case VAR:
+			_, ok := r.get_in_scope(sub.(*ast_variable).field)
+			if has_not {
+				ok = !ok
+			}
+			result = ok
+		}
+		if has_not {
+			has_not = false
+		}
+	}
+
+	return result
+}
+
+func (r *renderer) skip_import_condition(spindle *spindle, page *page_object, data_slice []ast_data) bool {
+	for _, entry := range data_slice {
+		if entry.type_check() == DECL {
+			entry := entry.(*ast_declare)
+
+			if entry.field == r.import_variable {
+				fields := unix_args(strings.ToLower(r.render_ast(spindle, page, entry.children)))
+
+				for _, tag := range fields {
+					if tag == page.import_cond {
+						return false
+					}
+				}
+
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+/*
+	@todo
+
+	when taginator is detected, immediately run through the
+	entire page and do the seek up front, storing all the
+	tags in a result map on the renderer.
+
+	we'll apply the tags back to the global gen_page when we're
+	done.
+
+	this lets us immediately inject "taginator.all_tags" for use.
+*/
+func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slice []ast_data) {
+	for _, entry := range data_slice {
+		if entry.type_check() == DECL {
+			entry := entry.(*ast_declare)
+
+			if entry.field == r.import_variable {
+				fields := unix_args(r.render_ast(spindle, page, entry.children))
+
+				for _, tag := range fields {
+					file_path := tag_path(make_general_url(spindle, page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
+					seek_path := rewrite_ext(file_path, "")
+
+					if _, ok := spindle.gen_pages[seek_path]; ok {
+						continue
+					}
+
+					// @todo
+					copy := &page_object{}
+
+					copy.content   = page.content
+					copy.top_scope = page.top_scope
+					copy.position  = page.position
+
+					copy.file         = page.file
+					copy.slug_tracker = make(map[string]uint, 16)
+					copy.page_path    = page.page_path
+					copy.import_cond  = strings.ToLower(tag)
+
+					spindle.gen_pages[seek_path] = copy
+				}
+				break
+			}
+		}
+	}
+}
+
 func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_data) string {
 	if r.unwind {
 		return ""
@@ -195,6 +268,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 		if tc.is(DECL, DECL_BLOCK, DECL_TOKEN) {
 			entry := entry.(*ast_declare)
 			r.write_to_scope(entry.field, entry)
+
+			// if we find a taginator in a scope
+			if tc == DECL && entry.field == taginator_hash {
+				r.import_seek     = (page.import_cond == "")
+				r.import_variable = new_hash(r.render_ast(spindle, page, entry.children))
+			}
+
 			continue
 		}
 
@@ -257,7 +337,6 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			entry := entry.(*ast_builtin)
 
 			t, ok := r.get_in_scope(entry.hash_name)
-
 			if !ok {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "no such template for import %q", get_hash(entry.hash_name))
 				r.unwind = true
@@ -266,14 +345,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			find_text := r.render_ast(spindle, page, entry.children)
 
-			// check cache
-			found_file, ok := spindle.finder_cache[find_text]
-
-			// if not in cache, do a full search
-			if !ok {
-				found_file, ok = find_file(spindle.file_tree, find_text)
-			}
-
+			found_file, ok := render_find_file(spindle, page, find_text)
 			if ok {
 				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "imported page %q is draft!", found_file.path)
@@ -284,32 +356,23 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			imported_page, page_success := load_page(spindle, found_file.path) // @todo cache
-
-			if r.import_condition > 0 {
-				has_match := false
-
-				for _, entry := range imported_page.top_scope {
-					if entry.type_check() != TEMPLATE {
-						entry := entry.(*ast_declare)
-						if entry.field == r.import_condition {
-							has_match = true
-							break
-						}
-					}
-				}
-
-				if !has_match {
-					continue
-				}
-			}
-
 			if !page_success {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", found_file.path)
 				r.unwind = true
 				return ""
 			}
 
+			if r.import_seek {
+				r.do_import_seek(spindle, page, imported_page.top_scope)
+			}
+			if page.import_cond != "" {
+				if r.skip_import_condition(spindle, page, imported_page.top_scope) {
+					continue
+				}
+			}
+
 			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
+
 			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
 			r.push_string_to_scope(new_hash("path"), find_text)
 
@@ -396,8 +459,15 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				text = r.render_ast(spindle, page, popped_anon.children)
 
 			} else {
-				if found, ok := r.get_in_scope(entry.field); ok {
-					text = r.render_ast(spindle, page, found.get_children())
+				switch entry.field {
+				case canonical_hash:
+					text = make_page_url(spindle, &page.file.anon_file_info, ABSOLUTE, "")
+				case url_hash:
+					text = make_page_url(spindle, &page.file.anon_file_info, spindle.path_mode, "")
+				default:
+					if found, ok := r.get_in_scope(entry.field); ok {
+						text = r.render_ast(spindle, page, found.get_children())
+					}
 				}
 			}
 
@@ -434,13 +504,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			// check cache
-			found_file, ok := spindle.finder_cache[find_text]
-
-			// if not in cache, do a full search
-			if !ok {
-				found_file, ok = find_file(spindle.file_tree, find_text)
-			}
-
+			found_file, ok := render_find_file(spindle, page, find_text)
 			if ok {
 				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "%q is a draft", found_file.path)
@@ -449,7 +513,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				the_url := ""
 
 				if entry.path_type == NO_PATH_TYPE {
-					entry.path_type = spindle.default_path_mode
+					entry.path_type = spindle.path_mode
 				}
 
 				switch entry.finder_type {
@@ -516,6 +580,15 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			entry := entry.(*ast_block)
 
 			x := entry.get_children()
+
+			if r.import_seek {
+				r.do_import_seek(spindle, page, x)
+			}
+			if page.import_cond != "" {
+				if r.skip_import_condition(spindle, page, x) {
+					continue
+				}
+			}
 
 			if entry.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
@@ -759,4 +832,12 @@ func apply_modifier(slugs map[string]uint, text string, modifier ast_modifier) s
 		text = strings.ToLower(text)
 	}
 	return text
+}
+
+func render_find_file(spindle *spindle, page *page_object, search_term string) (*disk_object, bool) {
+	found_file, ok := spindle.finder_cache[search_term]
+	if !ok {
+		return find_file(spindle.file_tree, search_term)
+	}
+	return found_file, true
 }

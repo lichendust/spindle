@@ -36,8 +36,8 @@ func command_serve(spindle *spindle) {
 	the_server := http.NewServeMux()
 
 	spindle.finder_cache = make(map[string]*disk_object, 64)
-	spindle.gen_images   = make(map[uint32]*gen_image, 32)
-	spindle.gen_pages    = make(map[string]*gen_page, 32)
+	spindle.gen_images   = make(map[uint32]*gen_image,   32)
+	spindle.gen_pages    = make(map[string]*page_object, 32)
 
 	spindle.partials  = load_all_partials(spindle)
 	spindle.templates = load_all_templates(spindle)
@@ -65,16 +65,9 @@ func command_serve(spindle *spindle) {
 	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		found_file, ok := find_file_hash(spindle.file_tree, new_hash(r.URL.Path))
 		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			w.Header().Add("Cache-Control", "no-cache")
-			w.Write([]byte(t_error_page_not_found))
-			return
-		}
-
-		if found_file.file_type == MARKUP {
-			page, ok := load_page(spindle, found_file.path)
-			if ok {
-				assembled := render_syntax_tree(spindle, page, 0)
+			// @todo streamline path seeking + returning page here
+			if page, ok := spindle.gen_pages[r.URL.Path]; ok {
+				assembled := render_syntax_tree(spindle, page)
 
 				if spindle.errors.has_errors() {
 					assembled = spindle.errors.render_html_page()
@@ -85,6 +78,29 @@ func command_serve(spindle *spindle) {
 				w.Header().Add("Cache-Control", "no-cache")
 				w.Write([]byte(assembled))
 				return
+			}
+
+			w.WriteHeader(http.StatusNotFound)
+			w.Header().Add("Cache-Control", "no-cache")
+			w.Write([]byte(t_error_page_not_found))
+			return
+		}
+
+		if found_file.file_type == MARKUP {
+			page, ok := load_page_from_disk_object(spindle, found_file)
+			if ok {
+				assembled := render_syntax_tree(spindle, page)
+
+				if spindle.errors.has_errors() {
+					assembled = spindle.errors.render_html_page()
+					spindle.errors.reset()
+				}
+
+				w.WriteHeader(http.StatusOK)
+				w.Header().Add("Cache-Control", "no-cache")
+				w.Write([]byte(assembled))
+				return
+
 			} else {
 				w.WriteHeader(http.StatusNotFound)
 				return

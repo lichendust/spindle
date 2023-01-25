@@ -99,7 +99,7 @@ type disk_object struct {
 	hash_url  uint32
 	is_used   bool
 	is_built  bool
-	// parent    *disk_object
+	parent    *disk_object
 	children  []*disk_object
 }
 
@@ -159,6 +159,7 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 			the_file.is_draft = is_draft(path)
 
 			the_file.hash_name = hash_base_name(the_file)
+			the_file.parent    = parent
 
 			if x, ok := recurse_directories(spindle, the_file); ok {
 				the_file.children = x
@@ -178,6 +179,8 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 
 		the_file.file_type = to_file_type(path)
 		the_file.hash_name = hash_base_name(the_file)
+
+		the_file.parent = parent
 
 		if x := the_file.file_type; x > is_page && x < end_page {
 			the_file.hash_url = new_hash(make_page_url(spindle, &the_file.anon_file_info, ROOTED, ""))

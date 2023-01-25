@@ -18,7 +18,7 @@ type spindle struct {
 
 	finder_cache map[string]*disk_object
 
-	gen_pages    map[string]*gen_page
+	gen_pages    map[string]*page_object
 	gen_images   map[uint32]*gen_image
 }
 

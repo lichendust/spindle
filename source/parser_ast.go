@@ -136,6 +136,7 @@ func (t *ast_base) get_position() *position {
 }
 
 
+
 type ast_variable struct {
 	ast_base_fields
 	ast_type ast_type
@@ -153,6 +154,8 @@ func (t *ast_variable) get_children() []ast_data {
 func (t *ast_variable) get_position() *position {
 	return &t.position
 }
+
+
 
 type ast_declare struct {
 	ast_base_fields
@@ -172,9 +175,19 @@ func (t *ast_declare) get_position() *position {
 	return &t.position
 }
 
+
+
+type special_block uint8
+const (
+	NOT_SPECIAL special_block = iota
+	TAGINATOR
+	// PAGINATOR @todo
+)
+
 type ast_block struct {
 	ast_base_fields
 	decl_hash uint32 // zero means anonymous
+	special   special_block
 }
 func (t *ast_block) type_check() ast_type {
 	return BLOCK
@@ -185,6 +198,8 @@ func (t *ast_block) get_children() []ast_data {
 func (t *ast_block) get_position() *position {
 	return &t.position
 }
+
+
 
 type ast_token struct {
 	ast_base_fields
@@ -200,6 +215,8 @@ func (t *ast_token) get_children() []ast_data {
 func (t *ast_token) get_position() *position {
 	return &t.position
 }
+
+
 
 type ast_finder struct {
 	ast_base_fields
@@ -217,6 +234,8 @@ func (t *ast_finder) get_position() *position {
 	return &t.position
 }
 
+
+
 type ast_for struct {
 	ast_base_fields
 	iterator_source ast_data
@@ -231,6 +250,8 @@ func (t *ast_for) get_position() *position {
 	return &t.position
 }
 
+
+
 type ast_if struct {
 	ast_base_fields
 	condition_list []ast_data
@@ -244,6 +265,7 @@ func (t *ast_if) get_children() []ast_data {
 func (t *ast_if) get_position() *position {
 	return &t.position
 }
+
 
 
 type ast_builtin struct {
@@ -263,6 +285,7 @@ func (t *ast_builtin) get_position() *position {
 }
 
 
+
 type ast_script struct {
 	ast_base_fields
 	hash_name uint32
@@ -276,6 +299,7 @@ func (t *ast_script) get_children() []ast_data {
 func (t *ast_script) get_position() *position {
 	return &t.position
 }
+
 
 
 type finder_type uint8

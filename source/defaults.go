@@ -22,12 +22,17 @@ const (
 	stop_hash    uint32 = 722245873  // "."
 	index_hash   uint32 = 151693739  // "index"
 
-	import_hash  uint32 = 288002260 // "import"
-
-	url_hash           uint32 = 4233404181 // "spindle.url"
-	canonical_hash     uint32 = 421032728  // "spindle.url_canonical"
 	is_server_hash     uint32 = 3014801206 // "spindle.is_server"
 	reload_script_hash uint32 = 2807780945 // "spindle.reload_script"
+
+	url_hash              uint32 = 221748551  // "page.url"
+	canonical_hash        uint32 = 847121482  // "page.url_canonical"
+	import_url_hash       uint32 = 941955437  // "import.url"
+	import_canonical_hash uint32 = 3120426992 // "import.url_canonical"
+
+	taginator_hash        uint32 = 296413604  // "taginator"
+	taginator_tag_hash    uint32 = 1240231138 // "taginator.tag_name"
+	taginator_parent_hash uint32 = 2602936506 // "taginator.parent_url"
 )
 
 const main_template = `/ markdown emulation

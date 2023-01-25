@@ -56,7 +56,6 @@ func make_page_url(spindle *spindle, file *anon_file_info, path_type path_type, 
 	if spindle.server_mode {
 		return _make_page_url(spindle, ROOTED, file.is_draft, file.path, current_location)
 	}
-
 	return _make_page_url(spindle, path_type, file.is_draft, file.path, current_location)
 }
 
@@ -191,4 +190,10 @@ func is_draft(input string) bool {
 	}
 
 	return false
+}
+
+func tag_path(input, sep, tag string) string {
+	path := filepath.Dir(input)
+	ext  := filepath.Ext(input)
+	return filepath.ToSlash(filepath.Join(path, sep, strings.ToLower(tag))) + ext
 }

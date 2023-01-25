@@ -13,9 +13,10 @@ type markup struct {
 
 type page_object struct {
 	markup
-	// page_id      uint32
+	file         *disk_object
 	slug_tracker map[string]uint
 	page_path    string
+	import_cond  string
 }
 
 type template_object struct {
@@ -35,9 +36,13 @@ type gen_image struct {
 	settings *image_settings
 }
 
-type gen_page struct {
-	is_built bool
-	original *disk_object
+func load_page_from_disk_object(spindle *spindle, o *disk_object) (*page_object, bool) {
+	x, ok := load_page(spindle, o.path)
+	if !ok {
+		return nil, false
+	}
+	x.file = o
+	return x, true
 }
 
 func load_page(spindle *spindle, full_path string) (*page_object, bool) {
@@ -57,17 +62,17 @@ func load_page(spindle *spindle, full_path string) (*page_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	finfo := anon_file_info{
+	anon_info := anon_file_info{
 		is_draft(full_path),
 		full_path,
 	}
 
-	syntax_tree := parse_stream(spindle, &finfo, token_stream, false)
+	syntax_tree := parse_stream(spindle, &anon_info, token_stream, false)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &page_object{
 		page_path:    full_path,
-		slug_tracker: make(map[string]uint, 4),
+		slug_tracker: make(map[string]uint, 16),
 	}
 
 	p.content   = syntax_tree
@@ -91,12 +96,12 @@ func load_template(spindle *spindle, full_path string) (*template_object, bool) 
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	finfo := anon_file_info{
+	anon_info := anon_file_info{
 		is_draft(full_path),
 		full_path,
 	}
 
-	syntax_tree := parse_stream(spindle, &finfo, token_stream, true)
+	syntax_tree := parse_stream(spindle, &anon_info, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := &template_object{
@@ -159,12 +164,12 @@ func load_partial(spindle *spindle, full_path string) (*partial_object, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	finfo := anon_file_info{
+	anon_info := anon_file_info{
 		is_draft(full_path),
 		full_path,
 	}
 
-	syntax_tree  := parse_stream(spindle, &finfo, token_stream, true)
+	syntax_tree  := parse_stream(spindle, &anon_info, token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := &partial_object{

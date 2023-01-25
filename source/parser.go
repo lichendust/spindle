@@ -9,13 +9,11 @@ import (
 type parser struct {
 	index       int
 	unwind      bool
-	inject_decl bool
 	stream      []*lexer_token
 }
 
 func parse_stream(spindle *spindle, file *anon_file_info, stream []*lexer_token, is_support bool) []ast_data {
-	parser := parser { stream: stream }
-	parser.inject_decl = !is_support // if we're a page, inject page things
+	parser := parser {stream: stream}
 	return parser.parse_block(spindle, file, 0, is_support)
 }
 
@@ -61,16 +59,6 @@ func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_de
 	}
 
 	array := make([]ast_data, 0, 32)
-
-	if parser.inject_decl {
-		canon_url := _make_page_url(spindle, ABSOLUTE, file.is_draft, file.path, "")
-		array = append(array, make_string_decl(canonical_hash, canon_url))
-
-		url := _make_page_url(spindle, ABSOLUTE, file.is_draft, file.path, "")
-		array = append(array, make_string_decl(url_hash, url))
-
-		parser.inject_decl = false
-	}
 
 	main_loop: for {
 		token := parser.next()
