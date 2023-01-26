@@ -216,6 +216,8 @@ func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slic
 				fields := unix_args(r.render_ast(spindle, page, entry.children))
 
 				for _, tag := range fields {
+					tag = strings.ToLower(tag)
+
 					file_path := tag_path(make_general_url(spindle, page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
 					seek_path := rewrite_ext(file_path, "")
 
@@ -233,7 +235,7 @@ func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slic
 					copy.file         = page.file
 					copy.slug_tracker = make(map[string]uint, 16)
 					copy.page_path    = page.page_path
-					copy.import_cond  = strings.ToLower(tag)
+					copy.import_cond  = tag
 
 					spindle.gen_pages[seek_path] = copy
 				}
@@ -446,7 +448,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if entry.ast_type.is(VAR_ANON, VAR_ENUM) {
 				if popped_anon == nil {
-					_println(entry.position)
+					fmt.Println(entry.position) // @todo remove this
 					panic("popped anon was missing!")
 				}
 

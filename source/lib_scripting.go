@@ -9,7 +9,7 @@ func init() {
 
 	the_vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 
-	the_vm.Set("console", _println)
+	the_vm.Set("console", println)
 	the_vm.Set("modifier", map[string]ast_modifier {
 		"slug":        SLUG,
 		"unique_slug": UNIQUE_SLUG,
@@ -84,7 +84,6 @@ func (r *renderer) script_call(spindle *spindle, page *page_object, line int, ex
 
 	v, err := the_vm.RunString(`function _(){` + exec_blob + `};_()`)
 	if err != nil {
-		_println(err)
 		return "", false
 	}
 

@@ -28,8 +28,8 @@ func open_browser(port string) {
 		panic(err)
 	}
 
-	_println(title)
-	_println("\n   ", url)
+	println(title)
+	println("\n   ", url)
 }
 
 func command_serve(spindle *spindle) {
@@ -43,7 +43,7 @@ func command_serve(spindle *spindle) {
 	spindle.templates = load_all_templates(spindle)
 
 	if spindle.errors.has_errors() {
-		_println(spindle.errors.render_term_errors())
+		println(spindle.errors.render_term_errors())
 		return
 	}
 
@@ -257,7 +257,7 @@ func (c *client) read_pump(the_hub *client_hub) {
 
 		if err != nil {
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway) {
-				_println("reload socket: unexpected closure") // @todo
+				println("reload socket: unexpected closure") // @todo
 			}
 			break
 		}

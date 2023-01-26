@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 	"path/filepath"
 )
 
@@ -192,8 +194,38 @@ func is_draft(input string) bool {
 	return false
 }
 
+func get_scheme(input string) (string, string) {
+	for i, c := range input {
+		if c == ':' {
+			r, _ := utf8.DecodeRuneInString(input[i + 1:])
+			if r == '/' {
+				return input[:i + 3], input[i + 3:]
+			}
+		}
+	}
+	return "", input
+}
+
 func tag_path(input, sep, tag string) string {
-	path := filepath.Dir(input)
-	ext  := filepath.Ext(input)
-	return filepath.ToSlash(filepath.Join(path, sep, strings.ToLower(tag))) + ext
+	ext := filepath.Ext(input)
+	input = input[:len(input) - len(ext)]
+
+	scheme, path := get_scheme(input)
+
+	if strings.HasSuffix(path, "index") {
+		path = path[:len(path) - 5]
+	}
+
+	if scheme != "" {
+		x, err := url.JoinPath(scheme, path, sep, tag)
+		if err != nil {
+			panic(err)
+		}
+		path = x
+
+	} else {
+		path = filepath.ToSlash(filepath.Join(path, sep, tag))
+	}
+
+	return path + ext
 }

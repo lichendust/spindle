@@ -74,6 +74,8 @@ func command_build(spindle *spindle) {
 	if spindle.errors.has_errors() {
 		fmt.Fprintln(os.Stderr, spindle.errors.render_term_errors())
 	}
+
+	sitemap(spindle)
 }
 
 func build_pages(spindle *spindle, file *disk_object) bool {
