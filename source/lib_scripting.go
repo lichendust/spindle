@@ -30,11 +30,11 @@ func (r *renderer) script_call(spindle *spindle, page *page_object, line int, ex
 		return apply_modifier(slug_tracker, text, mod)
 	})
 
-	the_vm.Set("get", func(name string) (string, bool) {
+	the_vm.Set("get", func(name string) string {
 		if entry, ok := r.get_in_scope(new_hash(name)); ok && entry.ast_type == DECL {
-			return r.render_ast(spindle, page, entry.get_children()), true
+			return r.render_ast(spindle, page, entry.get_children())
 		}
-		return "", false
+		return ""
 	})
 	the_vm.Set("get_token", func(depth int, match ...string) []script_token {
 		h := make([]uint32, len(match))
@@ -84,6 +84,7 @@ func (r *renderer) script_call(spindle *spindle, page *page_object, line int, ex
 
 	v, err := the_vm.RunString(`function _(){` + exec_blob + `};_()`)
 	if err != nil {
+		spindle.errors.new(FAILURE, err.Error())
 		return "", false
 	}
 
