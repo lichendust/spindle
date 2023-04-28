@@ -119,23 +119,24 @@ func _() {
 	_ = x[IMG_PNG-4]
 	_ = x[IMG_TIF-5]
 	_ = x[IMG_WEB-6]
-	_ = x[end_image-7]
-	_ = x[is_page-8]
-	_ = x[MARKUP-9]
-	_ = x[MARKDOWN-10]
-	_ = x[is_static-11]
-	_ = x[HTML-12]
-	_ = x[end_page-13]
-	_ = x[STATIC-14]
-	_ = x[JAVASCRIPT-15]
-	_ = x[SCSS-16]
-	_ = x[CSS-17]
-	_ = x[end_static-18]
+	_ = x[IMG_GIF-7]
+	_ = x[end_image-8]
+	_ = x[is_page-9]
+	_ = x[MARKUP-10]
+	_ = x[MARKDOWN-11]
+	_ = x[is_static-12]
+	_ = x[HTML-13]
+	_ = x[end_page-14]
+	_ = x[STATIC-15]
+	_ = x[JAVASCRIPT-16]
+	_ = x[SCSS-17]
+	_ = x[CSS-18]
+	_ = x[end_static-19]
 }
 
-const _file_type_name = "DIRECTORYROOTis_imageIMG_JPGIMG_PNGIMG_TIFIMG_WEBend_imageis_pageMARKUPMARKDOWNis_staticHTMLend_pageSTATICJAVASCRIPTSCSSCSSend_static"
+const _file_type_name = "DIRECTORYROOTis_imageIMG_JPGIMG_PNGIMG_TIFIMG_WEBIMG_GIFend_imageis_pageMARKUPMARKDOWNis_staticHTMLend_pageSTATICJAVASCRIPTSCSSCSSend_static"
 
-var _file_type_index = [...]uint8{0, 9, 13, 21, 28, 35, 42, 49, 58, 65, 71, 79, 88, 92, 100, 106, 116, 120, 123, 133}
+var _file_type_index = [...]uint8{0, 9, 13, 21, 28, 35, 42, 49, 56, 65, 72, 78, 86, 95, 99, 107, 113, 123, 127, 130, 140}
 
 func (i file_type) String() string {
 	if i >= file_type(len(_file_type_index)-1) {

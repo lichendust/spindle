@@ -18,6 +18,10 @@ const (
 	IMG_PNG
 	IMG_TIF
 	IMG_WEB
+
+	// end_process_image
+
+	IMG_GIF
 	end_image
 
 	is_page
@@ -57,6 +61,8 @@ func to_file_type(input string) file_type {
 		return IMG_TIF
 	case ".webp":
 		return IMG_WEB
+	case ".gif":
+		return IMG_GIF
 	}
 	return STATIC
 }
