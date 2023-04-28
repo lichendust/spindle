@@ -164,6 +164,7 @@ type ast_declare struct {
 	taxonomy   uint32
 	subname    uint32
 	immediate  bool
+	is_soft    bool
 }
 func (t *ast_declare) type_check() ast_type {
 	return t.ast_type

@@ -39,7 +39,7 @@ func (parser *parser) get_non_word(token *lexer_token) (string, int) {
 	return strings.Repeat(token.field, count + 1), count
 }
 
-func make_string_decl(id uint32, text string) *ast_declare {
+/*func make_string_decl(id uint32, text string) *ast_declare {
 	decl := &ast_declare {
 		ast_type: DECL,
 		field:    id,
@@ -51,7 +51,7 @@ func make_string_decl(id uint32, text string) *ast_declare {
 		},
 	}
 	return decl
-}
+}*/
 
 func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_depth int, is_support bool) []ast_data {
 	if parser.unwind {
@@ -318,11 +318,12 @@ func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_de
 				parser.eat_whitespace()
 
 				the_decl := &ast_declare{
-					ast_type: DECL,
-					field:    field,
-					taxonomy: taxonomy,
-					subname:  subname,
+					ast_type:  DECL,
+					field:     field,
+					taxonomy:  taxonomy,
+					subname:   subname,
 					immediate: is_immediate,
+					is_soft:   is_support,
 				}
 				the_decl.position  = token.position
 
@@ -391,6 +392,7 @@ func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_de
 
 			the_decl := &ast_declare{}
 			the_decl.position = token.position
+			the_decl.is_soft  = is_support
 
 			isnt_valid := false
 

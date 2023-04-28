@@ -1,10 +1,13 @@
 package main
 
-import "fmt"
-import "strings"
+import (
+	"fmt"
+	"time"
+	"strings"
+)
 
 type renderer struct {
-	unwind      bool
+	unwind bool
 
 	import_seek     bool
 	import_variable uint32
@@ -73,10 +76,18 @@ func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 			return x, true
 		}
 	}
+
 	return nil, false
 }
 
 func (r *renderer) write_to_scope(field uint32, entry *ast_declare) {
+	if entry.is_soft {
+		x, ok := r.get_in_scope(field)
+		if ok && !x.is_soft {
+			return
+		}
+	}
+
 	r.scope_stack[len(r.scope_stack) - 1][field] = entry
 }
 
@@ -85,6 +96,7 @@ func (r *renderer) push_blank_scope(alloc int) bool {
 		return false
 	}
 	r.scope_stack = append(r.scope_stack, make(map[uint32]*ast_declare, alloc))
+
 	return true
 }
 
@@ -374,7 +386,6 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			}
 
 			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
-
 			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
 			r.push_string_to_scope(new_hash("path"), find_text)
 
@@ -466,6 +477,11 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 					text = make_page_url(spindle, &page.file.anon_file_info, ABSOLUTE, "")
 				case url_hash:
 					text = make_page_url(spindle, &page.file.anon_file_info, spindle.path_mode, "")
+
+				// spindle.current_year
+				case 1115224399:
+					text = fmt.Sprintf("%d", time.Now().Year())
+
 				default:
 					if found, ok := r.get_in_scope(entry.field); ok {
 						text = r.render_ast(spindle, page, found.get_children())
@@ -594,11 +610,13 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if entry.decl_hash > 0 {
 				wrapper_block, ok := r.get_in_scope(entry.decl_hash)
+
 				if ok && wrapper_block.ast_type == DECL_BLOCK {
 					children := wrapper_block.get_children()
+					did_push := r.push_blank_scope(immediate_decl_count(children) * 2)
 
-					did_push := r.push_blank_scope(immediate_decl_count(children))
 					r.push_anon(x, children, *entry.get_position())
+					r.write_collective_to_scope(spindle, page, x)
 
 					buffer.WriteString(r.render_ast(spindle, page, children))
 
