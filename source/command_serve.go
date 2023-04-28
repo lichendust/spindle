@@ -28,7 +28,7 @@ func open_browser(port string) {
 		panic(err)
 	}
 
-	println(title)
+	println(SPINDLE)
 	println("\n   ", url)
 }
 

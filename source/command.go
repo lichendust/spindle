@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	VERSION uint8 = iota
-	HELP
-	INIT
-	BUILD
-	SERVE
+	COMMAND_VERSION uint8 = iota
+	COMMAND_HELP
+	COMMAND_INIT
+	COMMAND_BUILD
+	COMMAND_SERVE
 )
 
 func command_init(config *config) {

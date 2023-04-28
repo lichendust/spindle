@@ -164,7 +164,7 @@ func (e *error_handler) render_term_errors() string {
 }
 
 const t_error_page_not_found = `<html>` + t_error_head + `<body>
-<h1>` + title + `</h1>
+<h1>` + SPINDLE + `</h1>
 <main>
 	<section><p><b>Page not found...</b></p></section>
 </main>
@@ -228,7 +228,7 @@ const t_error_modal = `<div>
 
 const t_error_page = `<!DOCTYPE html>
 <html>` + t_error_head + `<body>
-	<h1>` + title + `</h1>
+	<h1>` + SPINDLE + `</h1>
 	<main>
 		%s
 	</main>

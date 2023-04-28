@@ -105,16 +105,16 @@ func get_arguments() (config, bool) {
 			switch args[0] {
 			case "build":
 				counter++
-				config.command = BUILD
+				config.command = COMMAND_BUILD
 				continue
 
 			case "serve":
 				counter++
-				config.command = SERVE
+				config.command = COMMAND_SERVE
 				continue
 
 			case "init":
-				config.command = INIT
+				config.command = COMMAND_INIT
 
 				if len(args) < 2 {
 					return config, true
@@ -131,11 +131,11 @@ func get_arguments() (config, bool) {
 				return config, true
 
 			case "help":
-				config.command = HELP
+				config.command = COMMAND_HELP
 				return config, true
 
 			case "version":
-				config.command = VERSION
+				config.command = COMMAND_VERSION
 				return config, true
 			}
 		}
@@ -147,11 +147,11 @@ func get_arguments() (config, bool) {
 		switch a {
 		case "":
 		case "version":
-			config.command = VERSION
+			config.command = COMMAND_VERSION
 			return config, true
 
 		case "help", "h":
-			config.command = HELP
+			config.command = COMMAND_HELP
 			return config, true
 
 		case "all", "a":

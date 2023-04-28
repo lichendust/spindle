@@ -2,7 +2,8 @@ package main
 
 import "fmt"
 
-const title = "Spindle 0.4.0"
+const VERSION = "v0.4.0"
+const SPINDLE = "Spindle " + VERSION
 
 type spindle struct {
 	server_mode  bool
@@ -30,13 +31,13 @@ func main() {
 	}
 
 	switch config.command {
-	case HELP:
-		fmt.Println(title)
+	case COMMAND_HELP:
+		fmt.Println(SPINDLE)
 		return
-	case VERSION:
-		fmt.Println(title)
+	case COMMAND_VERSION:
+		fmt.Println(SPINDLE)
 		return
-	case INIT:
+	case COMMAND_INIT:
 		command_init(&config)
 		return
 	}
@@ -46,9 +47,9 @@ func main() {
 	spindle.errors = new_error_handler()
 
 	switch config.command {
-	case BUILD:
+	case COMMAND_BUILD:
 		command_build(&spindle)
-	case SERVE:
+	case COMMAND_SERVE:
 		spindle.server_mode = true
 		command_serve(&spindle)
 	}
