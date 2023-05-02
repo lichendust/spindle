@@ -1,19 +1,23 @@
 package main
 
 import (
-	"os"
 	"fmt"
 	"image"
+	"strconv"
+
+	"os"
+	"os/exec"
 
 	"github.com/nfnt/resize"
 
 	lib_png "image/png"
 	lib_jpg "image/jpeg"
 	lib_tif "golang.org/x/image/tiff"
+	lib_web "golang.org/x/image/webp"
+)
 
-	// lib_web "github.com/kolesa-team/go-webp/webp"
-	// web_encoder "github.com/kolesa-team/go-webp/encoder"
-	// web_decoder "github.com/kolesa-team/go-webp/decoder"
+const (
+	DEFAULT_QUALITY = 100
 )
 
 type image_settings struct {
@@ -48,13 +52,28 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 			source_image, img_err = lib_tif.Decode(source_file)
 		case IMG_PNG:
 			source_image, img_err = lib_png.Decode(source_file)
-		/*case IMG_WEB:
-			source_image, img_err = lib_web.Decode(source_file, &web_decoder.Options{})*/
+		case IMG_WEB:
+			source_image, img_err = lib_web.Decode(source_file)
 		}
 
 		if img_err != nil {
 			return false
 		}
+	}
+
+	// break flow to escalate straight to cwebp
+	// instead of wasting any time below
+	if settings.file_type == IMG_WEB {
+		b := source_image.Bounds()
+		x := uint(b.Dx())
+		y := uint(b.Dy())
+
+		// correct aspect ratio
+		settings.width, settings.height = scaling(settings.width, settings.height, x, y)
+
+		go ext_cwebp(incoming_file.anon_file_info.path, output_path, settings)
+
+		return true
 	}
 
 	output_image := source_image
@@ -82,29 +101,59 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 			panic(err)
 		}
 
-		encoder := lib_png.Encoder { CompressionLevel: -1 }
+		encoder := lib_png.Encoder {
+			CompressionLevel: lib_png.NoCompression,
+		}
 
 		err = encoder.Encode(output_file, output_image)
 		if err != nil {
 			panic(err)
 		}
-
-	/*case IMG_WEB:
-		output_file, err := os.Create(output_path)
-		if err != nil {
-			panic(err)
-		}
-
-		options, err := web_encoder.NewLossyEncoderOptions(web_encoder.PresetDefault, float32(settings.quality))
-		if err != nil {
-			panic(err)
-		}
-
-		err = lib_web.Encode(output_file, output_image, options)
-		if err != nil {
-			panic(err)
-		}*/
 	}
 
 	return true
+}
+
+func ext_cwebp(input_path, output_path string, settings *image_settings) {
+	args := make([]string, 0, 8)
+
+	if settings.width > 0 && settings.height > 0 {
+		args = append(args, "-resize", strconv.FormatUint(uint64(settings.width), 10), strconv.FormatUint(uint64(settings.height), 10))
+	}
+
+	args = append(args, "-q", strconv.FormatUint(uint64(settings.quality), 10), input_path, "-o", output_path)
+
+	cmd := exec.Command("cwebp", args...)
+	err := cmd.Run()
+	if err != nil {
+		panic(err) // @error
+	}
+}
+
+// borrowed from "github.com/nfnt/resize" (MIT)
+func scaling(max_width, max_height, old_width, old_height uint) (uint, uint) {
+	new_width, new_height := old_width, old_height
+
+	if max_width >= old_width && max_height >= old_height {
+		return old_width, old_height
+	}
+
+	// Preserve aspect ratio
+	if old_width > max_width {
+		new_height = uint(old_height * max_width / old_width)
+		if new_height < 1 {
+			new_height = 1
+		}
+		new_width = max_width
+	}
+
+	if new_height > max_height {
+		new_width = uint(new_width * max_height / new_height)
+		if new_width < 1 {
+			new_width = 1
+		}
+		new_height = max_height
+	}
+
+	return new_width, new_height
 }

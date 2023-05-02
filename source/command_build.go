@@ -2,6 +2,8 @@ package main
 
 import (
 	"os"
+	"os/exec"
+
 	"fmt"
 	"path/filepath"
 )
@@ -11,15 +13,25 @@ func command_build(spindle *spindle) {
 		spindle.file_tree = data
 	}
 
-	spindle.templates    = load_all_templates(spindle)
-	spindle.partials     = load_all_partials(spindle)
+	spindle.templates = load_all_templates(spindle)
+	spindle.partials  = load_all_partials(spindle)
+
+	// if the user has requested any webp
+	// output in the templates
+	if spindle.has_webp {
+		_, err := exec.LookPath("cwebp")
+		if err != nil {
+			panic("cwebp not found in path") // @error
+			return
+		}
+	}
 
 	spindle.pages        = make(map[string]*page_object, 64)
 	spindle.finder_cache = make(map[string]*disk_object, 64)
 	spindle.gen_images   = make(map[uint32]*gen_image, 32)
 	spindle.gen_pages    = make(map[string]*page_object, 32)
 
-	make_dir(public_path)
+	make_dir(spindle.config.output_path)
 
 	if found_file, ok := find_file(spindle.file_tree, "index"); ok {
 		found_file.is_used = true

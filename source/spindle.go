@@ -13,6 +13,8 @@ type spindle struct {
 
 	config
 
+	has_webp     bool
+
 	pages        map[string]*page_object
 	templates    map[uint32]*template_object
 	partials     map[uint32]*partial_object

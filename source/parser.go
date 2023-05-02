@@ -991,9 +991,10 @@ func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
 			case "png":
 				settings.file_type = IMG_PNG
 				got_anything = true
-			/*case "webp":
+			case "webp":
 				settings.file_type = IMG_WEB
-				got_anything = true*/
+				got_anything = true
+				spindle.has_webp = true
 			case "jpeg", "jpg":
 				settings.file_type = IMG_JPG
 				got_anything = true
@@ -1011,7 +1012,7 @@ func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
 
 	if got_anything {
 		if settings.quality == 0 {
-			settings.quality = 100
+			settings.quality = DEFAULT_QUALITY
 		}
 		return settings
 	}
