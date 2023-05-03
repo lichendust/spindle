@@ -12,10 +12,10 @@ func sitemap(spindle *spindle) {
 	ordered := make([]string, 0, size)
 
 	for _, page := range spindle.pages {
-		ordered = append(ordered, make_page_url(spindle, &page.file.anon_file_info, ABSOLUTE, ""))
+		ordered = append(ordered, make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""))
 	}
 	for _, page := range spindle.gen_pages {
-		ordered = append(ordered, tag_path(make_page_url(spindle, &page.file.anon_file_info, ABSOLUTE, ""), spindle.tag_path, page.import_cond))
+		ordered = append(ordered, tag_path(make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""), spindle.tag_path, page.import_cond))
 	}
 
 	sort.SliceStable(ordered, func(i, j int) bool {

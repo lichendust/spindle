@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"fmt"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -33,7 +32,7 @@ type TOMLConfig struct {
 }
 
 func load_config() (config, bool) {
-	blob, ok := load_file(config_file_path)
+	blob, ok := load_file(CONFIG_FILE_PATH)
 	if !ok {
 		return config{}, false // @error
 	}
@@ -64,7 +63,7 @@ func load_config() (config, bool) {
 	}
 
 	if conf.Build_Path == "" {
-		output.output_path = public_path
+		output.output_path = PUBLIC_PATH
 	} else {
 		output.output_path = conf.Build_Path
 	}
@@ -161,7 +160,7 @@ func get_arguments() (config, bool) {
 			config.skip_images = true
 
 		default:
-			fmt.Fprintf(os.Stderr, "args: %q flag is unknown\n", a)
+			eprintf("args: %q flag is unknown\n", a)
 			has_errors = true
 
 			if b != "" {

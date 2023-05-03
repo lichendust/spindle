@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func make_general_file_path(spindle *spindle, file *disk_object) string {
+func make_general_file_path(spindle *spindle, file *File) string {
 	output_path := ""
 
 	new_ext := ext_for_file_type(file.file_type)
@@ -26,7 +26,7 @@ func make_general_file_path(spindle *spindle, file *disk_object) string {
 	return output_path
 }
 
-func make_generated_image_path(spindle *spindle, the_image *gen_image) string {
+func make_generated_image_path(spindle *spindle, the_image *Gen_Image) string {
 	public_path := spindle.output_path
 	file_path   := the_image.original.path
 	s           := the_image.settings
@@ -39,7 +39,7 @@ func make_generated_image_path(spindle *spindle, the_image *gen_image) string {
 	return rewrite_ext(rewrite_root(file_path, public_path), fmt.Sprintf("_%d%s", hash, new_ext))
 }
 
-func make_general_url(spindle *spindle, file *disk_object, path_type path_type, current_location string) string {
+func make_general_url(spindle *spindle, file *File, path_type path_type, current_location string) string {
 	if spindle.server_mode {
 		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
@@ -54,7 +54,7 @@ func make_general_url(spindle *spindle, file *disk_object, path_type path_type, 
 	return output_path
 }
 
-func make_page_url(spindle *spindle, file *anon_file_info, path_type path_type, current_location string) string {
+func make_page_url(spindle *spindle, file *file_info, path_type path_type, current_location string) string {
 	if spindle.server_mode {
 		return _make_page_url(spindle, ROOTED, file.is_draft, file.path, current_location)
 	}
@@ -87,7 +87,7 @@ func _make_page_url(spindle *spindle, path_type path_type, is_draft bool, path, 
 	return output_path
 }
 
-func make_generated_image_url(spindle *spindle, file *disk_object, s *image_settings, path_type path_type, current_location string) string {
+func make_generated_image_url(spindle *spindle, file *File, s *image_settings, path_type path_type, current_location string) string {
 	if spindle.server_mode {
 		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
@@ -212,9 +212,7 @@ func tag_path(input, sep, tag string) string {
 
 	scheme, path := get_scheme(input)
 
-	if strings.HasSuffix(path, "index") {
-		path = path[:len(path) - 5]
-	}
+	path = strings.TrimSuffix(path, "index")
 
 	if scheme != "" {
 		x, err := url.JoinPath(scheme, path, sep, tag)

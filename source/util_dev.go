@@ -9,8 +9,6 @@ import (
 	"strings"
 	"encoding/xml"
 	// "path/filepath"
-
-	"github.com/yosssi/gohtml"
 )
 
 func _println(name ...any) {
@@ -63,7 +61,7 @@ func print_syntax_tree(array []ast_data, level int) {
 	}
 }
 
-func print_file_tree(array []*disk_object, level int) {
+func print_file_tree(array []*File, level int) {
 	indent := strings.Repeat("    ", level)
 
 	for _, d := range array {
@@ -76,7 +74,7 @@ func print_file_tree(array []*disk_object, level int) {
 	}
 }
 
-func (d *disk_object) String() string {
+func (d *File) String() string {
 	// return fmt.Sprint(d.file_type, " ", filepath.Base(d.path))
 	return fmt.Sprint(d.file_type, " ", d.path, " ", d.is_used, " ", d.is_built)
 }
@@ -105,10 +103,6 @@ func validate_html(input string) bool {
 	}
 
 	return false
-}
-
-func format_html(input string) string {
-	return gohtml.Format(input)
 }
 
 var has_printed_scope = make(map[string]bool, 10)

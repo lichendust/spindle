@@ -9,7 +9,7 @@ import (
 	"github.com/tdewolff/minify/v2/css"
 )
 
-func copy_minify(the_file *disk_object, output_path string) bool {
+func copy_minify(the_file *File, output_path string) bool {
 	minifier := minify.New()
 	minifier.AddFunc("text/js", js.Minify)
 	minifier.AddFunc("text/css", css.Minify)

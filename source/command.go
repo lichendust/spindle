@@ -19,11 +19,11 @@ func command_init(config *config) {
 		os.Chdir(config.output_path)
 	}
 
-	make_dir(template_path)
-	make_dir(partial_path)
-	make_dir(script_path)
-	make_dir(source_path)
+	make_dir(TEMPLATE_PATH)
+	make_dir(PARTIAL_PATH)
+	make_dir(SCRIPT_PATH)
+	make_dir(SOURCE_PATH)
 
-	write_file(filepath.Join(config_path, "main" + extension),  main_template)
-	write_file(filepath.Join(source_path, "index" + extension), index_template)
+	write_file(filepath.Join(CONFIG_PATH, "main" + EXTENSION),  main_template)
+	write_file(filepath.Join(SOURCE_PATH, "index" + EXTENSION), index_template)
 }

@@ -16,7 +16,7 @@ type renderer struct {
 	scope_stack []map[uint32]*ast_declare
 }
 
-func render_syntax_tree(spindle *spindle, page *page_object) string {
+func render_syntax_tree(spindle *spindle, page *Page) string {
 	scope_stack := make([]map[uint32]*ast_declare, 0, 4)
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
 
@@ -26,12 +26,13 @@ func render_syntax_tree(spindle *spindle, page *page_object) string {
 	}
 
 	if spindle.server_mode {
-		r.push_string_to_scope(is_server_hash, "") // just has to exist
-		r.push_string_to_scope(reload_script_hash, reload_script)
+		r.push_string_to_scope(IS_SERVER_HASH, "") // just has to exist
+		r.push_string_to_scope(RELOAD_SCRIPT_HASH, reload_script)
 	}
 	if page.import_cond != "" {
-		r.push_string_to_scope(taginator_tag_hash, page.import_cond)
-		r.push_string_to_scope(taginator_parent_hash, make_page_url(spindle, &page.file.anon_file_info, spindle.path_mode, ""))
+		r.push_string_to_scope(TAGINATOR_ACTIVE_HASH, "") // just has to exist
+		r.push_string_to_scope(TAGINATOR_TAG_HASH, page.import_cond)
+		r.push_string_to_scope(TAGINATOR_PARENT_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
 	}
 
 	return r.render_ast(spindle, page, page.content)
@@ -124,7 +125,7 @@ func (r *renderer) push_string_to_scope(ident uint32, text string) {
 	r.write_to_scope(decl.field, decl)
 }
 
-func (r *renderer) write_collective_to_scope(spindle *spindle, page *page_object, input []ast_data) {
+func (r *renderer) write_collective_to_scope(spindle *spindle, page *Page, input []ast_data) {
 	for _, entry := range input {
 		_type := entry.type_check()
 
@@ -182,10 +183,15 @@ func (r *renderer) evaluate_if(entry *ast_if) bool {
 		}
 	}
 
+	// else
+	if entry.invert {
+		result = !result
+	}
+
 	return result
 }
 
-func (r *renderer) skip_import_condition(spindle *spindle, page *page_object, data_slice []ast_data) bool {
+func (r *renderer) skip_import_condition(spindle *spindle, page *Page, data_slice []ast_data) bool {
 	for _, entry := range data_slice {
 		if entry.type_check() == DECL {
 			entry := entry.(*ast_declare)
@@ -219,7 +225,7 @@ func (r *renderer) skip_import_condition(spindle *spindle, page *page_object, da
 
 	this lets us immediately inject "taginator.all_tags" for use.
 */
-func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slice []ast_data) {
+func (r *renderer) do_import_seek(spindle *spindle, page *Page, data_slice []ast_data) {
 	for _, entry := range data_slice {
 		if entry.type_check() == DECL {
 			entry := entry.(*ast_declare)
@@ -238,7 +244,7 @@ func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slic
 					}
 
 					// @todo
-					copy := &page_object{}
+					copy := &Page{}
 
 					copy.content   = page.content
 					copy.top_scope = page.top_scope
@@ -257,7 +263,7 @@ func (r *renderer) do_import_seek(spindle *spindle, page *page_object, data_slic
 	}
 }
 
-func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_data) string {
+func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) string {
 	if r.unwind {
 		return ""
 	}
@@ -284,7 +290,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			r.write_to_scope(entry.field, entry)
 
 			// if we find a taginator in a scope
-			if tc == DECL && entry.field == taginator_hash {
+			if tc == DECL && entry.field == TAGINATOR_HASH {
 				r.import_seek     = (page.import_cond == "")
 				r.import_variable = new_hash(r.render_ast(spindle, page, entry.children))
 			}
@@ -459,7 +465,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			if entry.ast_type.is(VAR_ANON, VAR_ENUM) {
 				if popped_anon == nil {
-					fmt.Println(entry.position) // @todo remove this
+					// @error
 					panic("popped anon was missing!")
 				}
 
@@ -473,10 +479,10 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 
 			} else {
 				switch entry.field {
-				case canonical_hash:
-					text = make_page_url(spindle, &page.file.anon_file_info, ABSOLUTE, "")
-				case url_hash:
-					text = make_page_url(spindle, &page.file.anon_file_info, spindle.path_mode, "")
+				case CANONICAL_HASH:
+					text = make_page_url(spindle, &page.file.file_info, ABSOLUTE, "")
+				case URL_HASH:
+					text = make_page_url(spindle, &page.file.file_info, spindle.path_mode, "")
 
 				// spindle.current_year
 				case 1115224399:
@@ -552,7 +558,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						{
 							hash := new_hash(the_url)
 							if _, ok := spindle.gen_images[hash]; !ok {
-								spindle.gen_images[hash] = &gen_image{
+								spindle.gen_images[hash] = &Gen_Image{
 									false, found_file, &settings,
 								}
 							}
@@ -572,7 +578,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 						r.unwind = true
 					}
 
-					the_url = make_page_url(spindle, &found_file.anon_file_info, entry.path_type, page.page_path)
+					the_url = make_page_url(spindle, &found_file.file_info, entry.path_type, page.page_path)
 					found_file.is_used = true
 
 				case _STATIC:
@@ -649,19 +655,23 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 				did_push = r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
 			} else {
 				if len(x) == 0 {
-					wrapper_block, ok := r.get_in_scope(default_hash)
+					wrapper_block, ok := r.get_in_scope(DEFAULT_HASH)
 					if ok {
 						children := wrapper_block.get_children()
 						did_push := r.push_blank_scope(immediate_decl_count(children))
+
 						r.push_anon(x, children, *entry.get_position())
+
 						buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, children)))
+
 						if did_push {
 							r.pop_scope()
 						}
 						continue
 					}
+
 				} else {
-					if entry.decl_hash != stop_hash {
+					if entry.decl_hash != STOP_HASH {
 						spindle.errors.new_pos(RENDER_WARNING, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
 					}
 
@@ -766,7 +776,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			sub_buffer.Grow(512)
 
 			for i, t := range array {
-				r.push_string_to_scope(it_hash, t)
+				r.push_string_to_scope(IT_HASH, t)
 
 				if i == len(array) - 1 {
 					r.push_string_to_scope(1787721130, "") // "end" @todo
@@ -797,7 +807,7 @@ func (r *renderer) render_ast(spindle *spindle, page *page_object, input []ast_d
 			x := entry.get_children()
 
 			if len(x) > 0 {
-				wrapper_block, ok := r.get_in_scope(default_hash)
+				wrapper_block, ok := r.get_in_scope(DEFAULT_HASH)
 				if ok {
 					children := wrapper_block.get_children()
 					did_push := r.push_blank_scope(immediate_decl_count(children))
@@ -854,7 +864,7 @@ func apply_modifier(slugs map[string]uint, text string, modifier ast_modifier) s
 	return text
 }
 
-func render_find_file(spindle *spindle, page *page_object, search_term string) (*disk_object, bool) {
+func render_find_file(spindle *spindle, page *Page, search_term string) (*File, bool) {
 	found_file, ok := spindle.finder_cache[search_term]
 	if !ok {
 		return find_file(spindle.file_tree, search_term)

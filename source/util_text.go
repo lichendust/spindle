@@ -1,21 +1,12 @@
 package main
 
 import (
-	"io"
-	"os"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
 var ascii_space = [256]uint8{'\t': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
-
-func println(msg ...string) {
-	for _, x := range msg {
-		io.WriteString(os.Stdout, x)
-	}
-	io.WriteString(os.Stdout, "\n")
-}
 
 func make_slug(source string) string {
 	buffer := strings.Builder{}

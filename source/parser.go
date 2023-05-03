@@ -12,7 +12,7 @@ type parser struct {
 	stream      []*lexer_token
 }
 
-func parse_stream(spindle *spindle, file *anon_file_info, stream []*lexer_token, is_support bool) []ast_data {
+func parse_stream(spindle *spindle, file *file_info, stream []*lexer_token, is_support bool) []ast_data {
 	parser := parser {stream: stream}
 	return parser.parse_block(spindle, file, 0, is_support)
 }
@@ -53,7 +53,7 @@ func (parser *parser) get_non_word(token *lexer_token) (string, int) {
 	return decl
 }*/
 
-func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_depth int, is_support bool) []ast_data {
+func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth int, is_support bool) []ast_data {
 	if parser.unwind {
 		return []ast_data{}
 	}
@@ -213,7 +213,25 @@ func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_de
 			}
 
 			if token.field == "else" {
-				// @todo
+				previous := array[len(array) - 1]
+
+				if previous.type_check() != CONTROL_IF {
+					spindle.errors.new_pos(PARSER_FAILURE, token.position, "'else' must follow if-statement")
+					continue
+				}
+
+				the_else := &ast_if{}
+
+				the_else.invert = true // it's an else
+				the_else.condition_list = previous.(*ast_if).condition_list
+
+				parser.eat_whitespace()
+
+				the_else.children = parser.parse_block(spindle, file, 1, is_support)
+				the_else.position = token.position
+
+				array = append(array, the_else)
+				continue
 			}
 
 			if token.field == "for" {
@@ -376,7 +394,6 @@ func (parser *parser) parse_block(spindle *spindle, file *anon_file_info, max_de
 
 				the_block.children = parser.parse_block(spindle, file, 0, is_support)
 				the_block.position = token.position
-
 
 				the_block.position.end += 1 // the closing brace
 
@@ -786,13 +803,13 @@ func (parser *parser) parse_variable(spindle *spindle, is_support bool) *ast_var
 			panic(err)
 		}
 
-		new_var.field   = base_hash
+		new_var.field   = BASE_HASH
 		new_var.subname = uint32(n)
 
 	} else if is_support && a.ast_type == PERCENT {
 		parser.next()
 		the_type      = VAR_ANON
-		new_var.field = base_hash // just a %
+		new_var.field = BASE_HASH // just a %
 	} else {
 		return nil
 	}

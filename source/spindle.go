@@ -1,7 +1,5 @@
 package main
 
-import "fmt"
-
 const VERSION = "v0.4.0"
 const SPINDLE = "Spindle " + VERSION
 
@@ -9,35 +7,34 @@ type spindle struct {
 	server_mode  bool
 
 	errors       *error_handler
-	file_tree    *disk_object
+	file_tree    *File
 
 	config
 
 	has_webp     bool
 
-	pages        map[string]*page_object
-	templates    map[uint32]*template_object
-	partials     map[uint32]*partial_object
+	pages        map[string]*Page
+	templates    map[uint32]*Support_Markup
+	partials     map[uint32]*Support_Markup
 
-	finder_cache map[string]*disk_object
+	finder_cache map[string]*File
 
-	gen_pages    map[string]*page_object
-	gen_images   map[uint32]*gen_image
+	gen_pages    map[string]*Page
+	gen_images   map[uint32]*Gen_Image
 }
 
 func main() {
 	config, ok := get_arguments()
-
 	if !ok {
 		return // @error
 	}
 
 	switch config.command {
 	case COMMAND_HELP:
-		fmt.Println(SPINDLE)
+		println(SPINDLE)
 		return
 	case COMMAND_VERSION:
-		fmt.Println(SPINDLE)
+		println(SPINDLE)
 		return
 	case COMMAND_INIT:
 		command_init(&config)

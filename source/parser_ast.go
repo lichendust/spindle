@@ -178,17 +178,9 @@ func (t *ast_declare) get_position() *position {
 
 
 
-type special_block uint8
-const (
-	NOT_SPECIAL special_block = iota
-	TAGINATOR
-	// PAGINATOR @todo
-)
-
 type ast_block struct {
 	ast_base_fields
 	decl_hash uint32 // zero means anonymous
-	special   special_block
 }
 func (t *ast_block) type_check() ast_type {
 	return BLOCK
@@ -255,6 +247,7 @@ func (t *ast_for) get_position() *position {
 
 type ast_if struct {
 	ast_base_fields
+	invert bool
 	condition_list []ast_data
 }
 func (t *ast_if) type_check() ast_type {

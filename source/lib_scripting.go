@@ -20,7 +20,7 @@ func init() {
 	the_vm.Set("text_truncate", truncate)
 }
 
-func (r *renderer) script_call(spindle *spindle, page *page_object, line int, exec_blob string, args ...string) (string, bool) {
+func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
 	slug_tracker := make(map[string]uint, 16) // @todo should be unique per-page, not per script-call
 
 	the_vm.Set("_line", line)
@@ -69,7 +69,7 @@ func (r *renderer) script_call(spindle *spindle, page *page_object, line int, ex
 			pp := page.page_path
 
 			if tc > is_page && tc < end_page {
-				return make_page_url(spindle, &found_file.anon_file_info, dp, pp)
+				return make_page_url(spindle, &found_file.file_info, dp, pp)
 			}
 			if tc > is_image && tc < end_image {
 				return make_general_url(spindle, found_file, dp, pp)
@@ -100,7 +100,7 @@ type script_token struct {
 	Line  int
 }
 
-func (r *renderer) script_get_tokens_as_strings(spindle *spindle, page *page_object, input []ast_data, depth int, match ...uint32) []script_token {
+func (r *renderer) script_get_tokens_as_strings(spindle *spindle, page *Page, input []ast_data, depth int, match ...uint32) []script_token {
 	if depth == 0 {
 		return []script_token{}
 	}
@@ -128,16 +128,14 @@ func (r *renderer) script_get_tokens_as_strings(spindle *spindle, page *page_obj
 		}
 		if x := entry.get_children(); len(x) > 0 {
 			sub := r.script_get_tokens_as_strings(spindle, page, x, depth - 1, match...)
-			for _, s := range sub {
-				array = append(array, s)
-			}
+			array = append(array, sub...)
 		}
 	}
 
 	return array
 }
 
-func (r *renderer) script_has_elements(spindle *spindle, page *page_object, input []ast_data, match ...uint32) bool {
+func (r *renderer) script_has_elements(spindle *spindle, page *Page, input []ast_data, match ...uint32) bool {
 	for _, entry := range input {
 		tc := entry.type_check()
 

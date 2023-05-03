@@ -35,12 +35,12 @@ func open_browser(port string) {
 func command_serve(spindle *spindle) {
 	the_server := http.NewServeMux()
 
-	spindle.finder_cache = make(map[string]*disk_object, 64)
-	spindle.gen_images   = make(map[uint32]*gen_image,   32)
-	spindle.gen_pages    = make(map[string]*page_object, 32)
+	spindle.finder_cache = make(map[string]*File, 64)
+	spindle.gen_pages    = make(map[string]*Page, 32)
+	spindle.gen_images   = make(map[uint32]*Gen_Image,   32)
 
-	spindle.partials  = load_all_partials(spindle)
-	spindle.templates = load_all_templates(spindle)
+	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
+	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
 
 	if spindle.errors.has_errors() {
 		println(spindle.errors.render_term_errors())
@@ -87,7 +87,7 @@ func command_serve(spindle *spindle) {
 		}
 
 		if found_file.file_type == MARKUP {
-			page, ok := load_page_from_disk_object(spindle, found_file)
+			page, ok := load_page_from_file(spindle, found_file)
 			if ok {
 				assembled := render_syntax_tree(spindle, page)
 
@@ -128,19 +128,25 @@ func command_serve(spindle *spindle) {
 	last_run := time.Now()
 
 	for range time.Tick(time.Second) {
-		if folder_has_changes(source_path, last_run) {
+		if folder_has_changes(SOURCE_PATH, last_run) {
 			if data, ok := load_file_tree(spindle); ok {
 				spindle.file_tree = data
+
 				send_reload(the_hub)
 			}
+
 			last_run = time.Now()
-		} else if folder_has_changes(template_path, last_run) {
-			spindle.templates = load_all_templates(spindle)
+
+		} else if folder_has_changes(TEMPLATE_PATH, last_run) {
+			spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
 			last_run = time.Now()
+
 			send_reload(the_hub)
-		} else if folder_has_changes(partial_path, last_run) {
-			spindle.partials = load_all_partials(spindle)
+
+		} else if folder_has_changes(PARTIAL_PATH, last_run) {
+			spindle.partials = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
 			last_run = time.Now()
+
 			send_reload(the_hub)
 		}
 	}

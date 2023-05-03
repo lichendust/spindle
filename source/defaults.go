@@ -2,37 +2,38 @@ package main
 
 // filepaths
 const (
-	extension = ".x"
+	EXTENSION = ".x"
 
-	source_path = "source"
-	public_path = "public"
-	config_path = "config"
-	config_file_path = "config/spindle.toml"
+	SOURCE_PATH = "source"
+	PUBLIC_PATH = "public"
+	CONFIG_PATH = "config"
+	CONFIG_FILE_PATH = "config/spindle.toml"
 
-	template_path = config_path + "/templates"
-	partial_path  = config_path + "/partials"
-	script_path   = config_path + "/scripts"
+	TEMPLATE_PATH = CONFIG_PATH + "/templates"
+	PARTIAL_PATH  = CONFIG_PATH + "/partials"
+	SCRIPT_PATH   = CONFIG_PATH + "/scripts"
 )
 
 // hashes
 const (
-	default_hash uint32 = 2470140894 // "default"
-	base_hash    uint32 = 537692064  // "%"
-	it_hash      uint32 = 1194886160 // "it"
-	stop_hash    uint32 = 722245873  // "."
-	index_hash   uint32 = 151693739  // "index"
+	DEFAULT_HASH uint32 = 2470140894 // "default"
+	BASE_HASH    uint32 = 537692064  // "%"
+	IT_HASH      uint32 = 1194886160 // "it"
+	STOP_HASH    uint32 = 722245873  // "."
+	INDEX_HASH   uint32 = 151693739  // "index"
 
-	is_server_hash     uint32 = 3014801206 // "spindle.is_server"
-	reload_script_hash uint32 = 2807780945 // "spindle.reload_script"
+	IS_SERVER_HASH     uint32 = 3014801206 // "spindle.is_server"
+	RELOAD_SCRIPT_HASH uint32 = 2807780945 // "spindle.reload_script"
 
-	url_hash              uint32 = 221748551  // "page.url"
-	canonical_hash        uint32 = 847121482  // "page.url_canonical"
-	import_url_hash       uint32 = 941955437  // "import.url"
-	import_canonical_hash uint32 = 3120426992 // "import.url_canonical"
+	URL_HASH              uint32 = 221748551  // "page.url"
+	CANONICAL_HASH        uint32 = 847121482  // "page.url_canonical"
+	IMPORT_URL_HASH       uint32 = 941955437  // "import.url"
+	IMPORT_CANONICAL_HASH uint32 = 3120426992 // "import.url_canonical"
 
-	taginator_hash        uint32 = 296413604  // "taginator"
-	taginator_tag_hash    uint32 = 1240231138 // "taginator.tag_name"
-	taginator_parent_hash uint32 = 2602936506 // "taginator.parent_url"
+	TAGINATOR_HASH        uint32 = 296413604  // "taginator"
+	TAGINATOR_ACTIVE_HASH uint32 = 795584262  // "taginator.active"
+	TAGINATOR_TAG_HASH    uint32 = 1240231138 // "taginator.tag_name"
+	TAGINATOR_PARENT_HASH uint32 = 2602936506 // "taginator.parent_url"
 )
 
 const main_template = `/ markdown emulation

@@ -31,7 +31,7 @@ func (s *image_settings) make_hash() uint32 {
 	return new_hash(fmt.Sprintf("%d%d%d%d", s.width, s.height, s.quality, s.file_type))
 }
 
-func copy_generated_image(the_image *gen_image, output_path string) bool {
+func copy_generated_image(the_image *Gen_Image, output_path string) bool {
 	var source_image image.Image
 
 	incoming_file := the_image.original
@@ -71,7 +71,7 @@ func copy_generated_image(the_image *gen_image, output_path string) bool {
 		// correct aspect ratio
 		settings.width, settings.height = scaling(settings.width, settings.height, x, y)
 
-		go ext_cwebp(incoming_file.anon_file_info.path, output_path, settings)
+		ext_cwebp(incoming_file.file_info.path, output_path, settings)
 
 		return true
 	}

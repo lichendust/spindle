@@ -1,10 +1,7 @@
 package main
 
 import (
-	"os"
 	"os/exec"
-
-	"fmt"
 	"path/filepath"
 )
 
@@ -13,8 +10,8 @@ func command_build(spindle *spindle) {
 		spindle.file_tree = data
 	}
 
-	spindle.templates = load_all_templates(spindle)
-	spindle.partials  = load_all_partials(spindle)
+	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
+	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
 
 	// if the user has requested any webp
 	// output in the templates
@@ -26,10 +23,11 @@ func command_build(spindle *spindle) {
 		}
 	}
 
-	spindle.pages        = make(map[string]*page_object, 64)
-	spindle.finder_cache = make(map[string]*disk_object, 64)
-	spindle.gen_images   = make(map[uint32]*gen_image, 32)
-	spindle.gen_pages    = make(map[string]*page_object, 32)
+	spindle.finder_cache = make(map[string]*File, 64)
+
+	spindle.pages        = make(map[string]*Page, 64)
+	spindle.gen_pages    = make(map[string]*Page, 32)
+	spindle.gen_images   = make(map[uint32]*Gen_Image, 32)
 
 	make_dir(spindle.config.output_path)
 
@@ -84,13 +82,13 @@ func command_build(spindle *spindle) {
 	}
 
 	if spindle.errors.has_errors() {
-		fmt.Fprintln(os.Stderr, spindle.errors.render_term_errors())
+		eprintln(spindle.errors.render_term_errors())
 	}
 
 	sitemap(spindle)
 }
 
-func build_pages(spindle *spindle, file *disk_object) bool {
+func build_pages(spindle *spindle, file *File) bool {
 	is_done := true
 
 	main_loop: for _, file := range file.children {
@@ -120,7 +118,7 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 
 		switch file.file_type {
 		case MARKUP:
-			page, ok := load_page_from_disk_object(spindle, file)
+			page, ok := load_page_from_file(spindle, file)
 			if !ok {
 				panic("failed to load page " + file.path)
 			}
@@ -133,9 +131,6 @@ func build_pages(spindle *spindle, file *disk_object) bool {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
 				break main_loop
 			}
-
-		/*case SCSS:
-			copy_scss(file, output_path)*/
 
 		case CSS, JAVASCRIPT:
 			copy_minify(file, output_path)

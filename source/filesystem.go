@@ -41,7 +41,7 @@ const (
 
 func to_file_type(input string) file_type {
 	switch filepath.Ext(input) {
-	case extension:
+	case EXTENSION:
 		return MARKUP
 	case ".md":
 		return MARKDOWN
@@ -93,33 +93,33 @@ func ext_for_file_type(file_type file_type) string {
 	return ""
 }
 
-type anon_file_info struct {
+type file_info struct {
 	is_draft bool
 	path     string
 }
 
-type disk_object struct {
-	anon_file_info
+type File struct {
+	file_info
 	file_type file_type
 	hash_name uint32
 	hash_url  uint32
 	is_used   bool
 	is_built  bool
-	parent    *disk_object
-	children  []*disk_object
+	parent    *File
+	children  []*File
 }
 
-func new_file_tree() []*disk_object {
-	return make([]*disk_object, 0, 32)
+func new_file_tree() []*File {
+	return make([]*File, 0, 32)
 }
 
-func load_file_tree(spindle *spindle) (*disk_object, bool) {
-	f := &disk_object{
+func load_file_tree(spindle *spindle) (*File, bool) {
+	f := &File{
 		file_type: ROOT,
 		is_used:   true,
 	}
 
-	f.path = source_path
+	f.path = SOURCE_PATH
 
 	children, ok := recurse_directories(spindle, f)
 	if !ok {
@@ -131,7 +131,7 @@ func load_file_tree(spindle *spindle) (*disk_object, bool) {
 	return f, true
 }
 
-func hash_base_name(file *disk_object) uint32 {
+func hash_base_name(file *File) uint32 {
 	base := filepath.Base(file.path)
 
 	if x := file.file_type; x > is_page && x < end_page {
@@ -141,7 +141,7 @@ func hash_base_name(file *disk_object) uint32 {
 	return new_hash(base)
 }
 
-func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object, bool) {
+func recurse_directories(spindle *spindle, parent *File) ([]*File, bool) {
 	array := new_file_tree()
 
 	err := filepath.WalkDir(parent.path, func(path string, file fs.DirEntry, err error) error {
@@ -156,7 +156,7 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 		path = filepath.ToSlash(path)
 
 		if file.IsDir() {
-			the_file := &disk_object{
+			the_file := &File{
 				file_type: DIRECTORY,
 				is_used:   false,
 			}
@@ -175,7 +175,7 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 			return filepath.SkipDir
 		}
 
-		the_file := &disk_object{
+		the_file := &File{
 			file_type: STATIC,
 			is_used:   false,
 		}
@@ -189,7 +189,7 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 		the_file.parent = parent
 
 		if x := the_file.file_type; x > is_page && x < end_page {
-			the_file.hash_url = new_hash(make_page_url(spindle, &the_file.anon_file_info, ROOTED, ""))
+			the_file.hash_url = new_hash(make_page_url(spindle, &the_file.file_info, ROOTED, ""))
 		} else {
 			the_file.hash_url = new_hash(make_general_url(spindle, the_file, ROOTED, ""))
 		}
@@ -204,7 +204,7 @@ func recurse_directories(spindle *spindle, parent *disk_object) ([]*disk_object,
 	return array, true
 }
 
-func find_file_hash(start_location *disk_object, target uint32) (*disk_object, bool) {
+func find_file_hash(start_location *File, target uint32) (*File, bool) {
 	for _, entry := range start_location.children {
 		if entry.file_type == DIRECTORY {
 			if x, ok := find_file_hash(entry, target); ok {
@@ -220,7 +220,7 @@ func find_file_hash(start_location *disk_object, target uint32) (*disk_object, b
 	return nil, false
 }
 
-func find_depthless_file(entry *disk_object, target string) (*disk_object, bool) {
+func find_depthless_file(entry *File, target string) (*File, bool) {
 	check := entry.path
 
 	if x := entry.file_type; x > is_page && x < end_page {
@@ -250,7 +250,7 @@ func find_depthless_file(entry *disk_object, target string) (*disk_object, bool)
 
 			// else look for "index"
 			for _, child := range entry.children {
-				if child.hash_name == index_hash {
+				if child.hash_name == INDEX_HASH {
 					return child, true
 				}
 			}
@@ -263,7 +263,7 @@ func find_depthless_file(entry *disk_object, target string) (*disk_object, bool)
 	return nil, false
 }
 
-func find_file(start_location *disk_object, target string) (*disk_object, bool) {
+func find_file(start_location *File, target string) (*File, bool) {
 	for _, entry := range start_location.children {
 		if x, ok := find_depthless_file(entry, target); ok {
 			return x, true
@@ -350,7 +350,7 @@ func make_dir(path string) bool {
 	return err == nil
 }
 
-func copy_file(file *disk_object, output_path string) {
+func copy_file(file *File, output_path string) {
 	source, err := os.Open(file.path)
 	if err != nil {
 		panic(err) // @error
