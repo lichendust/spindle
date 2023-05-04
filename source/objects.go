@@ -14,8 +14,8 @@ type markup struct {
 type Page struct {
 	markup
 	file         *File
-	slug_tracker map[string]uint
 	page_path    string
+	import_hash  uint32
 	import_cond  string
 }
 
@@ -24,7 +24,10 @@ type Support_Markup struct {
 	has_body bool
 }
 
-type Gen_Image struct {
+// Image is only used when an image is *modified*
+// some images are just straight copies and we bypass
+// this representation and treat them as regular statics
+type Image struct {
 	is_built bool
 	original *File
 	settings *image_settings
@@ -66,7 +69,6 @@ func load_page(spindle *spindle, full_path string) (*Page, bool) {
 
 	p := &Page{
 		page_path:    full_path,
-		slug_tracker: make(map[string]uint, 16),
 	}
 
 	p.content   = syntax_tree

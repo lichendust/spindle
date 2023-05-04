@@ -1,26 +1,26 @@
 package main
 
-const VERSION = "v0.4.0"
+const VERSION = "v0.4.1"
 const SPINDLE = "Spindle " + VERSION
 
 type spindle struct {
 	server_mode  bool
 
-	errors       *error_handler
+	errors       *Error_Handler
 	file_tree    *File
 
 	config
 
 	has_webp     bool
 
+	finder_cache map[string]*File
+
 	pages        map[string]*Page
 	templates    map[uint32]*Support_Markup
 	partials     map[uint32]*Support_Markup
 
-	finder_cache map[string]*File
-
 	gen_pages    map[string]*Page
-	gen_images   map[uint32]*Gen_Image
+	gen_images   map[uint32]*Image
 }
 
 func main() {

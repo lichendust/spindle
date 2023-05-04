@@ -43,7 +43,7 @@ func make_slug(source string) string {
 func truncate(input string, l int) string {
 	counter := 0
 	for i := range input {
-		counter++
+		counter += 1
 		if counter >= l {
 			input = input[:i]
 			break
@@ -122,7 +122,7 @@ func eat_spaces(s string) int {
 		if ascii_space[c] == 0 {
 			break
 		}
-		n ++
+		n += 1
 	}
 
 	return n
@@ -276,15 +276,15 @@ func levenshtein_distance(a, b string) int {
 		x = x[:len_one + 1]
 	}
 
-	for i := 1; i < len(x); i++ {
+	for i := 1; i < len(x); i += 1 {
 		x[i] = uint16(i)
 	}
 
 	_ = x[len_one]
 
-	for i := 1; i <= len_two; i++ {
+	for i := 1; i <= len_two; i += 1 {
 		prev := uint16(i)
-		for j := 1; j <= len_one; j++ {
+		for j := 1; j <= len_one; j += 1 {
 			current := x[j - 1] // match
 			if string_two[i - 1] != string_one[j - 1] {
 				current = min(min(x[j - 1] + 1, prev + 1), x[j] + 1)

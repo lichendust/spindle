@@ -217,12 +217,13 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 				if previous.type_check() != CONTROL_IF {
 					spindle.errors.new_pos(PARSER_FAILURE, token.position, "'else' must follow if-statement")
+					parser.unwind = true
 					continue
 				}
 
 				the_else := &ast_if{}
 
-				the_else.invert = true // it's an else
+				the_else.is_else = true // it's an else
 				the_else.condition_list = previous.(*ast_if).condition_list
 
 				parser.eat_whitespace()
@@ -770,7 +771,7 @@ func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
 
 		if c.ast_type.is(WORD, IDENT) {
 			parser.next()
-			return new_hash(a.field + c.field), new_hash(a.field), new_hash(c.field)
+			return new_hash(a.field + "." + c.field), new_hash(a.field), new_hash(c.field)
 		}
 
 		parser.step_back()
@@ -876,11 +877,11 @@ func (parser *parser) eat_comment() {
 
 		case BRACE_OPEN:
 			if !is_escaped {
-				index++
+				index += 1
 			}
 		case BRACE_CLOSE:
 			if !is_escaped {
-				index--
+				index -= 1
 			}
 			if passed_newline {
 				passed_newline = false
@@ -933,11 +934,11 @@ func (parser *parser) parse_raw_block() ast_data {
 
 		case BRACE_OPEN:
 			if !is_escaped {
-				brace_balance++
+				brace_balance += 1
 			}
 		case BRACE_CLOSE:
 			if !is_escaped {
-				brace_balance--
+				brace_balance -= 1
 			}
 		case EOF:
 			parser.index += i + 1
@@ -1038,7 +1039,7 @@ func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
 }
 
 func (parser *parser) step_back() {
-	parser.index--
+	parser.index -= 1
 }
 
 func (parser *parser) step_backn(n int) {
@@ -1057,7 +1058,7 @@ func (parser *parser) next() *lexer_token {
 		return nil
 	}
 	t := parser.stream[parser.index]
-	parser.index++
+	parser.index += 1
 	return t
 }
 
@@ -1073,7 +1074,7 @@ func (parser *parser) peek_whitespace() *lexer_token {
 
 	for _, token := range parser.stream[parser.index:] {
 		if token.ast_type == WHITESPACE {
-			index++
+			index += 1
 			continue
 		}
 		break
@@ -1088,7 +1089,7 @@ func (parser *parser) eat_whitespace() bool {
 	for _, token := range parser.stream[parser.index:] {
 		if token.ast_type == WHITESPACE {
 			did_any = true
-			parser.index++
+			parser.index += 1
 			continue
 		}
 		break
@@ -1104,7 +1105,7 @@ func recursive_anon_count(children []ast_data) int {
 			continue
 		}
 		if entry.type_check().is(VAR_ANON, VAR_ENUM) {
-			count++
+			count += 1
 			continue
 		}
 		if x := entry.get_children(); len(x) > 0 {
@@ -1118,7 +1119,7 @@ func immediate_decl_count(children []ast_data) int {
 	count := 0
 	for _, entry := range children {
 		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
-			count++
+			count += 1
 		}
 		if entry.type_check() == TEMPLATE {
 			count += 8
@@ -1163,7 +1164,7 @@ func reindent_text(input string) string {
 			if c != ' ' {
 				break
 			}
-			count ++
+			count += 1
 		}
 
 		if count < shortest_indent {
@@ -1199,7 +1200,7 @@ func reindent_text(input string) string {
 	// not utf8 aware, but should be fine
 	// because we're only interested in a
 	// single-width char
-	for i := len(render) - 1; i >= 0; i-- {
+	for i := len(render) - 1; i >= 0; i -= 1 {
 		c := render[i]
 		if c != '\n' {
 			render = render[:i + 1]

@@ -68,7 +68,7 @@ func lex_blob(path, input string) []*lexer_token {
 		rune, width := utf8.DecodeRuneInString(input)
 
 		if rune == '\n' {
-			line_no ++
+			line_no += 1
 		}
 
 		if result, ok := rune_match[rune]; ok {
@@ -165,7 +165,7 @@ func lex_blob(path, input string) []*lexer_token {
 		break
 	}
 
-	for i := len(array) - 1; i >= 0; i-- {
+	for i := len(array) - 1; i >= 0; i -= 1 {
 		type_check := array[i].ast_type
 		if type_check == NEWLINE || type_check == WHITESPACE {
 			continue

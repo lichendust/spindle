@@ -78,23 +78,23 @@ func (e *spindle_error) term_string() string {
 }
 
 
-func new_error_handler() *error_handler {
-	e := error_handler{}
+func new_error_handler() *Error_Handler {
+	e := Error_Handler{}
 	e.reset()
 	return &e
 }
 
-type error_handler struct {
+type Error_Handler struct {
 	has_failures bool
 	all_errors   []_error
 }
 
-func (e *error_handler) reset() {
+func (e *Error_Handler) reset() {
 	e.has_failures = false
 	e.all_errors   = make([]_error, 0, 8)
 }
 
-func (e *error_handler) new_pos(kind error_type, pos position, message string, subst ...any) {
+func (e *Error_Handler) new_pos(kind error_type, pos position, message string, subst ...any) {
 	if kind > is_failure {
 		e.has_failures = true
 	}
@@ -106,7 +106,7 @@ func (e *error_handler) new_pos(kind error_type, pos position, message string, s
 	})
 }
 
-func (e *error_handler) new(kind error_type, message string, subst ...any) {
+func (e *Error_Handler) new(kind error_type, message string, subst ...any) {
 	if kind > is_failure {
 		e.has_failures = true
 	}
@@ -117,7 +117,7 @@ func (e *error_handler) new(kind error_type, message string, subst ...any) {
 	})
 }
 
-func (e *error_handler) has_errors() bool {
+func (e *Error_Handler) has_errors() bool {
 	return len(e.all_errors) > 0
 }
 
@@ -127,7 +127,7 @@ func (e *error_handler) has_errors() bool {
 	modal, while failures will be served as
 	an error page
 */
-func (e *error_handler) render_html_page() string {
+func (e *Error_Handler) render_html_page() string {
 	buffer := strings.Builder{}
 	buffer.Grow(len(e.all_errors) * 128)
 
@@ -138,7 +138,7 @@ func (e *error_handler) render_html_page() string {
 	return fmt.Sprintf(t_error_page, buffer.String())
 }
 
-/*func (e *error_handler) render_html_modal() string {
+/*func (e *Error_Handler) render_html_modal() string {
 	buffer := strings.Builder{}
 	buffer.Grow(len(e.all_errors) * 128)
 
@@ -149,7 +149,7 @@ func (e *error_handler) render_html_page() string {
 	return fmt.Sprintf(t_error_modal, buffer.String())
 }*/
 
-func (e *error_handler) render_term_errors() string {
+func (e *Error_Handler) render_term_errors() string {
 	// @todo sort these by severity
 
 	buffer := strings.Builder{}

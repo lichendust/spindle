@@ -37,7 +37,7 @@ func command_serve(spindle *spindle) {
 
 	spindle.finder_cache = make(map[string]*File, 64)
 	spindle.gen_pages    = make(map[string]*Page, 32)
-	spindle.gen_images   = make(map[uint32]*Gen_Image,   32)
+	spindle.gen_images   = make(map[uint32]*Image,   32)
 
 	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
 	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
@@ -78,6 +78,10 @@ func command_serve(spindle *spindle) {
 				w.Header().Add("Cache-Control", "no-cache")
 				w.Write([]byte(assembled))
 				return
+			}
+
+			for x := range spindle.gen_pages {
+				delete(spindle.gen_pages, x)
 			}
 
 			w.WriteHeader(http.StatusNotFound)
@@ -298,7 +302,7 @@ func (c *client) write_pump() {
 
 			n := len(c.send)
 
-			for i := 0; i < n; i++ {
+			for i := 0; i < n; i += 1 {
 				w.Write([]byte{'\n'})
 				w.Write(<-c.send)
 			}

@@ -21,13 +21,11 @@ func init() {
 }
 
 func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
-	slug_tracker := make(map[string]uint, 16) // @todo should be unique per-page, not per script-call
-
 	the_vm.Set("_line", line)
 	the_vm.Set("args", args)
 
 	the_vm.Set("text_modifier", func(text string, mod ast_modifier) string {
-		return apply_modifier(slug_tracker, text, mod)
+		return apply_modifier(r, text, mod)
 	})
 
 	the_vm.Set("get", func(name string) string {
@@ -36,6 +34,7 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 		}
 		return ""
 	})
+
 	the_vm.Set("get_token", func(depth int, match ...string) []script_token {
 		h := make([]uint32, len(match))
 		for i, n := range match {
@@ -43,6 +42,14 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 		}
 		return r.script_get_tokens_as_strings(spindle, page, page.content, depth, h...)
 	})
+
+	the_vm.Set("get_array", func(name string) []string {
+		if entry, ok := r.get_in_scope(new_hash(name)); ok && entry.ast_type == DECL {
+			return unix_args(r.render_ast(spindle, page, entry.get_children()))
+		}
+		return []string{}
+	})
+
 	the_vm.Set("has_elements", func(match ...string) bool {
 		h := make([]uint32, len(match))
 		for i, n := range match {
@@ -50,6 +57,7 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 		}
 		return r.script_has_elements(spindle, page, page.content, h...)
 	})
+
 	the_vm.Set("find_file", func(find_text string) string {
 		found_file, ok := spindle.finder_cache[find_text]
 

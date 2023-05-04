@@ -247,7 +247,7 @@ func (t *ast_for) get_position() *position {
 
 type ast_if struct {
 	ast_base_fields
-	invert bool
+	is_else bool
 	condition_list []ast_data
 }
 func (t *ast_if) type_check() ast_type {

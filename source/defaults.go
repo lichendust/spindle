@@ -22,18 +22,20 @@ const (
 	STOP_HASH    uint32 = 722245873  // "."
 	INDEX_HASH   uint32 = 151693739  // "index"
 
-	IS_SERVER_HASH     uint32 = 3014801206 // "spindle.is_server"
-	RELOAD_SCRIPT_HASH uint32 = 2807780945 // "spindle.reload_script"
+	IS_SERVER_HASH     uint32 = 3202569332 // "spindle.is_server"
+	RELOAD_SCRIPT_HASH uint32 = 3668506343 // "spindle.reload_script"
 
-	URL_HASH              uint32 = 221748551  // "page.url"
-	CANONICAL_HASH        uint32 = 847121482  // "page.url_canonical"
-	IMPORT_URL_HASH       uint32 = 941955437  // "import.url"
-	IMPORT_CANONICAL_HASH uint32 = 3120426992 // "import.url_canonical"
+	URL_HASH              uint32 = 3862688697 // "page.url"
+	CANONICAL_HASH        uint32 = 168974084  // "page.url_canonical"
+	IMPORT_URL_HASH       uint32 = 4180644383 // "import.url"
+	IMPORT_CANONICAL_HASH uint32 = 3998801026 // "import.url_canonical"
 
 	TAGINATOR_HASH        uint32 = 296413604  // "taginator"
-	TAGINATOR_ACTIVE_HASH uint32 = 795584262  // "taginator.active"
-	TAGINATOR_TAG_HASH    uint32 = 1240231138 // "taginator.tag_name"
-	TAGINATOR_PARENT_HASH uint32 = 2602936506 // "taginator.parent_url"
+	TAGINATOR_ACTIVE_HASH uint32 = 1983695352 // "taginator.active"
+	TAGINATOR_TAG_HASH    uint32 = 3373312024 // "taginator.tag_name"
+	TAGINATOR_ALL_HASH    uint32 = 3084771407 // "taginator.all_tags"
+
+	TAGINATOR_PARENT_HASH uint32 = 2722466740 // "taginator.parent_url"
 )
 
 const main_template = `/ markdown emulation

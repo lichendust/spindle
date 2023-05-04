@@ -27,7 +27,7 @@ func command_build(spindle *spindle) {
 
 	spindle.pages        = make(map[string]*Page, 64)
 	spindle.gen_pages    = make(map[string]*Page, 32)
-	spindle.gen_images   = make(map[uint32]*Gen_Image, 32)
+	spindle.gen_images   = make(map[uint32]*Image, 32)
 
 	make_dir(spindle.config.output_path)
 

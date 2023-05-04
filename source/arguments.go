@@ -103,12 +103,12 @@ func get_arguments() (config, bool) {
 		if len(args) > 0 {
 			switch args[0] {
 			case "build":
-				counter++
+				counter += 1
 				config.command = COMMAND_BUILD
 				continue
 
 			case "serve":
-				counter++
+				counter += 1
 				config.command = COMMAND_SERVE
 				continue
 
@@ -141,7 +141,7 @@ func get_arguments() (config, bool) {
 
 		a, b := pull_argument(args[counter:])
 
-		counter++
+		counter += 1
 
 		switch a {
 		case "":
@@ -164,7 +164,7 @@ func get_arguments() (config, bool) {
 			has_errors = true
 
 			if b != "" {
-				counter ++
+				counter += 1
 			}
 		}
 	}

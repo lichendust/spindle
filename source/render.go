@@ -3,17 +3,16 @@ package main
 import (
 	"fmt"
 	"time"
+	"sort"
 	"strings"
 )
 
 type renderer struct {
 	unwind bool
 
-	import_seek     bool
-	import_variable uint32
-
-	anon_stack  []*anon_entry
-	scope_stack []map[uint32]*ast_declare
+	anon_stack   []*anon_entry
+	scope_stack  []map[uint32]*ast_declare
+	slug_tracker map[string]uint
 }
 
 func render_syntax_tree(spindle *spindle, page *Page) string {
@@ -21,19 +20,26 @@ func render_syntax_tree(spindle *spindle, page *Page) string {
 	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
 
 	r := &renderer{
-		anon_stack:  make([]*anon_entry, 0, 4),
-		scope_stack: scope_stack,
+		anon_stack:   make([]*anon_entry, 0, 4),
+		scope_stack:  scope_stack,
+		slug_tracker: make(map[string]uint, 16),
 	}
 
 	if spindle.server_mode {
 		r.push_string_to_scope(IS_SERVER_HASH, "") // just has to exist
 		r.push_string_to_scope(RELOAD_SCRIPT_HASH, reload_script)
 	}
-	if page.import_cond != "" {
+	if page.import_hash > 0 {
 		r.push_string_to_scope(TAGINATOR_ACTIVE_HASH, "") // just has to exist
 		r.push_string_to_scope(TAGINATOR_TAG_HASH, page.import_cond)
 		r.push_string_to_scope(TAGINATOR_PARENT_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
 	}
+
+	r.push_string_to_scope(CANONICAL_HASH, make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""))
+	r.push_string_to_scope(URL_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
+
+	// spindle.current_year
+	r.push_string_to_scope(519639417, fmt.Sprintf("%d", time.Now().Year()))
 
 	return r.render_ast(spindle, page, page.content)
 }
@@ -67,7 +73,7 @@ func (r *renderer) push_anon(content, wrapper []ast_data, pos position) {
 }
 
 func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
-	for i := len(r.scope_stack) - 1; i >= 0; i-- {
+	for i := len(r.scope_stack) - 1; i >= 0; i -= 1 {
 		level := r.scope_stack[i]
 
 		if x, ok := level[value]; ok {
@@ -183,8 +189,7 @@ func (r *renderer) evaluate_if(entry *ast_if) bool {
 		}
 	}
 
-	// else
-	if entry.invert {
+	if entry.is_else {
 		result = !result
 	}
 
@@ -196,7 +201,7 @@ func (r *renderer) skip_import_condition(spindle *spindle, page *Page, data_slic
 		if entry.type_check() == DECL {
 			entry := entry.(*ast_declare)
 
-			if entry.field == r.import_variable {
+			if entry.field == page.import_hash {
 				fields := unix_args(strings.ToLower(r.render_ast(spindle, page, entry.children)))
 
 				for _, tag := range fields {
@@ -213,24 +218,98 @@ func (r *renderer) skip_import_condition(spindle *spindle, page *Page, data_slic
 	return false
 }
 
-/*
-	@todo
 
-	when taginator is detected, immediately run through the
-	entire page and do the seek up front, storing all the
-	tags in a result map on the renderer.
+func __recurse(r *renderer, spindle *spindle, page *Page, input []ast_data, target_hash uint32) map[string]bool {
+	index := 0
 
-	we'll apply the tags back to the global gen_page when we're
-	done.
+	capture := make(map[string]bool, 4)
 
-	this lets us immediately inject "taginator.all_tags" for use.
-*/
-func (r *renderer) do_import_seek(spindle *spindle, page *Page, data_slice []ast_data) {
+	for {
+		if index > len(input) - 1 {
+			break
+		}
+
+		entry := input[index]
+		index += 1
+
+		switch entry.type_check() {
+		case DECL:
+			entry := entry.(*ast_declare)
+
+			if entry.field == target_hash {
+				fields := unix_args(r.render_ast(spindle, page, entry.children))
+
+				for _, tag := range fields {
+					tag = strings.ToLower(tag)
+
+					capture[tag] = true
+
+					file_path := tag_path(make_general_url(spindle, page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
+					seek_path := rewrite_ext(file_path, "")
+
+					if _, ok := spindle.gen_pages[seek_path]; ok {
+						continue
+					}
+
+					copy := &Page{}
+
+					copy.content   = page.content
+					copy.top_scope = page.top_scope
+					copy.position  = page.position
+
+					copy.file        = page.file
+					copy.page_path   = page.page_path
+					copy.import_cond = tag
+					copy.import_hash = target_hash
+
+					spindle.gen_pages[seek_path] = copy
+				}
+			}
+
+		case IMPORT:
+			entry := entry.(*ast_builtin)
+
+			// @todo CRASH CENTRAL BAYBEEE
+			find_text := r.render_ast(spindle, page, entry.children)
+			found_file, _ := render_find_file(spindle, page, find_text)
+			imported_page, _ := load_page(spindle, found_file.path)
+
+			res := __recurse(r, spindle, page, imported_page.top_scope, target_hash)
+			for x := range res {
+				capture[x] = true
+			}
+
+		case BLOCK:
+			res := __recurse(r, spindle, page, entry.get_children(), target_hash)
+			for x := range res {
+				capture[x] = true
+			}
+		}
+	}
+
+	return capture
+}
+
+func (r *renderer) do_import_seek(spindle *spindle, page *Page, target_hash uint32) {
+	capture := __recurse(r, spindle, page, page.content, target_hash)
+
+	array := make([]string, 0, len(capture))
+
+	for x := range capture {
+		array = append(array, x) // @todo make sure strings get requoted if needed
+	}
+
+	sort.Strings(array)
+
+	r.push_string_to_scope(TAGINATOR_ALL_HASH, strings.Join(array, " "))
+}
+
+/*func (r *renderer) do_import_seek(spindle *spindle, page *Page, data_slice []ast_data) {
 	for _, entry := range data_slice {
 		if entry.type_check() == DECL {
 			entry := entry.(*ast_declare)
 
-			if entry.field == r.import_variable {
+			if entry.field == page.import_hash {
 				fields := unix_args(r.render_ast(spindle, page, entry.children))
 
 				for _, tag := range fields {
@@ -250,18 +329,18 @@ func (r *renderer) do_import_seek(spindle *spindle, page *Page, data_slice []ast
 					copy.top_scope = page.top_scope
 					copy.position  = page.position
 
-					copy.file         = page.file
-					copy.slug_tracker = make(map[string]uint, 16)
-					copy.page_path    = page.page_path
-					copy.import_cond  = tag
+					copy.file        = page.file
+					copy.page_path   = page.page_path
+					copy.import_cond = tag
 
 					spindle.gen_pages[seek_path] = copy
 				}
+
 				break
 			}
 		}
 	}
-}
+}*/
 
 func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) string {
 	if r.unwind {
@@ -281,7 +360,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 		}
 
 		entry := input[index]
-		index++
+		index += 1
 
 		tc := entry.type_check()
 
@@ -291,10 +370,8 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 			// if we find a taginator in a scope
 			if tc == DECL && entry.field == TAGINATOR_HASH {
-				r.import_seek     = (page.import_cond == "")
-				r.import_variable = new_hash(r.render_ast(spindle, page, entry.children))
+				r.do_import_seek(spindle, page, new_hash(r.render_ast(spindle, page, entry.children)))
 			}
-
 			continue
 		}
 
@@ -356,6 +433,8 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 		case IMPORT:
 			entry := entry.(*ast_builtin)
 
+			// @todo we need a type check pass all these inline errors are going to give me a seizure
+
 			t, ok := r.get_in_scope(entry.hash_name)
 			if !ok {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "no such template for import %q", get_hash(entry.hash_name))
@@ -375,17 +454,14 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				continue
 			}
 
-			imported_page, page_success := load_page(spindle, found_file.path) // @todo cache
+			imported_page, page_success := load_page(spindle, found_file.path)
 			if !page_success {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", found_file.path)
 				r.unwind = true
 				return ""
 			}
 
-			if r.import_seek {
-				r.do_import_seek(spindle, page, imported_page.top_scope)
-			}
-			if page.import_cond != "" {
+			if page.import_hash > 0 {
 				if r.skip_import_condition(spindle, page, imported_page.top_scope) {
 					continue
 				}
@@ -393,7 +469,8 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
 			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
-			r.push_string_to_scope(new_hash("path"), find_text)
+
+			r.push_string_to_scope(new_hash("path"), find_text) // @todo why is this design choice buried here
 
 			// @todo undefined behaviour for %% in imports
 			// we should probably disallow it but we can't know until
@@ -477,22 +554,8 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 				text = r.render_ast(spindle, page, popped_anon.children)
 
-			} else {
-				switch entry.field {
-				case CANONICAL_HASH:
-					text = make_page_url(spindle, &page.file.file_info, ABSOLUTE, "")
-				case URL_HASH:
-					text = make_page_url(spindle, &page.file.file_info, spindle.path_mode, "")
-
-				// spindle.current_year
-				case 1115224399:
-					text = fmt.Sprintf("%d", time.Now().Year())
-
-				default:
-					if found, ok := r.get_in_scope(entry.field); ok {
-						text = r.render_ast(spindle, page, found.get_children())
-					}
-				}
+			} else if found, ok := r.get_in_scope(entry.field); ok {
+				text = r.render_ast(spindle, page, found.get_children())
 			}
 
 			if entry.ast_type == VAR_ENUM && entry.subname > 0 {
@@ -512,7 +575,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			}
 
 			if entry.modifier > NONE {
-				text = apply_modifier(page.slug_tracker, text, entry.modifier)
+				text = apply_modifier(r, text, entry.modifier)
 			}
 
 			buffer.WriteString(text)
@@ -558,7 +621,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 						{
 							hash := new_hash(the_url)
 							if _, ok := spindle.gen_images[hash]; !ok {
-								spindle.gen_images[hash] = &Gen_Image{
+								spindle.gen_images[hash] = &Image{
 									false, found_file, &settings,
 								}
 							}
@@ -605,10 +668,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 			x := entry.get_children()
 
-			if r.import_seek {
-				r.do_import_seek(spindle, page, x)
-			}
-			if page.import_cond != "" {
+			if page.import_hash > 0 {
 				if r.skip_import_condition(spindle, page, x) {
 					continue
 				}
@@ -688,7 +748,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				sub_buffer := strings.Builder{}
 				sub_buffer.Grow(512)
 
-				index-- // step back one to get the original again
+				index -= 1 // step back one to get the original again
 
 				for _, sub := range input[index:] {
 					if sub.type_check() == TOKEN {
@@ -842,17 +902,17 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 	return buffer.String()
 }
 
-func apply_modifier(slugs map[string]uint, text string, modifier ast_modifier) string {
+func apply_modifier(renderer *renderer, text string, modifier ast_modifier) string {
 	switch modifier {
 	case SLUG:
 		text = make_slug(text)
 	case UNIQUE_SLUG:
 		text = make_slug(text)
-		if n, ok := slugs[text]; ok {
-			slugs[text] = n + 1
+		if n, ok := renderer.slug_tracker[text]; ok {
+			renderer.slug_tracker[text] = n + 1
 			text = fmt.Sprintf("%s-%d", text, n)
 		} else {
-			slugs[text] = 1
+			renderer.slug_tracker[text] = 1
 		}
 	case TITLE:
 		text = make_title(text)
