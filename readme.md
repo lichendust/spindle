@@ -10,6 +10,8 @@ Spindle is a personal project.  It will never be the cleanest code-base and it's
 
 In short, attempt to use it at your own peril.
 
+## Contents
+
 <!-- MarkdownTOC autolink=true -->
 
 - [Dependencies](#dependencies)
@@ -26,3 +28,5 @@ Spindle depends on a number of libraries, some of which are presently only neces
 While Spindle can *read* WEBP files (and indeed convert them to JPEG and PNG), it cannot output WEBP if the project calls for images to be converted or resized or re-encoded.
 
 Spindle makes external calls to the `cwebp` executable [from Google](https://developers.google.com/speed/webp/download) to do this.  This isn't required out of the box: Spindle will also warn if any conversions have been requested and `cwebp` isn't found during builds.
+
+Placing `cwebp` anywhere on `$PATH` will suffice.
