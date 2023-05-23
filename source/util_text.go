@@ -8,6 +8,13 @@ import (
 
 var ascii_space = [256]uint8{'\t': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
+// utility to simplify sequential buffer writes
+func write_to(buffer *strings.Builder, text ...string) {
+	for _, x := range text {
+		buffer.WriteString(x)
+	}
+}
+
 func make_slug(source string) string {
 	buffer := strings.Builder{}
 

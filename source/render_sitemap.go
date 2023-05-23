@@ -12,10 +12,13 @@ func sitemap(spindle *spindle) {
 	ordered := make([]string, 0, size)
 
 	for _, page := range spindle.pages {
-		ordered = append(ordered, make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""))
+		the_url := make_page_url(spindle, &page.file.file_info, ABSOLUTE, "")
+		ordered = append(ordered, the_url)
 	}
 	for _, page := range spindle.gen_pages {
-		ordered = append(ordered, tag_path(make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""), spindle.tag_path, page.import_cond))
+		the_url := make_page_url(spindle, &page.file.file_info, ABSOLUTE, "")
+		the_url  = tag_path(the_url, spindle.tag_path, page.import_cond)
+		ordered = append(ordered, the_url)
 	}
 
 	sort.SliceStable(ordered, func(i, j int) bool {
@@ -25,15 +28,13 @@ func sitemap(spindle *spindle) {
 	buffer := strings.Builder{}
 	buffer.Grow(size * 128 + 256)
 
-	buffer.WriteString(`<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">`)
+	write_to(&buffer, `<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">`)
 
 	for _, page_path := range ordered {
-		buffer.WriteString(`<url><loc>`)
-		buffer.WriteString(page_path)
-		buffer.WriteString(`</url></loc>`)
+		write_to(&buffer, `<url><loc>`, page_path, `<url></loc>`)
 	}
 
-	buffer.WriteString(`</urlset>`)
+	write_to(&buffer, `</urlset>`)
 
 	write_file(filepath.Join(spindle.output_path, "sitemap.xml"), buffer.String())
 }

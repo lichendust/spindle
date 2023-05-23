@@ -24,6 +24,6 @@ func command_init(config *config) {
 	make_dir(SCRIPT_PATH)
 	make_dir(SOURCE_PATH)
 
-	write_file(filepath.Join(CONFIG_PATH, "main" + EXTENSION),  main_template)
+	write_file(filepath.Join(TEMPLATE_PATH, "main" + EXTENSION),  main_template)
 	write_file(filepath.Join(SOURCE_PATH, "index" + EXTENSION), index_template)
 }

@@ -207,9 +207,6 @@ func get_scheme(input string) (string, string) {
 }
 
 func tag_path(input, sep, tag string) string {
-	ext := filepath.Ext(input)
-	input = input[:len(input) - len(ext)]
-
 	scheme, path := get_scheme(input)
 
 	path = strings.TrimSuffix(path, "index")
@@ -225,5 +222,5 @@ func tag_path(input, sep, tag string) string {
 		path = filepath.ToSlash(filepath.Join(path, sep, tag))
 	}
 
-	return path + ext
+	return path
 }

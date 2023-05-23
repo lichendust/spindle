@@ -341,12 +341,12 @@ func load_file(source_file string) (string, bool) {
 }
 
 func write_file(path, content string) bool {
-	err := os.WriteFile(path, []byte(content), 0777)
+	err := os.WriteFile(path, []byte(content), os.ModePerm)
 	return err == nil
 }
 
 func make_dir(path string) bool {
-	err := os.MkdirAll(path, os.ModeDir | 0777)
+	err := os.MkdirAll(path, os.ModeDir | os.ModePerm)
 	return err == nil
 }
 
@@ -357,7 +357,7 @@ func copy_file(file *File, output_path string) {
 	}
 	defer source.Close()
 
-	destination, err := os.OpenFile(output_path, os.O_CREATE|os.O_WRONLY, 0777)
+	destination, err := os.OpenFile(output_path, os.O_CREATE | os.O_WRONLY, os.ModePerm)
 	if err != nil {
 		panic(err)
 	}
@@ -390,7 +390,7 @@ func read_time() time.Time {
 func save_time() {
 	the_time := []byte(strconv.FormatInt(time.Now().Unix(), 10))
 
-	if err := os.WriteFile(last_build, the_time, 0777); err != nil {
+	if err := os.WriteFile(last_build, the_time, os.ModePerm); err != nil {
 		panic(err)
 	}
 }*/

@@ -21,11 +21,13 @@ func init() {
 }
 
 func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
+	slug_tracker := make(map[string]uint, 8) // @todo shouldn't be per-call
+
 	the_vm.Set("_line", line)
 	the_vm.Set("args", args)
 
 	the_vm.Set("text_modifier", func(text string, mod ast_modifier) string {
-		return apply_modifier(r, text, mod)
+		return apply_modifier(slug_tracker, text, mod)
 	})
 
 	the_vm.Set("get", func(name string) string {

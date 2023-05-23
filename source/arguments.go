@@ -81,12 +81,12 @@ func load_config() (config, bool) {
 func get_arguments() (config, bool) {
 	args := os.Args[1:]
 
-	config, ok := load_config()
+	conf, ok := load_config()
 	if !ok {
-		panic("failed to load config")
+		conf = config{}
 	}
 
-	config.build_only_used = true
+	conf.build_only_used = true
 
 	counter    := 0
 	has_errors := false
@@ -104,38 +104,38 @@ func get_arguments() (config, bool) {
 			switch args[0] {
 			case "build":
 				counter += 1
-				config.command = COMMAND_BUILD
+				conf.command = COMMAND_BUILD
 				continue
 
 			case "serve":
 				counter += 1
-				config.command = COMMAND_SERVE
+				conf.command = COMMAND_SERVE
 				continue
 
 			case "init":
-				config.command = COMMAND_INIT
+				conf.command = COMMAND_INIT
 
 				if len(args) < 2 {
-					return config, true
+					return conf, true
 				}
 
 				path := args[1]
 
 				if !is_valid_path(path) {
 					// @error
-					return config, false
+					return conf, false
 				}
 
-				config.output_path = path
-				return config, true
+				conf.output_path = path
+				return conf, true
 
 			case "help":
-				config.command = COMMAND_HELP
-				return config, true
+				conf.command = COMMAND_HELP
+				return conf, true
 
 			case "version":
-				config.command = COMMAND_VERSION
-				return config, true
+				conf.command = COMMAND_VERSION
+				return conf, true
 			}
 		}
 
@@ -146,18 +146,18 @@ func get_arguments() (config, bool) {
 		switch a {
 		case "":
 		case "version":
-			config.command = COMMAND_VERSION
-			return config, true
+			conf.command = COMMAND_VERSION
+			return conf, true
 
 		case "help", "h":
-			config.command = COMMAND_HELP
-			return config, true
+			conf.command = COMMAND_HELP
+			return conf, true
 
 		case "all", "a":
-			config.build_only_used = false
+			conf.build_only_used = false
 
 		case "skip-images":
-			config.skip_images = true
+			conf.skip_images = true
 
 		default:
 			eprintf("args: %q flag is unknown\n", a)
@@ -169,7 +169,7 @@ func get_arguments() (config, bool) {
 		}
 	}
 
-	return config, !has_errors
+	return conf, !has_errors
 }
 
 func pull_argument(args []string) (string, string) {

@@ -52,7 +52,17 @@ func command_build(spindle *spindle) {
 	}
 
 	for _, page := range spindle.gen_pages {
-		output_path := tag_path(make_general_file_path(spindle, page.file), spindle.tag_path, page.import_cond)
+		output_path := make_general_file_path(spindle, page.file)
+
+		// @todo tag path can't distinguish between a file extension
+		// and the TLD of an index page on a domain.  This is the only
+		// place it actually matters, so we just trim and replace it
+		{
+			ext := filepath.Ext(output_path)
+			output_path = output_path[:len(output_path) - len(ext)]
+			output_path = tag_path(output_path, spindle.tag_path, page.import_cond) + ext
+		}
+
 		make_dir(filepath.Dir(output_path))
 
 		assembled := render_syntax_tree(spindle, page)

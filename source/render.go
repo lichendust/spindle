@@ -29,14 +29,22 @@ func render_syntax_tree(spindle *spindle, page *Page) string {
 		r.push_string_to_scope(IS_SERVER_HASH, "") // just has to exist
 		r.push_string_to_scope(RELOAD_SCRIPT_HASH, reload_script)
 	}
+
+	canonical_path := make_page_url(spindle, &page.file.file_info, ABSOLUTE, "")
+	url_path       := make_page_url(spindle, &page.file.file_info, spindle.path_mode, "")
+
 	if page.import_hash > 0 {
 		r.push_string_to_scope(TAGINATOR_ACTIVE_HASH, "") // just has to exist
 		r.push_string_to_scope(TAGINATOR_TAG_HASH, page.import_cond)
-		r.push_string_to_scope(TAGINATOR_PARENT_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
+		r.push_string_to_scope(CANONICAL_HASH, tag_path(canonical_path, spindle.tag_path, page.import_cond))
+		r.push_string_to_scope(URL_HASH, tag_path(url_path, spindle.tag_path, page.import_cond))
+	} else {
+		r.push_string_to_scope(CANONICAL_HASH, canonical_path)
+		r.push_string_to_scope(URL_HASH, url_path)
 	}
 
-	r.push_string_to_scope(CANONICAL_HASH, make_page_url(spindle, &page.file.file_info, ABSOLUTE, ""))
-	r.push_string_to_scope(URL_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
+	// taginator parent url falls back to own url so it can be used regardless
+	r.push_string_to_scope(TAGINATOR_PARENT_HASH, make_page_url(spindle, &page.file.file_info, spindle.path_mode, ""))
 
 	// spindle.current_year
 	r.push_string_to_scope(519639417, fmt.Sprintf("%d", time.Now().Year()))
@@ -245,9 +253,8 @@ func __recurse(r *renderer, spindle *spindle, page *Page, input []ast_data, targ
 					capture[tag] = true
 
 					file_path := tag_path(make_general_url(spindle, page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
-					seek_path := rewrite_ext(file_path, "")
 
-					if _, ok := spindle.gen_pages[seek_path]; ok {
+					if _, ok := spindle.gen_pages[file_path]; ok {
 						continue
 					}
 
@@ -262,7 +269,7 @@ func __recurse(r *renderer, spindle *spindle, page *Page, input []ast_data, targ
 					copy.import_cond = tag
 					copy.import_hash = target_hash
 
-					spindle.gen_pages[seek_path] = copy
+					spindle.gen_pages[file_path] = copy
 				}
 			}
 
@@ -575,7 +582,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			}
 
 			if entry.modifier > NONE {
-				text = apply_modifier(r, text, entry.modifier)
+				text = apply_modifier(r.slug_tracker, text, entry.modifier)
 			}
 
 			buffer.WriteString(text)
@@ -902,17 +909,17 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 	return buffer.String()
 }
 
-func apply_modifier(renderer *renderer, text string, modifier ast_modifier) string {
+func apply_modifier(slug_tracker map[string]uint, text string, modifier ast_modifier) string {
 	switch modifier {
 	case SLUG:
 		text = make_slug(text)
 	case UNIQUE_SLUG:
 		text = make_slug(text)
-		if n, ok := renderer.slug_tracker[text]; ok {
-			renderer.slug_tracker[text] = n + 1
+		if n, ok := slug_tracker[text]; ok {
+			slug_tracker[text] = n + 1
 			text = fmt.Sprintf("%s-%d", text, n)
 		} else {
-			renderer.slug_tracker[text] = 1
+			slug_tracker[text] = 1
 		}
 	case TITLE:
 		text = make_title(text)
