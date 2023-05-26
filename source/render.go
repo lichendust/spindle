@@ -108,11 +108,10 @@ func (r *renderer) push_to_scope(entry *ast_declare) {
 }
 
 func (r *renderer) start_scope(alloc int) bool {
-	r.scope_offset = append(r.scope_offset, 0)
 	if alloc == 0 {
 		return false
 	}
-
+	r.scope_offset = append(r.scope_offset, 0)
 	return true
 }
 
