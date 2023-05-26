@@ -18,6 +18,10 @@ type config struct {
 	skip_images     bool
 	tag_path        string
 
+	image_quality  int
+	image_max_size uint
+	image_format   file_type
+
 	output_path string
 
 	inline []*regex_entry
@@ -29,6 +33,10 @@ type TOMLConfig struct {
 	Build_Path        string          `toml:"build_path"`
 	Tag_Path          string          `toml:"tag_path"`
 	Inline            []*Regex_Config `toml:"inline"`
+
+	Image_Quality  int    `toml:"image_quality"`
+	Image_Max_Size uint   `toml:"image_size"`
+	Image_Format   string `toml:"image_format"`
 }
 
 func load_config() (config, bool) {
@@ -71,6 +79,20 @@ func load_config() (config, bool) {
 		output.tag_path = "tag"
 	} else {
 		output.tag_path = conf.Tag_Path
+	}
+
+	output.image_quality  = conf.Image_Quality
+	output.image_max_size = conf.Image_Max_Size
+
+	switch strings.ToLower(conf.Image_Format) {
+	case "webp":
+		output.image_format = IMG_WEB
+	case "jpg", "jpeg":
+		output.image_format = IMG_JPG
+	case "tif", "tiff":
+		output.image_format = IMG_TIF
+	case "png":
+		output.image_format = IMG_PNG
 	}
 
 	output.domain = conf.Domain

@@ -80,6 +80,17 @@ func (r *renderer) push_anon(content, wrapper []ast_data, pos position) {
 	r.anon_stack = append(r.anon_stack, stack_entry)
 }
 
+/*
+	declaration scope stack
+*/
+func (r *renderer) start_scope(alloc int) bool {
+	if alloc == 0 {
+		return false
+	}
+	r.scope_offset = append(r.scope_offset, 0)
+	return true
+}
+
 func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 	for i := len(r.scope_stack) - 1; i >= 0; i -= 1 {
 		x := r.scope_stack[i]
@@ -107,12 +118,50 @@ func (r *renderer) push_to_scope(entry *ast_declare) {
 	r.scope_offset[len(r.scope_offset) - 1] += 1
 }
 
-func (r *renderer) start_scope(alloc int) bool {
-	if alloc == 0 {
-		return false
+func (r *renderer) push_string_to_scope(ident uint32, text string) {
+	decl := &ast_declare {
+		ast_type: DECL,
+		field:    ident,
 	}
-	r.scope_offset = append(r.scope_offset, 0)
-	return true
+	decl.children = []ast_data{
+		&ast_base{
+			ast_type: NORMAL,
+			field:    text,
+		},
+	}
+	r.push_to_scope(decl)
+}
+
+func (r *renderer) push_collective_to_scope(spindle *spindle, page *Page, input []ast_data) {
+	for _, entry := range input {
+		_type := entry.type_check()
+
+		if _type.is(DECL, DECL_TOKEN, DECL_BLOCK) {
+			entry := entry.(*ast_declare)
+			r.push_to_scope(entry)
+			continue
+		}
+
+		if _type == TEMPLATE {
+			entry := entry.(*ast_builtin)
+
+			if t, ok := spindle.templates[entry.hash_name]; ok {
+				r.push_collective_to_scope(spindle, page, t.top_scope)
+			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
+				x := t.get_children()
+
+				if len(x) == 1 && x[0].type_check() == BLOCK {
+					r.push_collective_to_scope(spindle, page, x[0].get_children())
+				}
+
+			} else {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
+				r.unwind = true
+				break
+			}
+			continue
+		}
+	}
 }
 
 func (r *renderer) pop_scope() {
@@ -136,52 +185,9 @@ func (r *renderer) delete_scope_entry(value uint32) {
 	r.push_to_scope(&y)
 }
 
-func (r *renderer) push_string_to_scope(ident uint32, text string) {
-	decl := &ast_declare {
-		ast_type: DECL,
-		field:    ident,
-	}
-	decl.children = []ast_data{
-		&ast_base{
-			ast_type: NORMAL,
-			field:    text,
-		},
-	}
-	r.push_to_scope(decl)
-}
-
-func (r *renderer) write_collective_to_scope(spindle *spindle, page *Page, input []ast_data) {
-	for _, entry := range input {
-		_type := entry.type_check()
-
-		if _type.is(DECL, DECL_TOKEN, DECL_BLOCK) {
-			entry := entry.(*ast_declare)
-			r.push_to_scope(entry)
-			continue
-		}
-
-		if _type == TEMPLATE {
-			entry := entry.(*ast_builtin)
-
-			if t, ok := spindle.templates[entry.hash_name]; ok {
-				r.write_collective_to_scope(spindle, page, t.top_scope)
-			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
-				x := t.get_children()
-
-				if len(x) == 1 && x[0].type_check() == BLOCK {
-					r.write_collective_to_scope(spindle, page, x[0].get_children())
-				}
-
-			} else {
-				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load template %q", get_hash(entry.hash_name))
-				r.unwind = true
-				break
-			}
-			continue
-		}
-	}
-}
-
+/*
+	if statements
+*/
 func (r *renderer) evaluate_if(entry *ast_if) bool {
 	result  := false
 	has_not := false
@@ -236,7 +242,6 @@ func (r *renderer) skip_import_condition(spindle *spindle, page *Page, data_slic
 
 	return false
 }
-
 
 func __recurse(r *renderer, spindle *spindle, page *Page, input []ast_data, target_hash uint32) map[string]bool {
 	index := 0
@@ -486,7 +491,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			}
 
 			r.start_scope(immediate_decl_count(imported_page.top_scope) + 1)
-			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
+			r.push_collective_to_scope(spindle, page, imported_page.top_scope)
 
 			// @todo we're copying the now-cached finder text
 			// rather than the _actual_ path, which is not
@@ -528,7 +533,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 					// with the change to using buffer.len instead of index == 1
 					// we now slice off by the index because everything above is
 					// already on scope — it's... _funky_... but it works.
-					r.write_collective_to_scope(spindle, page, input[index:])
+					r.push_collective_to_scope(spindle, page, input[index:])
 					r.push_anon(input[index:], t.content, t.position)
 
 					buffer.WriteString(r.render_ast(spindle, page, t.content))
@@ -542,13 +547,13 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				// if we're not the first, we just pull in the
 				// declarations from the template to be used from
 				// here on out in this scope
-				r.write_collective_to_scope(spindle, page, t.top_scope)
+				r.push_collective_to_scope(spindle, page, t.top_scope)
 
 			} else if t, ok := r.get_in_scope(entry.hash_name); ok {
 				x := t.get_children()
 
 				if len(x) == 1 && x[0].type_check() == BLOCK {
-					r.write_collective_to_scope(spindle, page, x[0].get_children())
+					r.push_collective_to_scope(spindle, page, x[0].get_children())
 				}
 
 			} else {
@@ -704,7 +709,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 					needs_pop := r.start_scope(immediate_decl_count(children) * 2)
 
 					r.push_anon(x, children, *entry.get_position())
-					r.write_collective_to_scope(spindle, page, x)
+					r.push_collective_to_scope(spindle, page, x)
 
 					buffer.WriteString(r.render_ast(spindle, page, children))
 

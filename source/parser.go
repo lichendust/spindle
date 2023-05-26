@@ -652,8 +652,16 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 
 					parser.eat_whitespace()
 
+					// @todo this block is weird but i don't have the brainpower to flip it right now
+
 					if parser.peek().ast_type == BRACE_CLOSE {
 						parser.next()
+
+						if the_finder.finder_type == _IMAGE {
+							if x, ok := default_image_settings(spindle); ok {
+								the_finder.image_settings = x
+							}
+						}
 					} else {
 						if the_finder.finder_type == _IMAGE {
 							the_finder.image_settings = parser.parse_image_settings(spindle)
@@ -963,10 +971,28 @@ func (parser *parser) parse_raw_block() ast_data {
 	}
 }
 
-func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
-	settings := &image_settings{}
-
+func default_image_settings(spindle *spindle) (*image_settings, bool) {
+	settings := new(image_settings)
 	got_anything := false
+
+	if spindle.image_quality > 0 {
+		settings.quality = spindle.image_quality
+		got_anything = true
+	}
+	if spindle.image_max_size > 0 {
+		settings.max_size = spindle.image_max_size
+		got_anything = true
+	}
+	if spindle.image_format > is_image {
+		settings.file_type = spindle.image_format
+		got_anything = true
+	}
+
+	return settings, got_anything
+}
+
+func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
+	settings, got_anything := default_image_settings(spindle)
 
 	main_loop: for {
 		parser.eat_whitespace()
@@ -980,7 +1006,7 @@ func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
 			}
 
 			if parser.peek().ast_type == WORD {
-				settings.width = uint(a)
+				settings.max_size = uint(a)
 			} else {
 				settings.quality = int(a)
 			}
@@ -994,13 +1020,6 @@ func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
 
 			if rune == 'x' {
 				field = field[1:]
-
-				b, err := strconv.ParseInt(field, 10, 64)
-				if err != nil {
-					panic(err) // @error (this is user error)
-				}
-
-				settings.height = uint(b)
 				got_anything = true
 				continue
 			}

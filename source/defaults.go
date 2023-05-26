@@ -65,3 +65,14 @@ title = Hello, World!
 # Welcome to your new Spindle site!
 
 The server you're currently accessing also hosts Spindle's [documentation](/_spindle/manual).`
+
+const toml_template = `domain = "https://website.com/"
+
+path_mode  = "absolute"
+build_path = "public"
+tag_path   = "tag"
+
+# default settings for image linkers
+# applied to any images without inline settings
+# image_quality 90
+# image_size    1920`

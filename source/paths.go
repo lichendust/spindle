@@ -32,11 +32,14 @@ func make_generated_image_path(spindle *spindle, the_image *Image) string {
 	s           := the_image.settings
 
 	new_ext := ext_for_file_type(s.file_type)
-	hash    := s.make_hash()
 
-	// @todo reject additional name if only ext is changed?
+	// tack a name on if the file has changed size *unless* its
+	// the default settings for the project
+	if s.max_size > 0 && s.max_size != spindle.image_max_size {
+		new_ext = fmt.Sprintf("_%d%s", s.max_size, new_ext)
+	}
 
-	return rewrite_ext(rewrite_root(file_path, public_path), fmt.Sprintf("_%d%s", hash, new_ext))
+	return rewrite_ext(rewrite_root(file_path, public_path), new_ext)
 }
 
 func make_general_url(spindle *spindle, file *File, path_type path_type, current_location string) string {
@@ -94,9 +97,12 @@ func make_generated_image_url(spindle *spindle, file *File, s *image_settings, p
 
 	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, file.path)
 	new_ext     := ext_for_file_type(s.file_type)
-	hash        := s.make_hash()
 
-	return rewrite_ext(output_path, fmt.Sprintf("_%d%s", hash, new_ext))
+	if s.max_size > 0 && s.max_size != spindle.image_max_size {
+		new_ext = fmt.Sprintf("_%d%s", s.max_size, new_ext)
+	}
+
+	return rewrite_ext(output_path, new_ext)
 }
 
 func rewrite_by_path_type(path_type path_type, domain, current_location, target_location string) string {

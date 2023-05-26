@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"image"
 	"strconv"
 
@@ -16,20 +15,26 @@ import (
 	lib_web "golang.org/x/image/webp"
 )
 
+// @todo remove quality from individual
+//  images and just have one global setting?
+//  it just never seems to come up in
+//  practice
+
 const (
 	DEFAULT_QUALITY = 100
 )
 
 type image_settings struct {
+	max_size  uint
 	width     uint
 	height    uint
 	quality   int
 	file_type file_type
 }
 
-func (s *image_settings) make_hash() uint32 {
+/*func (s *image_settings) make_hash() uint32 {
 	return new_hash(fmt.Sprintf("%d%d%d%d", s.width, s.height, s.quality, s.file_type))
-}
+}*/
 
 func copy_generated_image(the_image *Image, output_path string) bool {
 	var source_image image.Image
@@ -69,7 +74,7 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 		y := uint(b.Dy())
 
 		// correct aspect ratio
-		settings.width, settings.height = scaling(settings.width, settings.height, x, y)
+		settings.width, settings.height = scaling(settings.max_size, settings.max_size, x, y)
 
 		ext_cwebp(incoming_file.file_info.path, output_path, settings)
 

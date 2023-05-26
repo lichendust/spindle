@@ -2,7 +2,7 @@ package main
 
 //go:generate go run generators/builtin_ids.go
 
-const VERSION = "v0.4.1"
+const VERSION = "v0.4.2"
 const SPINDLE = "Spindle " + VERSION
 
 type spindle struct {
