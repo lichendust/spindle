@@ -10,18 +10,18 @@ import (
 type renderer struct {
 	unwind bool
 
+	scope_offset []int
+	scope_stack  []*ast_declare
 	anon_stack   []*anon_entry
-	scope_stack  []map[uint32]*ast_declare
+
 	slug_tracker map[string]uint
 }
 
 func render_syntax_tree(spindle *spindle, page *Page) string {
-	scope_stack := make([]map[uint32]*ast_declare, 0, 4)
-	scope_stack = append(scope_stack, make(map[uint32]*ast_declare, 32))
-
 	r := &renderer{
+		scope_offset: []int{0},
+		scope_stack:  make([]*ast_declare, 0, 64),
 		anon_stack:   make([]*anon_entry, 0, 4),
-		scope_stack:  scope_stack,
 		slug_tracker: make(map[string]uint, 16),
 	}
 
@@ -82,9 +82,9 @@ func (r *renderer) push_anon(content, wrapper []ast_data, pos position) {
 
 func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 	for i := len(r.scope_stack) - 1; i >= 0; i -= 1 {
-		level := r.scope_stack[i]
+		x := r.scope_stack[i]
 
-		if x, ok := level[value]; ok {
+		if x.field == value {
 			if x.ast_type == DECL_REJECT {
 				break
 			}
@@ -95,34 +95,46 @@ func (r *renderer) get_in_scope(value uint32) (*ast_declare, bool) {
 	return nil, false
 }
 
-func (r *renderer) write_to_scope(field uint32, entry *ast_declare) {
+func (r *renderer) push_to_scope(entry *ast_declare) {
 	if entry.is_soft {
-		x, ok := r.get_in_scope(field)
+		x, ok := r.get_in_scope(entry.field)
 		if ok && !x.is_soft {
 			return
 		}
 	}
 
-	r.scope_stack[len(r.scope_stack) - 1][field] = entry
+	r.scope_stack = append(r.scope_stack, entry)
+	r.scope_offset[len(r.scope_offset) - 1] += 1
 }
 
-func (r *renderer) push_blank_scope(alloc int) bool {
+func (r *renderer) start_scope(alloc int) bool {
+	r.scope_offset = append(r.scope_offset, 0)
 	if alloc == 0 {
 		return false
 	}
-	r.scope_stack = append(r.scope_stack, make(map[uint32]*ast_declare, alloc))
 
 	return true
 }
 
 func (r *renderer) pop_scope() {
-	r.scope_stack = r.scope_stack[:len(r.scope_stack) - 1]
+	x := r.scope_offset[len(r.scope_offset) - 1]
+
+	r.scope_offset = r.scope_offset[:len(r.scope_offset) - 1]
+	r.scope_stack  = r.scope_stack[:len(r.scope_stack) - x]
 }
 
 func (r *renderer) delete_scope_entry(value uint32) {
-	x := &ast_declare{ast_type:DECL_REJECT}
-	r.write_to_scope(value,     x)
-	r.write_to_scope(value + 1, x)
+	x := ast_declare{
+		field:    value,
+		ast_type: DECL_REJECT,
+	}
+	y := ast_declare{
+		field:    value + 1,
+		ast_type: DECL_REJECT,
+	}
+
+	r.push_to_scope(&x)
+	r.push_to_scope(&y)
 }
 
 func (r *renderer) push_string_to_scope(ident uint32, text string) {
@@ -136,7 +148,7 @@ func (r *renderer) push_string_to_scope(ident uint32, text string) {
 			field:    text,
 		},
 	}
-	r.write_to_scope(decl.field, decl)
+	r.push_to_scope(decl)
 }
 
 func (r *renderer) write_collective_to_scope(spindle *spindle, page *Page, input []ast_data) {
@@ -145,7 +157,7 @@ func (r *renderer) write_collective_to_scope(spindle *spindle, page *Page, input
 
 		if _type.is(DECL, DECL_TOKEN, DECL_BLOCK) {
 			entry := entry.(*ast_declare)
-			r.write_to_scope(entry.field, entry)
+			r.push_to_scope(entry)
 			continue
 		}
 
@@ -373,7 +385,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 		if tc.is(DECL, DECL_BLOCK, DECL_TOKEN) {
 			entry := entry.(*ast_declare)
-			r.write_to_scope(entry.field, entry)
+			r.push_to_scope(entry)
 
 			// if we find a taginator in a scope
 			if tc == DECL && entry.field == TAGINATOR_HASH {
@@ -432,7 +444,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				return ""
 			}
 
-			did_push := r.push_blank_scope(immediate_decl_count(p.content))
+			did_push := r.start_scope(immediate_decl_count(p.content))
 			buffer.WriteString(r.render_ast(spindle, page, p.content))
 
 			if did_push { r.pop_scope() }
@@ -474,7 +486,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				}
 			}
 
-			r.push_blank_scope(immediate_decl_count(imported_page.top_scope) + 1)
+			r.start_scope(immediate_decl_count(imported_page.top_scope) + 1)
 			r.write_collective_to_scope(spindle, page, imported_page.top_scope)
 
 			r.push_string_to_scope(new_hash("path"), find_text) // @todo why is this design choice buried here
@@ -508,7 +520,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 					// we also reverse the order in which the
 					// top-level scope is applied
-					did_push := r.push_blank_scope(immediate_decl_count(t.content))
+					did_push := r.start_scope(immediate_decl_count(t.content))
 
 					// with the change to using buffer.len instead of index == 1
 					// we now slice off by the index because everything above is
@@ -686,7 +698,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 				if ok && wrapper_block.ast_type == DECL_BLOCK {
 					children := wrapper_block.get_children()
-					did_push := r.push_blank_scope(immediate_decl_count(children) * 2)
+					did_push := r.start_scope(immediate_decl_count(children) * 2)
 
 					r.push_anon(x, children, *entry.get_position())
 					r.write_collective_to_scope(spindle, page, x)
@@ -701,7 +713,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			}
 
 			// else:
-			did_push := r.push_blank_scope(immediate_decl_count(x))
+			did_push := r.start_scope(immediate_decl_count(x))
 			buffer.WriteString(r.render_ast(spindle, page, x))
 			if did_push {
 				r.pop_scope()
@@ -719,13 +731,13 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			wrapper_block, ok := r.get_in_scope(entry.decl_hash)
 
 			if ok && wrapper_block.ast_type == DECL_TOKEN {
-				did_push = r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
+				did_push = r.start_scope(immediate_decl_count(wrapper_block.get_children()))
 			} else {
 				if len(x) == 0 {
 					wrapper_block, ok := r.get_in_scope(DEFAULT_HASH)
 					if ok {
 						children := wrapper_block.get_children()
-						did_push := r.push_blank_scope(immediate_decl_count(children))
+						did_push := r.start_scope(immediate_decl_count(children))
 
 						r.push_anon(x, children, *entry.get_position())
 
@@ -810,7 +822,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				if ok {
 					children := wrapper_block.get_children()
 
-					did_push := r.push_blank_scope(immediate_decl_count(children))
+					did_push := r.start_scope(immediate_decl_count(children))
 					r.push_anon(x, children, *entry.get_position())
 
 					buffer.WriteString(r.render_ast(spindle, page, children))
@@ -823,7 +835,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 			}
 
 			// else:
-			did_push := r.push_blank_scope(immediate_decl_count(x))
+			did_push := r.start_scope(immediate_decl_count(x))
 			buffer.WriteString(r.render_ast(spindle, page, x))
 			if did_push { r.pop_scope() }
 
@@ -837,7 +849,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 
 			the_block := entry.get_children()[0].(*ast_block)
 
-			did_push := r.push_blank_scope(immediate_decl_count(the_block.get_children()))
+			did_push := r.start_scope(immediate_decl_count(the_block.get_children()))
 
 			sub_buffer := strings.Builder{}
 			sub_buffer.Grow(512)
@@ -877,7 +889,7 @@ func (r *renderer) render_ast(spindle *spindle, page *Page, input []ast_data) st
 				wrapper_block, ok := r.get_in_scope(DEFAULT_HASH)
 				if ok {
 					children := wrapper_block.get_children()
-					did_push := r.push_blank_scope(immediate_decl_count(children))
+					did_push := r.start_scope(immediate_decl_count(children))
 
 					r.push_anon(x, children, *entry.get_position())
 
