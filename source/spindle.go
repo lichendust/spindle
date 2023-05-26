@@ -1,5 +1,7 @@
 package main
 
+//go:generate go run generators/builtin_ids.go
+
 const VERSION = "v0.4.1"
 const SPINDLE = "Spindle " + VERSION
 

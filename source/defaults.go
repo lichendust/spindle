@@ -14,30 +14,6 @@ const (
 	SCRIPT_PATH   = CONFIG_PATH + "/scripts"
 )
 
-// hashes
-const (
-	DEFAULT_HASH uint32 = 2470140894 // "default"
-	BASE_HASH    uint32 = 537692064  // "%"
-	IT_HASH      uint32 = 1194886160 // "it"
-	STOP_HASH    uint32 = 722245873  // "."
-	INDEX_HASH   uint32 = 151693739  // "index"
-
-	IS_SERVER_HASH     uint32 = 3202569332 // "spindle.is_server"
-	RELOAD_SCRIPT_HASH uint32 = 3668506343 // "spindle.reload_script"
-
-	URL_HASH              uint32 = 3862688697 // "page.url"
-	CANONICAL_HASH        uint32 = 168974084  // "page.url_canonical"
-	IMPORT_URL_HASH       uint32 = 4180644383 // "import.url"
-	IMPORT_CANONICAL_HASH uint32 = 3998801026 // "import.url_canonical"
-
-	TAGINATOR_HASH        uint32 = 296413604  // "taginator"
-	TAGINATOR_ACTIVE_HASH uint32 = 1983695352 // "taginator.active"
-	TAGINATOR_TAG_HASH    uint32 = 3373312024 // "taginator.tag_name"
-	TAGINATOR_ALL_HASH    uint32 = 3084771407 // "taginator.all_tags"
-
-	TAGINATOR_PARENT_HASH uint32 = 2722466740 // "taginator.parent_url"
-)
-
 const main_template = `/ markdown emulation
 / headings
 [#]      = <h1 id="%%:unique_slug">%%</h1>

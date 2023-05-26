@@ -1,0 +1,23 @@
+DEFAULT default
+BASE    %
+IT      it
+STOP    .
+INDEX   index
+
+IS_SERVER     spindle.is_server
+RELOAD_SCRIPT spindle.reload_script
+
+PAGE_PATH        page.file_path
+PAGE_URL         page.url
+PAGE_CANONICAL   page.url_canonical
+
+IMPORT_PATH      import.file_path
+IMPORT_URL       import.url
+IMPORT_CANONICAL import.url_canonical
+
+TAGINATOR        taginator
+TAGINATOR_ACTIVE taginator.active
+TAGINATOR_TAG    taginator.tag_name
+TAGINATOR_ALL    taginator.all_tags
+
+TAGINATOR_PARENT taginator.parent_url

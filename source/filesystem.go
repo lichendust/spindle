@@ -250,7 +250,7 @@ func find_depthless_file(entry *File, target string) (*File, bool) {
 
 			// else look for "index"
 			for _, child := range entry.children {
-				if child.hash_name == INDEX_HASH {
+				if child.hash_name == _INDEX {
 					return child, true
 				}
 			}

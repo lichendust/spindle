@@ -804,13 +804,13 @@ func (parser *parser) parse_variable(spindle *spindle, is_support bool) *ast_var
 			panic(err)
 		}
 
-		new_var.field   = BASE_HASH
+		new_var.field   = _BASE
 		new_var.subname = uint32(n)
 
 	} else if is_support && a.ast_type == PERCENT {
 		parser.next()
 		the_type      = VAR_ANON
-		new_var.field = BASE_HASH // just a %
+		new_var.field = _BASE // just a %
 	} else {
 		return nil
 	}
