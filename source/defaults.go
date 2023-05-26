@@ -14,7 +14,7 @@ const (
 	SCRIPT_PATH   = CONFIG_PATH + "/scripts"
 )
 
-const main_template = `/ markdown emulation
+const MAIN_TEMPLATE = `/ markdown emulation
 / headings
 [#]      = <h1 id="%%:unique_slug">%%</h1>
 [##]     = <h2 id="%%:unique_slug">%%</h2>
@@ -58,7 +58,7 @@ const main_template = `/ markdown emulation
 <body>%%</body>
 </html>`
 
-const index_template = `& main
+const INDEX_TEMPLATE = `& main
 
 title = Hello, World!
 
@@ -66,7 +66,7 @@ title = Hello, World!
 
 The server you're currently accessing also hosts Spindle's [documentation](/_spindle/manual).`
 
-const toml_template = `domain = "https://website.com/"
+const CONFIG_TEMPLATE = `domain = "https://website.com/"
 
 path_mode  = "absolute"
 build_path = "public"

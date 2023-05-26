@@ -10,7 +10,7 @@ func init() {
 	the_vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 
 	the_vm.Set("console", println)
-	the_vm.Set("modifier", map[string]ast_modifier {
+	the_vm.Set("modifier", map[string]AST_Modifier {
 		"slug":        SLUG,
 		"unique_slug": UNIQUE_SLUG,
 		"upper":       UPPER,
@@ -21,13 +21,13 @@ func init() {
 	the_vm.Set("current_date", nsdate)
 }
 
-func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
+func (r *Renderer) script_call(spindle *Spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
 	slug_tracker := make(map[string]uint, 8) // @todo shouldn't be per-call
 
 	the_vm.Set("_line", line)
 	the_vm.Set("args", args)
 
-	the_vm.Set("text_modifier", func(text string, mod ast_modifier) string {
+	the_vm.Set("text_modifier", func(text string, mod AST_Modifier) string {
 		return apply_modifier(slug_tracker, text, mod)
 	})
 
@@ -38,7 +38,7 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 		return ""
 	})
 
-	the_vm.Set("get_token", func(depth int, match ...string) []script_token {
+	the_vm.Set("get_token", func(depth int, match ...string) []Script_Token {
 		h := make([]uint32, len(match))
 		for i, n := range match {
 			h[i] = new_hash(n)
@@ -80,7 +80,7 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 			pp := page.page_path
 
 			if tc > is_page && tc < end_page {
-				return make_page_url(spindle, &found_file.file_info, dp, pp)
+				return make_page_url(spindle, &found_file.File_Info, dp, pp)
 			}
 			if tc > is_image && tc < end_image {
 				return make_general_url(spindle, found_file, dp, pp)
@@ -105,26 +105,26 @@ func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob
 	return "", true
 }
 
-type script_token struct {
+type Script_Token struct {
 	Token string
 	Text  string
 	Line  int
 }
 
-func (r *renderer) script_get_tokens_as_strings(spindle *spindle, page *Page, input []ast_data, depth int, match ...uint32) []script_token {
+func (r *Renderer) script_get_tokens_as_strings(spindle *Spindle, page *Page, input []AST_Data, depth int, match ...uint32) []Script_Token {
 	if depth == 0 {
-		return []script_token{}
+		return []Script_Token{}
 	}
 
-	array := make([]script_token, 0, len(input))
+	array := make([]Script_Token, 0, len(input))
 
 	for _, entry := range input {
 		if entry.type_check() == TOKEN {
-			token := entry.(*ast_token)
+			token := entry.(*AST_Token)
 
 			for _, h := range match {
 				if token.decl_hash == h {
-					array = append(array, script_token{
+					array = append(array, Script_Token{
 						Token: token.orig_field,
 						Text:  r.render_ast(spindle, page, token.get_children()),
 						Line:  token.position.line,
@@ -146,12 +146,12 @@ func (r *renderer) script_get_tokens_as_strings(spindle *spindle, page *Page, in
 	return array
 }
 
-func (r *renderer) script_has_elements(spindle *spindle, page *Page, input []ast_data, match ...uint32) bool {
+func (r *Renderer) script_has_elements(spindle *Spindle, page *Page, input []AST_Data, match ...uint32) bool {
 	for _, entry := range input {
 		tc := entry.type_check()
 
 		if tc == TOKEN {
-			token := entry.(*ast_token)
+			token := entry.(*AST_Token)
 			for _, h := range match {
 				if token.decl_hash == h {
 					return true
@@ -161,7 +161,7 @@ func (r *renderer) script_has_elements(spindle *spindle, page *Page, input []ast
 		}
 
 		if tc == BLOCK {
-			block := entry.(*ast_block)
+			block := entry.(*AST_Block)
 			for _, h := range match {
 				if block.decl_hash == h {
 					return true

@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 )
 
-func command_build(spindle *spindle) {
+func command_build(spindle *Spindle) {
 	if data, ok := load_file_tree(spindle); ok {
 		spindle.file_tree = data
 	}
@@ -29,7 +29,7 @@ func command_build(spindle *spindle) {
 	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
 	spindle.gen_images   = make(map[uint32]*Image, 32)
 
-	make_dir(spindle.config.output_path)
+	make_dir(spindle.output_path)
 
 	if found_file, ok := find_file(spindle.file_tree, "index"); ok {
 		found_file.is_used = true
@@ -107,7 +107,7 @@ func command_build(spindle *spindle) {
 	sitemap(spindle)
 }
 
-func build_pages(spindle *spindle, file *File) bool {
+func build_pages(spindle *Spindle, file *File) bool {
 	is_done := true
 
 	main_loop: for _, file := range file.children {

@@ -10,9 +10,9 @@ type _error interface {
 	term_string() string
 }
 
-type error_type uint8
+type Error_Type uint8
 const (
-	WARNING error_type = iota
+	WARNING Error_Type = iota
 	RENDER_WARNING
 	PARSER_WARNING
 
@@ -22,7 +22,7 @@ const (
 	PARSER_FAILURE
 )
 
-func (e error_type) String() string {
+func (e Error_Type) String() string {
 	switch e {
 	case WARNING:
 		return "Warning"
@@ -40,19 +40,19 @@ func (e error_type) String() string {
 	return ""
 }
 
-type spindle_pos_error struct {
-	kind    error_type
+type Spindle_Pos_Error struct {
+	kind    Error_Type
 	pos     position
 	message string
 }
 
-func (e *spindle_pos_error) html_string() string {
+func (e *Spindle_Pos_Error) html_string() string {
 	const t_error_html = `<section><p><b>%s — line %d</b></p><p class="space"><tt>%s</tt></p><p>%s</p></section>`
 
 	return fmt.Sprintf(t_error_html, e.kind, e.pos.line, e.pos.file_path, e.message)
 }
 
-func (e *spindle_pos_error) term_string() string {
+func (e *Spindle_Pos_Error) term_string() string {
 	const t_error_term = "%s! %s — line %d\n    %s"
 
 	return fmt.Sprintf(t_error_term, e.kind, e.pos.file_path, e.pos.line, e.message)
@@ -60,18 +60,18 @@ func (e *spindle_pos_error) term_string() string {
 
 
 
-type spindle_error struct {
-	kind    error_type
+type Spindle_Error struct {
+	kind    Error_Type
 	message string
 }
 
-func (e *spindle_error) html_string() string {
+func (e *Spindle_Error) html_string() string {
 	const t_error_html = `<section><p><b>%s!</b></p><p>%s</p></section>`
 
 	return fmt.Sprintf(t_error_html, e.kind, e.message)
 }
 
-func (e *spindle_error) term_string() string {
+func (e *Spindle_Error) term_string() string {
 	const t_error_term = "%s!\n    %s"
 
 	return fmt.Sprintf(t_error_term, e.kind, e.message)
@@ -94,24 +94,24 @@ func (e *Error_Handler) reset() {
 	e.all_errors   = make([]_error, 0, 8)
 }
 
-func (e *Error_Handler) new_pos(kind error_type, pos position, message string, subst ...any) {
+func (e *Error_Handler) new_pos(kind Error_Type, pos position, message string, subst ...any) {
 	if kind > is_failure {
 		e.has_failures = true
 	}
 
-	e.all_errors = append(e.all_errors, &spindle_pos_error{
+	e.all_errors = append(e.all_errors, &Spindle_Pos_Error{
 		kind,
 		pos,
 		fmt.Sprintf(message, subst...),
 	})
 }
 
-func (e *Error_Handler) new(kind error_type, message string, subst ...any) {
+func (e *Error_Handler) new(kind Error_Type, message string, subst ...any) {
 	if kind > is_failure {
 		e.has_failures = true
 	}
 
-	e.all_errors = append(e.all_errors, &spindle_error {
+	e.all_errors = append(e.all_errors, &Spindle_Error {
 		kind,
 		fmt.Sprintf(message, subst...),
 	})
@@ -135,7 +135,7 @@ func (e *Error_Handler) render_html_page() string {
 		buffer.WriteString(the_error.html_string())
 	}
 
-	return fmt.Sprintf(t_error_page, buffer.String())
+	return fmt.Sprintf(ERROR_PAGE, buffer.String())
 }
 
 /*func (e *Error_Handler) render_html_modal() string {
@@ -146,7 +146,7 @@ func (e *Error_Handler) render_html_page() string {
 		buffer.WriteString(the_error.html_string())
 	}
 
-	return fmt.Sprintf(t_error_modal, buffer.String())
+	return fmt.Sprintf(ERROR_MODAL, buffer.String())
 }*/
 
 func (e *Error_Handler) render_term_errors() string {
@@ -163,7 +163,7 @@ func (e *Error_Handler) render_term_errors() string {
 	return strings.TrimSpace(buffer.String())
 }
 
-const t_error_page_not_found = `<html>` + t_error_head + `<body>
+const ERROR_PAGE_NOT_FOUND = `<html>` + ERROR_HEAD + `<body>
 <h1>` + SPINDLE + `</h1>
 <main>
 	<section><p><b>Page not found...</b></p></section>
@@ -178,7 +178,7 @@ const t_error_page_not_found = `<html>` + t_error_head + `<body>
 <br clear="all">
 </body></html>`
 
-const t_error_style = `<style type="text/css">
+const ERROR_STYLE = `<style type="text/css">
 	body {
 		font-family: Atkinson Hyperlegible, Helvetica, Arial, sans-serif;
 		margin: 5ex;
@@ -217,17 +217,17 @@ const t_error_style = `<style type="text/css">
 	}
 </style>`
 
-const t_error_head = `<head>
+const ERROR_HEAD = `<head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Spindle</title>` + t_error_style + reload_script + `</head>`
+	<title>Spindle</title>` + ERROR_STYLE + reload_script + `</head>`
 
-const t_error_modal = `<div>
+const ERROR_MODAL = `<div>
 
 </div>`
 
-const t_error_page = `<!DOCTYPE html>
-<html>` + t_error_head + `<body>
+const ERROR_PAGE = `<!DOCTYPE html>
+<html>` + ERROR_HEAD + `<body>
 	<h1>` + SPINDLE + `</h1>
 	<main>
 		%s

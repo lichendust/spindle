@@ -9,13 +9,13 @@ type position struct {
 	file_path  string
 }
 
-type lexer_token struct {
-	ast_type   ast_type
+type Lexer_Token struct {
+	ast_type   AST_Type
 	position   position
 	field      string
 }
 
-var rune_match = map[rune]ast_type {
+var rune_match = map[rune]AST_Type {
 	'\n': NEWLINE,
 	'\\': ESCAPE,
 	'/':  FORWARD_SLASH,
@@ -38,8 +38,8 @@ var rune_match = map[rune]ast_type {
 	'$':  DOLLAR,
 }
 
-func lex_blob(path, input string) []*lexer_token {
-	array   := make([]*lexer_token, 0, 512)
+func lex_blob(path, input string) []*Lexer_Token{
+	array   := make([]*Lexer_Token, 0, 512)
 	line_no := 1
 
 	start := 0
@@ -51,7 +51,7 @@ func lex_blob(path, input string) []*lexer_token {
 
 		if i > 0 {
 			end += i
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type: WHITESPACE,
 				position: position{line_no, start, end, path},
 				field: input[:i],
@@ -73,7 +73,7 @@ func lex_blob(path, input string) []*lexer_token {
 
 		if result, ok := rune_match[rune]; ok {
 			end += width
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type: result,
 				position: position{line_no, start, end, path},
 				field: string(rune),
@@ -87,7 +87,7 @@ func lex_blob(path, input string) []*lexer_token {
 
 		if n := len(number); n > 0 {
 			end += len(number)
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type: NUMBER,
 				position: position{line_no, start, end, path},
 				field: number,
@@ -104,7 +104,7 @@ func lex_blob(path, input string) []*lexer_token {
 		// then the ident is the winner
 		if n := len(ident); n != len(word) {
 			end += n
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type: IDENT,
 				position: position{line_no, start, end, path},
 				field: ident,
@@ -117,7 +117,7 @@ func lex_blob(path, input string) []*lexer_token {
 		// otherwise it's the word, we use that instead
 		if n := len(word); n > 0 {
 			end += n
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type: WORD,
 				position: position{line_no, start, end, path},
 				field: word,
@@ -140,7 +140,7 @@ func lex_blob(path, input string) []*lexer_token {
 
 			end += n
 
-			array = append(array, &lexer_token {
+			array = append(array, &Lexer_Token{
 				ast_type:   the_type,
 				position: position{line_no, start, end, path},
 				field:      non_word,
@@ -174,7 +174,7 @@ func lex_blob(path, input string) []*lexer_token {
 		break
 	}*/
 
-	array = append(array, &lexer_token {
+	array = append(array, &Lexer_Token{
 		ast_type: EOF,
 		position: position{line_no, start, end, path},
 	})

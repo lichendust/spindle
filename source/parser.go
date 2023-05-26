@@ -9,15 +9,15 @@ import (
 type parser struct {
 	index       int
 	unwind      bool
-	stream      []*lexer_token
+	stream      []*Lexer_Token
 }
 
-func parse_stream(spindle *spindle, file *file_info, stream []*lexer_token, is_support bool) []ast_data {
+func parse_stream(spindle *Spindle, file *File_Info, stream []*Lexer_Token, is_support bool) []AST_Data {
 	parser := parser {stream: stream}
 	return parser.parse_block(spindle, file, 0, is_support)
 }
 
-func (parser *parser) get_non_word(token *lexer_token) (string, int) {
+func (parser *parser) get_non_word(token *Lexer_Token) (string, int) {
 	if token.ast_type == NON_WORD {
 		return token.field, 1
 	}
@@ -39,26 +39,26 @@ func (parser *parser) get_non_word(token *lexer_token) (string, int) {
 	return strings.Repeat(token.field, count + 1), count
 }
 
-/*func make_string_decl(id uint32, text string) *ast_declare {
-	decl := &ast_declare {
-		ast_type: DECL,
+/*func make_string_decl(id uint32, text string) *AST_Declare {
+	decl := &AST_Declare {
+		AST_Type: DECL,
 		field:    id,
 	}
-	decl.children = []ast_data{
-		&ast_base{
-			ast_type: NORMAL,
+	decl.children = []AST_Data{
+		&AST_Base{
+			AST_Type: NORMAL,
 			field:    text,
 		},
 	}
 	return decl
 }*/
 
-func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth int, is_support bool) []ast_data {
+func (parser *parser) parse_block(spindle *Spindle, file *File_Info, max_depth int, is_support bool) []AST_Data {
 	if parser.unwind {
-		return []ast_data{}
+		return []AST_Data{}
 	}
 
-	array := make([]ast_data, 0, 32)
+	array := make([]AST_Data, 0, 32)
 
 	main_loop: for {
 		token := parser.next()
@@ -72,10 +72,11 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 		if token.ast_type == NEWLINE {
 			if p := parser.prev(); p != nil && p.ast_type == NEWLINE {
-				t := &ast_base{
-					ast_type: BLANK,
-				}
+				t := new(AST_Base)
+
+				t.ast_type = BLANK
 				t.position = token.position
+
 				array = append(array, t)
 			}
 			continue
@@ -85,7 +86,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 			word, count := parser.get_non_word(token)
 
 			if p := parser.peek(); p != nil && p.ast_type.is(WHITESPACE, NEWLINE) {
-				new_tok := &ast_token{
+				new_tok := &AST_Token{
 					decl_hash:  new_hash(word),
 					orig_field: word,
 				}
@@ -113,7 +114,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 			continue
 
 		case DOLLAR:
-			the_script := &ast_script{}
+			the_script := &AST_Script{}
 
 			parser.eat_whitespace()
 			word := parser.next()
@@ -136,7 +137,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 			continue
 
 		case TILDE, MULTIPLY, AMPERSAND, ANGLE_CLOSE:
-			the_builtin := &ast_builtin{}
+			the_builtin := new(AST_Builtin)
 			the_type    := NULL
 
 			switch token.ast_type {
@@ -194,7 +195,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 		case WORD, IDENT:
 			if token.field == "if" {
-				the_if := &ast_if{}
+				the_if := &AST_If{}
 
 				the_if.condition_list = parser.parse_if(spindle)
 
@@ -221,10 +222,10 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 					continue
 				}
 
-				the_else := &ast_if{}
+				the_else := &AST_If{}
 
 				the_else.is_else = true // it's an else
-				the_else.condition_list = previous.(*ast_if).condition_list
+				the_else.condition_list = previous.(*AST_If).condition_list
 
 				parser.eat_whitespace()
 
@@ -236,7 +237,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 			}
 
 			if token.field == "for" {
-				the_for := &ast_for{}
+				the_for := &AST_For{}
 				parser.eat_whitespace()
 
 				x := parser.parse_paragraph(spindle, is_support, WHITESPACE)
@@ -290,14 +291,14 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 				parser.eat_whitespace()
 				parser.next()
 
-				the_block := &ast_block {
+				the_block := &AST_Block {
 					decl_hash: new_hash(token.field),
 				}
 
 				if needs_raw {
 					x := parser.parse_raw_block()
 
-					the_block.children = []ast_data{x}
+					the_block.children = []AST_Data{x}
 
 					// @todo update positions, etc.
 					array = append(array, the_block)
@@ -336,14 +337,14 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 				parser.eat_whitespace()
 
-				the_decl := &ast_declare{
-					ast_type:  DECL,
-					field:     field,
-					taxonomy:  taxonomy,
-					subname:   subname,
-					immediate: is_immediate,
-					is_soft:   is_support,
-				}
+				the_decl := new(AST_Declare)
+
+				the_decl.ast_type  = DECL
+				the_decl.field     = field
+				the_decl.taxonomy  = taxonomy
+				the_decl.subname   = subname
+				the_decl.immediate = is_immediate
+				the_decl.is_soft   = is_support
 				the_decl.position  = token.position
 
 				x = parser.peek()
@@ -354,7 +355,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 					if parser.peek().ast_type == BRACE_OPEN {
 						parser.next()
-						new_block := &ast_block{
+						new_block := &AST_Block{
 							decl_hash: new_hash(x.field),
 						}
 						new_block.children = parser.parse_block(spindle, file, 0, is_support)
@@ -362,7 +363,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 						new_block.position.end += 1 // the closing brace
 
-						the_decl.children = []ast_data{new_block}
+						the_decl.children = []AST_Data{new_block}
 						the_decl.position = new_block.position
 
 					} else {
@@ -391,7 +392,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 		case BRACE_OPEN:
 			if p := parser.peek(); p.ast_type.is(WHITESPACE, NEWLINE) {
-				the_block := &ast_block{}
+				the_block := &AST_Block{}
 
 				the_block.children = parser.parse_block(spindle, file, 0, is_support)
 				the_block.position = token.position
@@ -408,7 +409,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 			is_brace := token.ast_type == BRACE_OPEN
 
-			the_decl := &ast_declare{}
+			the_decl := &AST_Declare{}
 			the_decl.position = token.position
 			the_decl.is_soft  = is_support
 
@@ -484,7 +485,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 				if parser.peek().ast_type == BRACE_OPEN {
 					parser.next()
-					new_block := &ast_block{
+					new_block := &AST_Block{
 						decl_hash: new_hash(x.field),
 					}
 					new_block.children = parser.parse_block(spindle, file, 0, true)
@@ -493,7 +494,7 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 
 					new_block.position.end += 1 // the closing brace
 
-					the_decl.children = []ast_data{new_block}
+					the_decl.children = []AST_Data{new_block}
 					the_decl.position.start = new_block.position.start
 				} else {
 					parser.step_backn(2)
@@ -513,9 +514,10 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 		{
 			// parse_p needs to get the first tok again
 			parser.step_back()
-			the_para := ast_base{
-				ast_type: NORMAL,
-			}
+
+			the_para := AST_Base{}
+
+			the_para.ast_type = NORMAL
 			the_para.position = token.position
 			the_para.children = parser.parse_paragraph(spindle, is_support, NULL)
 
@@ -533,12 +535,12 @@ func (parser *parser) parse_block(spindle *spindle, file *file_info, max_depth i
 	return array
 }
 
-func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_upon ...ast_type) []ast_data {
+func (parser *parser) parse_paragraph(spindle *Spindle, is_support bool, exit_upon ...AST_Type) []AST_Data {
 	if parser.unwind {
-		return []ast_data{}
+		return []AST_Data{}
 	}
 
-	array := make([]ast_data, 0, 32)
+	array := make([]AST_Data, 0, 32)
 
 	const alloc = 256
 
@@ -562,8 +564,8 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 		switch token.ast_type {
 		default:
 			buffer.WriteString(token.field)
-			/*n := &ast_base{
-				ast_type: NORMAL,
+			/*n := &AST_Base{
+				AST_Type: NORMAL,
 				field:    token.field,
 			}
 			n.position = token.position
@@ -571,8 +573,8 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 
 		case WHITESPACE:
 			buffer.WriteRune(' ')
-			/*n := &ast_base{
-				ast_type: WHITESPACE,
+			/*n := &AST_Base{
+				AST_Type: WHITESPACE,
 				field:    token.field,
 			}
 			n.position = token.position
@@ -584,8 +586,8 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 			x := parser.peek()
 
 			if open && x.ast_type.is(WHITESPACE, NEWLINE, EOF) {
-				n := &ast_base{
-					ast_type: WHITESPACE,
+				n := &AST_Base{
+					AST_Type: WHITESPACE,
 					field:    token.field,
 				}
 				n.position = token.position
@@ -605,8 +607,8 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 				the_type += 1
 			}
 
-			the_formatter := &ast_base{
-				ast_type: the_type,
+			the_formatter := &AST_Base{
+				AST_Type: the_type,
 			}
 			the_formatter.position = token.position
 
@@ -617,7 +619,7 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 			if parser.peek().ast_type == BRACE_OPEN {
 				parser.next()
 
-				the_finder := &ast_finder{}
+				the_finder := &AST_Finder{}
 				the_finder.position = token.position
 
 				word := parser.peek()
@@ -625,12 +627,12 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 				if word.ast_type == WORD {
 					parser.next()
 					switch strings.ToLower(word.field) {
-					case "page":   the_finder.finder_type = _PAGE
-					case "image":  the_finder.finder_type = _IMAGE
-					case "static": the_finder.finder_type = _STATIC
+					case "page":   the_finder.Finder_Type = _PAGE
+					case "image":  the_finder.Finder_Type = _IMAGE
+					case "static": the_finder.Finder_Type = _STATIC
 					}
 
-					if the_finder.finder_type == _NO_FINDER {
+					if the_finder.Finder_Type == _NO_FINDER {
 						parser.step_backn(2)
 						buffer.WriteRune('%')
 						continue
@@ -657,14 +659,14 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 					if parser.peek().ast_type == BRACE_CLOSE {
 						parser.next()
 
-						if the_finder.finder_type == _IMAGE {
+						if the_finder.Finder_Type == _IMAGE {
 							if x, ok := default_image_settings(spindle); ok {
-								the_finder.image_settings = x
+								the_finder.Image_Settings = x
 							}
 						}
 					} else {
-						if the_finder.finder_type == _IMAGE {
-							the_finder.image_settings = parser.parse_image_settings(spindle)
+						if the_finder.Finder_Type == _IMAGE {
+							the_finder.Image_Settings = parser.parse_image_settings(spindle)
 
 							if parser.unwind {
 								return array
@@ -677,11 +679,13 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 				}
 
 				if buffer.Len() > 0 {
-					n := &ast_base{
-						ast_type: NORMAL,
-						field:    buffer.String(),
-					}
+					n := new(AST_Base)
+
+					n.ast_type = NORMAL
+					n.field    = buffer.String()
+
 					array = append(array, n)
+
 					buffer.Reset()
 					buffer.Grow(alloc)
 				}
@@ -698,11 +702,13 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 			}
 
 			if buffer.Len() > 0 {
-				n := &ast_base{
-					ast_type: NORMAL,
-					field:    buffer.String(),
-				}
+				n := new(AST_Base)
+
+				n.ast_type = NORMAL
+				n.field    = buffer.String()
+
 				array = append(array, n)
+
 				buffer.Reset()
 				buffer.Grow(alloc)
 			}
@@ -713,19 +719,21 @@ func (parser *parser) parse_paragraph(spindle *spindle, is_support bool, exit_up
 	}
 
 	if buffer.Len() > 0 {
-		n := &ast_base{
-			ast_type: NORMAL,
-			field:    buffer.String(),
-		}
+		n := new(AST_Base)
+
+		n.ast_type = NORMAL
+		n.field    = buffer.String()
+
 		array = append(array, n)
+
 		buffer.Reset()
 	}
 
 	return array
 }
 
-func (parser *parser) parse_if(spindle *spindle) []ast_data {
-	array := make([]ast_data, 0, 8)
+func (parser *parser) parse_if(spindle *Spindle) []AST_Data {
+	array := make([]AST_Data, 0, 8)
 
 	for {
 		parser.eat_whitespace()
@@ -733,17 +741,17 @@ func (parser *parser) parse_if(spindle *spindle) []ast_data {
 
 		switch token.ast_type {
 		case BANG:
-			array = append(array, &ast_base{
+			array = append(array, &AST_Base{
 				ast_type: OP_NOT,
 			})
 
 		case PLUS:
-			array = append(array, &ast_base{
+			array = append(array, &AST_Base{
 				ast_type: OP_AND,
 			})
 
 		case PIPE:
-			array = append(array, &ast_base{
+			array = append(array, &AST_Base{
 				ast_type: OP_OR,
 			})
 
@@ -789,7 +797,7 @@ func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
 	return new_hash(a.field), 0, 0
 }
 
-func (parser *parser) parse_variable(spindle *spindle, is_support bool) *ast_variable {
+func (parser *parser) parse_variable(spindle *Spindle, is_support bool) *ast_variable {
 	new_var := &ast_variable{}
 
 	a := parser.peek()
@@ -908,7 +916,7 @@ func (parser *parser) eat_comment() {
 	}
 }
 
-func (parser *parser) parse_raw_block() ast_data {
+func (parser *parser) parse_raw_block() AST_Data {
 	buffer := strings.Builder{}
 	buffer.Grow(512)
 
@@ -965,14 +973,14 @@ func (parser *parser) parse_raw_block() ast_data {
 
 	str := reindent_text(buffer.String())
 
-	return &ast_base{
+	return &AST_Base{
 		ast_type: RAW,
 		field:    str,
 	}
 }
 
-func default_image_settings(spindle *spindle) (*image_settings, bool) {
-	settings := new(image_settings)
+func default_image_settings(spindle *Spindle) (*Image_Settings, bool) {
+	settings := new(Image_Settings)
 	got_anything := false
 
 	if spindle.image_quality > 0 {
@@ -991,7 +999,7 @@ func default_image_settings(spindle *spindle) (*image_settings, bool) {
 	return settings, got_anything
 }
 
-func (parser *parser) parse_image_settings(spindle *spindle) *image_settings {
+func (parser *parser) parse_image_settings(spindle *Spindle) *Image_Settings {
 	settings, got_anything := default_image_settings(spindle)
 
 	main_loop: for {
@@ -1065,14 +1073,14 @@ func (parser *parser) step_backn(n int) {
 	parser.index -= n
 }
 
-func (parser *parser) prev() *lexer_token {
+func (parser *parser) prev() *Lexer_Token {
 	if parser.index < 2 {
 		return nil
 	}
 	return parser.stream[parser.index - 2]
 }
 
-func (parser *parser) next() *lexer_token {
+func (parser *parser) next() *Lexer_Token {
 	if parser.index > len(parser.stream) - 1 {
 		return nil
 	}
@@ -1081,14 +1089,14 @@ func (parser *parser) next() *lexer_token {
 	return t
 }
 
-func (parser *parser) peek() *lexer_token {
+func (parser *parser) peek() *Lexer_Token {
 	if parser.index > len(parser.stream) - 1 {
 		return nil
 	}
 	return parser.stream[parser.index]
 }
 
-func (parser *parser) peek_whitespace() *lexer_token {
+func (parser *parser) peek_whitespace() *Lexer_Token {
 	index := 0
 
 	for _, token := range parser.stream[parser.index:] {
@@ -1117,7 +1125,7 @@ func (parser *parser) eat_whitespace() bool {
 	return did_any
 }
 
-func recursive_anon_count(children []ast_data) int {
+func recursive_anon_count(children []AST_Data) int {
 	count := 0
 	for _, entry := range children {
 		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
@@ -1134,7 +1142,7 @@ func recursive_anon_count(children []ast_data) int {
 	return count
 }
 
-func immediate_decl_count(children []ast_data) int {
+func immediate_decl_count(children []AST_Data) int {
 	count := 0
 	for _, entry := range children {
 		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK) {
@@ -1147,8 +1155,8 @@ func immediate_decl_count(children []ast_data) int {
 	return count
 }
 
-func arrange_top_scope(content []ast_data) []ast_data {
-	array := make([]ast_data, 0, 8)
+func arrange_top_scope(content []AST_Data) []AST_Data {
+	array := make([]AST_Data, 0, 8)
 
 	for _, entry := range content {
 		if entry.type_check().is(DECL, DECL_TOKEN, DECL_BLOCK, TEMPLATE) {

@@ -81,10 +81,29 @@ var short_words = map[string]bool {
 
 // a title caser that actually works!
 func make_title(input string) string {
+	short_words := func(x string) bool {
+		switch x {
+		case "a":    return true
+		case "an":   return true
+		case "and":  return true
+		case "the":  return true
+		case "on":   return true
+		case "to":   return true
+		case "in":   return true
+		case "for":  return true
+		case "nor":  return true
+		case "or":   return true
+		case "from": return true
+		case "but":  return true
+		case "is":   return true
+		}
+		return false
+	}
+
 	words := strings.Split(input, " ")
 
 	for i, word := range words {
-		if i > 0 && short_words[word] {
+		if i > 0 && short_words(word) {
 			continue
 		}
 

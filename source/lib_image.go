@@ -24,16 +24,16 @@ const (
 	DEFAULT_QUALITY = 100
 )
 
-type image_settings struct {
+type Image_Settings struct {
 	max_size  uint
 	width     uint
 	height    uint
 	quality   int
-	file_type file_type
+	file_type File_Type
 }
 
-/*func (s *image_settings) make_hash() uint32 {
-	return new_hash(fmt.Sprintf("%d%d%d%d", s.width, s.height, s.quality, s.file_type))
+/*func (s *Image_Settings) make_hash() uint32 {
+	return new_hash(fmt.Sprintf("%d%d%d%d", s.width, s.height, s.quality, s.File_Type))
 }*/
 
 func copy_generated_image(the_image *Image, output_path string) bool {
@@ -76,7 +76,7 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 		// correct aspect ratio
 		settings.width, settings.height = scaling(settings.max_size, settings.max_size, x, y)
 
-		ext_cwebp(incoming_file.file_info.path, output_path, settings)
+		ext_cwebp(incoming_file.File_Info.path, output_path, settings)
 
 		return true
 	}
@@ -119,7 +119,7 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 	return true
 }
 
-func ext_cwebp(input_path, output_path string, settings *image_settings) {
+func ext_cwebp(input_path, output_path string, settings *Image_Settings) {
 	args := make([]string, 0, 8)
 
 	if settings.width > 0 && settings.height > 0 {

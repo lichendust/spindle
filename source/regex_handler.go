@@ -52,14 +52,14 @@ type Regex_Config struct {
 	Output string `toml:"template"`
 }
 
-type regex_entry struct {
+type Regex_Entry struct {
 	regexp *regexp.Regexp
 	output []byte
 	// d_hash uint32
 }
 
-func process_regex_array(array []*Regex_Config) ([]*regex_entry, bool) {
-	output := make([]*regex_entry, 0, len(array))
+func process_regex_array(array []*Regex_Config) ([]*Regex_Entry, bool) {
+	output := make([]*Regex_Entry, 0, len(array))
 
 	for _, entry := range array {
 		re, err := regexp.Compile(entry.Input)
@@ -67,7 +67,7 @@ func process_regex_array(array []*Regex_Config) ([]*regex_entry, bool) {
 			return nil, false
 		}
 
-		output = append(output, &regex_entry{
+		output = append(output, &Regex_Entry{
 			regexp: re,
 			output: []byte(entry.Output),
 			// d_hash: new_hash(entry.Output),
@@ -77,7 +77,7 @@ func process_regex_array(array []*Regex_Config) ([]*regex_entry, bool) {
 	return output, true
 }
 
-func apply_regex_array(array []*regex_entry, input string) string {
+func apply_regex_array(array []*Regex_Entry, input string) string {
 	if len(array) == 0 {
 		return input
 	}
@@ -91,7 +91,7 @@ func apply_regex_array(array []*regex_entry, input string) string {
 	return string(cast)
 }
 
-/*func _apply_regex_array(r *renderer, array []*regex_entry, input string) string {
+/*func _apply_regex_array(r *renderer, array []*Regex_Entry, input string) string {
 	if len(array) == 0 {
 		return input
 	}

@@ -10,11 +10,15 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const serve_port     = ":3011"
-const reload_address = "/_spindle/reload"
+const SERVE_PORT     = ":3011"
+const RELOAD_ADDRESS = "/_spindle/reload"
+
+const TIME_WRITE_WAIT  = 10 * time.Second
+const TIME_PONG_WAIT   = 60 * time.Second
+const TIME_PING_PERIOD = (TIME_PONG_WAIT * 9) / 10
 
 func open_browser(port string) {
-	const url = "http://localhost" + serve_port
+	const url = "http://localhost" + SERVE_PORT
 
 	var err error
 
@@ -32,7 +36,7 @@ func open_browser(port string) {
 	println("\n   ", url)
 }
 
-func command_serve(spindle *spindle) {
+func command_serve(spindle *Spindle) {
 	the_server := http.NewServeMux()
 
 	spindle.finder_cache = make(map[string]*File, 64)
@@ -52,11 +56,11 @@ func command_serve(spindle *spindle) {
 	}
 
 	// websocket hub
-	the_hub := &client_hub {
-		clients:    make(map[*client]bool),
+	the_hub := &Client_Hub{
+		clients:    make(map[*Client]bool),
 		broadcast:  make(chan []byte),
-		register:   make(chan *client),
-		unregister: make(chan *client),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
 	}
 
 	go the_hub.run()
@@ -88,7 +92,7 @@ func command_serve(spindle *spindle) {
 
 			w.WriteHeader(http.StatusNotFound)
 			w.Header().Add("Cache-Control", "no-cache")
-			w.Write([]byte(t_error_page_not_found))
+			w.Write([]byte(ERROR_PAGE_NOT_FOUND))
 			return
 		}
 
@@ -116,19 +120,19 @@ func command_serve(spindle *spindle) {
 		w.Header().Add("Cache-Control", "no-cache")
 		http.ServeFile(w, r, found_file.path)
 	})
-	the_server.HandleFunc(reload_address, func(w http.ResponseWriter, r *http.Request) {
+	the_server.HandleFunc(RELOAD_ADDRESS, func(w http.ResponseWriter, r *http.Request) {
 		register_client(the_hub, w, r)
 	})
 
 	// start server
 	go func() {
-		err := http.ListenAndServe(serve_port, the_server)
+		err := http.ListenAndServe(SERVE_PORT, the_server)
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	open_browser(serve_port)
+	open_browser(SERVE_PORT)
 
 	// monitor files for changes
 	last_run := time.Now()
@@ -204,19 +208,13 @@ func command_serve(spindle *spindle) {
 // golang's own websocket, but for now this
 // works fine
 
-const (
-	time_write_wait  = 10 * time.Second
-	time_pong_wait   = 60 * time.Second
-	time_ping_period = (time_pong_wait * 9) / 10
-)
-
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 }
 
 const reload_script = `<script type='text/javascript'>function spindle_reload() {
-	var socket = new WebSocket("ws://" + window.location.host + "` + reload_address + `");
+	var socket = new WebSocket("ws://" + window.location.host + "` + RELOAD_ADDRESS + `");
 	socket.onclose = function(evt) {
 		setTimeout(() => spindle_reload(), 2000);
 	};
@@ -226,14 +224,14 @@ const reload_script = `<script type='text/javascript'>function spindle_reload() 
 };
 spindle_reload()</script>`
 
-type client_hub struct {
-	clients    map[*client]bool
+type Client_Hub struct {
+	clients    map[*Client]bool
 	broadcast  chan []byte
-	register   chan *client
-	unregister chan *client
+	register   chan *Client
+	unregister chan *Client
 }
 
-func (h *client_hub) run() {
+func (h *Client_Hub) run() {
 	for {
 		select {
 		case client := <-h.register:
@@ -258,12 +256,12 @@ func (h *client_hub) run() {
 	}
 }
 
-type client struct {
+type Client struct {
 	socket  *websocket.Conn
 	send    chan []byte
 }
 
-func (c *client) read_pump(the_hub *client_hub) {
+func (c *Client) read_pump(the_hub *Client_Hub) {
 	defer func() {
 		the_hub.unregister <- c
 		c.socket.Close()
@@ -281,8 +279,8 @@ func (c *client) read_pump(the_hub *client_hub) {
 	}
 }
 
-func (c *client) write_pump() {
-	ticker := time.NewTicker(time_ping_period)
+func (c *Client) write_pump() {
+	ticker := time.NewTicker(TIME_PING_PERIOD)
 
 	defer func() {
 		ticker.Stop()
@@ -297,7 +295,7 @@ func (c *client) write_pump() {
 				return
 			}
 
-			c.socket.SetWriteDeadline(time.Now().Add(time_write_wait))
+			c.socket.SetWriteDeadline(time.Now().Add(TIME_WRITE_WAIT))
 
 			w, err := c.socket.NextWriter(websocket.TextMessage)
 
@@ -326,19 +324,19 @@ func (c *client) write_pump() {
 	}
 }
 
-func (c *client) write(mt int, payload []byte) error {
-	c.socket.SetWriteDeadline(time.Now().Add(time_write_wait))
+func (c *Client) write(mt int, payload []byte) error {
+	c.socket.SetWriteDeadline(time.Now().Add(TIME_WRITE_WAIT))
 	return c.socket.WriteMessage(mt, payload)
 }
 
-func register_client(the_hub *client_hub, w http.ResponseWriter, r *http.Request) {
+func register_client(the_hub *Client_Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
 
 	if err != nil {
 		panic(err)
 	}
 
-	the_client := &client {
+	the_client := &Client{
 		socket: conn,
 		send:   make(chan []byte, 256),
 	}
@@ -349,6 +347,6 @@ func register_client(the_hub *client_hub, w http.ResponseWriter, r *http.Request
 	the_client.read_pump(the_hub)
 }
 
-func send_reload(the_hub *client_hub) {
+func send_reload(the_hub *Client_Hub) {
 	the_hub.broadcast <- []byte("reload")
 }

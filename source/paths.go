@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 )
 
-func make_general_file_path(spindle *spindle, file *File) string {
+func make_general_file_path(spindle *Spindle, file *File) string {
 	output_path := ""
 
 	new_ext := ext_for_file_type(file.file_type)
@@ -26,7 +26,7 @@ func make_general_file_path(spindle *spindle, file *File) string {
 	return output_path
 }
 
-func make_generated_image_path(spindle *spindle, the_image *Image) string {
+func make_generated_image_path(spindle *Spindle, the_image *Image) string {
 	public_path := spindle.output_path
 	file_path   := the_image.original.path
 	s           := the_image.settings
@@ -42,12 +42,12 @@ func make_generated_image_path(spindle *spindle, the_image *Image) string {
 	return rewrite_ext(rewrite_root(file_path, public_path), new_ext)
 }
 
-func make_general_url(spindle *spindle, file *File, path_type path_type, current_location string) string {
+func make_general_url(spindle *Spindle, file *File, Path_Type Path_Type, current_location string) string {
 	if spindle.server_mode {
 		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
 
-	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, file.path)
+	output_path := rewrite_by_path_type(Path_Type, spindle.domain, current_location, file.path)
 	output_path = rewrite_ext(output_path, ext_for_file_type(file.file_type))
 
 	if spindle.build_drafts && file.is_draft {
@@ -57,15 +57,15 @@ func make_general_url(spindle *spindle, file *File, path_type path_type, current
 	return output_path
 }
 
-func make_page_url(spindle *spindle, file *file_info, path_type path_type, current_location string) string {
+func make_page_url(spindle *Spindle, file *File_Info, Path_Type Path_Type, current_location string) string {
 	if spindle.server_mode {
 		return _make_page_url(spindle, ROOTED, file.is_draft, file.path, current_location)
 	}
-	return _make_page_url(spindle, path_type, file.is_draft, file.path, current_location)
+	return _make_page_url(spindle, Path_Type, file.is_draft, file.path, current_location)
 }
 
-func _make_page_url(spindle *spindle, path_type path_type, is_draft bool, path, current_location string) string {
-	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, path)
+func _make_page_url(spindle *Spindle, Path_Type Path_Type, is_draft bool, path, current_location string) string {
+	output_path := rewrite_by_path_type(Path_Type, spindle.domain, current_location, path)
 
 	if spindle.build_drafts && is_draft {
 		output_path = undraft_path(output_path)
@@ -90,12 +90,12 @@ func _make_page_url(spindle *spindle, path_type path_type, is_draft bool, path, 
 	return output_path
 }
 
-func make_generated_image_url(spindle *spindle, file *File, s *image_settings, path_type path_type, current_location string) string {
+func make_generated_image_url(spindle *Spindle, file *File, s *Image_Settings, Path_Type Path_Type, current_location string) string {
 	if spindle.server_mode {
 		return rewrite_by_path_type(ROOTED, spindle.domain, current_location, file.path)
 	}
 
-	output_path := rewrite_by_path_type(path_type, spindle.domain, current_location, file.path)
+	output_path := rewrite_by_path_type(Path_Type, spindle.domain, current_location, file.path)
 	new_ext     := ext_for_file_type(s.file_type)
 
 	if s.max_size > 0 && s.max_size != spindle.image_max_size {
@@ -105,11 +105,11 @@ func make_generated_image_url(spindle *spindle, file *File, s *image_settings, p
 	return rewrite_ext(output_path, new_ext)
 }
 
-func rewrite_by_path_type(path_type path_type, domain, current_location, target_location string) string {
+func rewrite_by_path_type(Path_Type Path_Type, domain, current_location, target_location string) string {
 	buffer := strings.Builder{}
 	buffer.Grow(64)
 
-	switch path_type {
+	switch Path_Type {
 	case ROOTED:
 		buffer.WriteRune('/')
 		buffer.WriteString(rewrite_root(target_location, ""))

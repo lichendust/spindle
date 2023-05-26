@@ -5,13 +5,13 @@ package main
 const VERSION = "v0.4.2"
 const SPINDLE = "Spindle " + VERSION
 
-type spindle struct {
+type Spindle struct {
 	server_mode  bool
 
 	errors       *Error_Handler
 	file_tree    *File
 
-	config
+	Config
 
 	has_webp     bool
 
@@ -43,15 +43,16 @@ func main() {
 		return
 	}
 
-	spindle := spindle{}
-	spindle.config = config
+	spindle := new(Spindle)
+
+	spindle.Config = config
 	spindle.errors = new_error_handler()
 
 	switch config.command {
 	case COMMAND_BUILD:
-		command_build(&spindle)
+		command_build(spindle)
 	case COMMAND_SERVE:
 		spindle.server_mode = true
-		command_serve(&spindle)
+		command_serve(spindle)
 	}
 }

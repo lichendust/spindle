@@ -15,17 +15,17 @@ func _println(name ...any) {
 	fmt.Println(name...)
 }
 
-func print_token_stream(array []*lexer_token) {
+func print_token_stream(array []*Lexer_Token) {
 	for _, entry := range array {
 		fmt.Println(entry)
 	}
 }
 
-func (t *lexer_token) String() string {
-	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.ast_type, t.field)
+func (t *Lexer_Token) String() string {
+	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.AST_Type, t.field)
 }
 
-func print_syntax_tree(array []ast_data, level int) {
+func print_syntax_tree(array []AST_Data, level int) {
 	indent := strings.Repeat("    ", level)
 
 	for _, entry := range array {
@@ -38,11 +38,11 @@ func print_syntax_tree(array []ast_data, level int) {
 
 		switch _type {
 		case NORMAL:
-			cast := entry.(*ast_base)
+			cast := entry.(*AST_Base)
 			fmt.Print(" ", cast.field)
 
 		case DECL, DECL_TOKEN, DECL_BLOCK:
-			cast := entry.(*ast_declare)
+			cast := entry.(*AST_Declare)
 			fmt.Print(" ", get_hash(cast.field))
 
 		case VAR, VAR_ENUM, VAR_ANON:
@@ -75,8 +75,8 @@ func print_file_tree(array []*File, level int) {
 }
 
 func (d *File) String() string {
-	// return fmt.Sprint(d.file_type, " ", filepath.Base(d.path))
-	return fmt.Sprint(d.file_type, " ", d.path, " ", d.is_used, " ", d.is_built)
+	// return fmt.Sprint(d.File_Type, " ", filepath.Base(d.path))
+	return fmt.Sprint(d.File_Type, " ", d.path, " ", d.is_used, " ", d.is_built)
 }
 
 // this is a *bad* implementation of HTML
@@ -107,7 +107,7 @@ func validate_html(input string) bool {
 
 var has_printed_scope = make(map[string]bool, 10)
 
-func print_scope_stack(location string, scope_stack []map[uint32]*ast_declare) {
+func print_scope_stack(location string, scope_stack []map[uint32]*AST_Declare) {
 	if has_printed_scope[location] {
 		return
 	}

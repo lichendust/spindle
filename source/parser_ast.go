@@ -1,10 +1,10 @@
 package main
 
-//go:generate stringer -type=ast_type,ast_modifier,file_type -output=parser_string.go
+//go:generate stringer -type=AST_Type,AST_Modifier,File_Type -output=parser_string.go
 
-type ast_type uint8
+type AST_Type uint8
 const (
-	NULL ast_type = iota
+	NULL AST_Type = iota
 
 	BLANK
 	RAW
@@ -87,9 +87,9 @@ const (
 	non-alphanumeric rune, like ## or &&&
 */
 
-type ast_modifier uint8
+type AST_Modifier uint8
 const (
-	NONE ast_modifier = iota
+	NONE AST_Modifier = iota
 	SLUG
 	UNIQUE_SLUG
 	UPPER
@@ -99,7 +99,7 @@ const (
 	EXPAND_ALL
 )
 
-func (t ast_type) is(comp ...ast_type) bool {
+func (t AST_Type) is(comp ...AST_Type) bool {
 	for _, c := range comp {
 		if t == c {
 			return true
@@ -109,46 +109,41 @@ func (t ast_type) is(comp ...ast_type) bool {
 }
 
 // base token data structure
-type ast_data interface {
-	type_check()   ast_type
-	get_children() []ast_data
+type AST_Data interface {
+	type_check()   AST_Type
+	get_children() []AST_Data
 	get_position() *position
 }
-type ast_base_fields struct {
+type AST_Base struct {
 	position position
-	children []ast_data
+	children []AST_Data
+	ast_type AST_Type
+	field    string
 }
-
-// normal token, which is the real "base object"
-type ast_base struct {
-	ast_base_fields
-	ast_type   ast_type
-	field      string
-}
-func (t *ast_base) type_check() ast_type {
+func (t *AST_Base) type_check() AST_Type {
 	return t.ast_type
 }
-func (t *ast_base) get_children() []ast_data {
+func (t *AST_Base) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_base) get_position() *position {
+func (t *AST_Base) get_position() *position {
 	return &t.position
 }
 
 
 
 type ast_variable struct {
-	ast_base_fields
-	ast_type ast_type
-	modifier ast_modifier
+	AST_Base
+	ast_type AST_Type
+	modifier AST_Modifier
 	field    uint32
 	taxonomy uint32
 	subname  uint32
 }
-func (t *ast_variable) type_check() ast_type {
+func (t *ast_variable) type_check() AST_Type {
 	return t.ast_type
 }
-func (t *ast_variable) get_children() []ast_data {
+func (t *ast_variable) get_children() []AST_Data {
 	return t.children
 }
 func (t *ast_variable) get_position() *position {
@@ -157,162 +152,162 @@ func (t *ast_variable) get_position() *position {
 
 
 
-type ast_declare struct {
-	ast_base_fields
-	ast_type   ast_type
+type AST_Declare struct {
+	AST_Base
+	ast_type   AST_Type
 	field      uint32
 	taxonomy   uint32
 	subname    uint32
 	immediate  bool
 	is_soft    bool
 }
-func (t *ast_declare) type_check() ast_type {
+func (t *AST_Declare) type_check() AST_Type {
 	return t.ast_type
 }
-func (t *ast_declare) get_children() []ast_data {
+func (t *AST_Declare) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_declare) get_position() *position {
+func (t *AST_Declare) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_block struct {
-	ast_base_fields
+type AST_Block struct {
+	AST_Base
 	decl_hash uint32 // zero means anonymous
 }
-func (t *ast_block) type_check() ast_type {
+func (t *AST_Block) type_check() AST_Type {
 	return BLOCK
 }
-func (t *ast_block) get_children() []ast_data {
+func (t *AST_Block) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_block) get_position() *position {
+func (t *AST_Block) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_token struct {
-	ast_base_fields
+type AST_Token struct {
+	AST_Base
 	decl_hash  uint32
 	orig_field string
 }
-func (t *ast_token) type_check() ast_type {
+func (t *AST_Token) type_check() AST_Type {
 	return TOKEN
 }
-func (t *ast_token) get_children() []ast_data {
+func (t *AST_Token) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_token) get_position() *position {
+func (t *AST_Token) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_finder struct {
-	ast_base_fields
-	finder_type    finder_type
-	path_type      path_type
-	image_settings *image_settings
+type AST_Finder struct {
+	AST_Base
+	Finder_Type    Finder_Type
+	path_type      Path_Type
+	Image_Settings *Image_Settings
 }
-func (t *ast_finder) type_check() ast_type {
+func (t *AST_Finder) type_check() AST_Type {
 	return RES_FINDER
 }
-func (t *ast_finder) get_children() []ast_data {
+func (t *AST_Finder) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_finder) get_position() *position {
+func (t *AST_Finder) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_for struct {
-	ast_base_fields
-	iterator_source ast_data
+type AST_For struct {
+	AST_Base
+	iterator_source AST_Data
 }
-func (t *ast_for) type_check() ast_type {
+func (t *AST_For) type_check() AST_Type {
 	return CONTROL_FOR
 }
-func (t *ast_for) get_children() []ast_data {
+func (t *AST_For) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_for) get_position() *position {
+func (t *AST_For) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_if struct {
-	ast_base_fields
+type AST_If struct {
+	AST_Base
 	is_else bool
-	condition_list []ast_data
+	condition_list []AST_Data
 }
-func (t *ast_if) type_check() ast_type {
+func (t *AST_If) type_check() AST_Type {
 	return CONTROL_IF
 }
-func (t *ast_if) get_children() []ast_data {
+func (t *AST_If) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_if) get_position() *position {
+func (t *AST_If) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_builtin struct {
-	ast_base_fields
-	ast_type  ast_type
+type AST_Builtin struct {
+	AST_Base
+	ast_type  AST_Type
 	hash_name uint32
 	// target    string
 }
-func (t *ast_builtin) type_check() ast_type {
+func (t *AST_Builtin) type_check() AST_Type {
 	return t.ast_type
 }
-func (t *ast_builtin) get_children() []ast_data {
+func (t *AST_Builtin) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_builtin) get_position() *position {
+func (t *AST_Builtin) get_position() *position {
 	return &t.position
 }
 
 
 
-type ast_script struct {
-	ast_base_fields
+type AST_Script struct {
+	AST_Base
 	hash_name uint32
 }
-func (t *ast_script) type_check() ast_type {
+func (t *AST_Script) type_check() AST_Type {
 	return SCRIPT
 }
-func (t *ast_script) get_children() []ast_data {
+func (t *AST_Script) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_script) get_position() *position {
+func (t *AST_Script) get_position() *position {
 	return &t.position
 }
 
 
 
-type finder_type uint8
+type Finder_Type uint8
 const (
-	_NO_FINDER finder_type = iota
+	_NO_FINDER Finder_Type = iota
 	_PAGE
 	_IMAGE
 	_STATIC
 )
 
-type path_type uint8
+type Path_Type uint8
 const (
-	NO_PATH_TYPE path_type = iota
+	NO_PATH_TYPE Path_Type = iota
 	RELATIVE
 	ABSOLUTE
 	ROOTED // @todo bad name
 )
 
-func check_path_type(input string) path_type {
+func check_path_type(input string) Path_Type {
 	switch input {
 	case "abs", "absolute":
 		return ABSOLUTE
