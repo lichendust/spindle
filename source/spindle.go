@@ -21,7 +21,7 @@ type spindle struct {
 	templates    map[uint32]*Support_Markup
 	partials     map[uint32]*Support_Markup
 
-	gen_pages    map[string]*Page
+	gen_pages    map[string]*Gen_Page
 	gen_images   map[uint32]*Image
 }
 

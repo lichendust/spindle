@@ -19,6 +19,12 @@ type Page struct {
 	import_cond  string
 }
 
+type Gen_Page struct {
+	file *File
+	import_hash uint32
+	import_cond string
+}
+
 type Support_Markup struct {
 	markup
 	has_body bool

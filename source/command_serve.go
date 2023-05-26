@@ -36,7 +36,7 @@ func command_serve(spindle *spindle) {
 	the_server := http.NewServeMux()
 
 	spindle.finder_cache = make(map[string]*File, 64)
-	spindle.gen_pages    = make(map[string]*Page, 32)
+	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
 	spindle.gen_images   = make(map[uint32]*Image,   32)
 
 	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
@@ -64,24 +64,26 @@ func command_serve(spindle *spindle) {
 	// server components
 	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		found_file, ok := find_file_hash(spindle.file_tree, new_hash(r.URL.Path))
+
 		if !ok {
-			// @todo streamline path seeking + returning page here
-			if page, ok := spindle.gen_pages[r.URL.Path]; ok {
-				assembled := render_syntax_tree(spindle, page)
+			if gen, ok := spindle.gen_pages[r.URL.Path]; ok {
+				if page, ok := load_page_from_file(spindle, gen.file); ok {
+					page.file        = gen.file
+					page.import_cond = gen.import_cond
+					page.import_hash = gen.import_hash
 
-				if spindle.errors.has_errors() {
-					assembled = spindle.errors.render_html_page()
-					spindle.errors.reset()
+					assembled := render_syntax_tree(spindle, page)
+
+					if spindle.errors.has_errors() {
+						assembled = spindle.errors.render_html_page()
+						spindle.errors.reset()
+					}
+
+					w.WriteHeader(http.StatusOK)
+					w.Header().Add("Cache-Control", "no-cache")
+					w.Write([]byte(assembled))
+					return
 				}
-
-				w.WriteHeader(http.StatusOK)
-				w.Header().Add("Cache-Control", "no-cache")
-				w.Write([]byte(assembled))
-				return
-			}
-
-			for x := range spindle.gen_pages {
-				delete(spindle.gen_pages, x)
 			}
 
 			w.WriteHeader(http.StatusNotFound)
@@ -135,6 +137,11 @@ func command_serve(spindle *spindle) {
 		if folder_has_changes(SOURCE_PATH, last_run) {
 			if data, ok := load_file_tree(spindle); ok {
 				spindle.file_tree = data
+
+				// @todo gen_page cache expiry in server
+				/*for x := range spindle.gen_pages {
+					delete(spindle.gen_pages, x)
+				}*/
 
 				send_reload(the_hub)
 			}

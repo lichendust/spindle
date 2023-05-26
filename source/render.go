@@ -268,20 +268,20 @@ func __recurse(r *renderer, spindle *spindle, page *Page, input []ast_data, targ
 
 					capture[tag] = true
 
-					file_path := tag_path(make_general_url(spindle, page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
+					file_path := tag_path(make_page_url(spindle, &page.file.file_info, NO_PATH_TYPE, ""), spindle.tag_path, tag)
 
 					if _, ok := spindle.gen_pages[file_path]; ok {
 						continue
 					}
 
-					copy := &Page{}
+					/*
+						@todo this is the wrong structure and causes cache fails
+						we need to reference (not copy) the original page
+					*/
 
-					copy.content   = page.content
-					copy.top_scope = page.top_scope
-					copy.position  = page.position
+					copy := new(Gen_Page)
 
 					copy.file        = page.file
-					copy.page_path   = page.page_path
 					copy.import_cond = tag
 					copy.import_hash = target_hash
 

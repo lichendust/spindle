@@ -26,7 +26,7 @@ func command_build(spindle *spindle) {
 	spindle.finder_cache = make(map[string]*File, 64)
 
 	spindle.pages        = make(map[string]*Page, 64)
-	spindle.gen_pages    = make(map[string]*Page, 32)
+	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
 	spindle.gen_images   = make(map[uint32]*Image, 32)
 
 	make_dir(spindle.config.output_path)
@@ -51,8 +51,8 @@ func command_build(spindle *spindle) {
 		}
 	}
 
-	for _, page := range spindle.gen_pages {
-		output_path := make_general_file_path(spindle, page.file)
+	for _, gen := range spindle.gen_pages {
+		output_path := make_general_file_path(spindle, gen.file)
 
 		// @todo tag path can't distinguish between a file extension
 		// and the TLD of an index page on a domain.  This is the only
@@ -60,10 +60,19 @@ func command_build(spindle *spindle) {
 		{
 			ext := filepath.Ext(output_path)
 			output_path = output_path[:len(output_path) - len(ext)]
-			output_path = tag_path(output_path, spindle.tag_path, page.import_cond) + ext
+			output_path = tag_path(output_path, spindle.tag_path, gen.import_cond) + ext
 		}
 
 		make_dir(filepath.Dir(output_path))
+
+		page, ok := load_page_from_file(spindle, gen.file)
+		if !ok {
+			panic("failed to load page " + gen.file.path)
+		}
+
+		page.file        = gen.file
+		page.import_cond = gen.import_cond
+		page.import_hash = gen.import_hash
 
 		assembled := render_syntax_tree(spindle, page)
 
