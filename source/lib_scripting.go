@@ -18,6 +18,7 @@ func init() {
 		"title":       TITLE,
 	})
 	the_vm.Set("text_truncate", truncate)
+	the_vm.Set("current_date", nsdate)
 }
 
 func (r *renderer) script_call(spindle *spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {

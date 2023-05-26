@@ -1,7 +1,9 @@
 package main
 
 import (
+	"time"
 	"strings"
+	"strconv"
 	"unicode"
 	"unicode/utf8"
 )
@@ -317,5 +319,104 @@ func count_rune(input string, r rune) int {
 			return i
 		}
 	}
-	return 0
+	return len(input)
+}
+
+func nsdate(input string) string {
+	nsconvert := func(x string) string {
+		switch x {
+		case "M":    return "1"
+		case "MM":   return "01"
+		case "MMM":  return "Jan"
+		case "MMMM": return "January"
+		case "d":    return "2"
+		case "dd":   return "02"
+		case "E":    return "Mon"
+		case "EEEE": return "Monday"
+		case "h":    return "3"
+		case "hh":   return "03"
+		case "HH":   return "15"
+		case "a":    return "PM"
+		case "m":    return "4"
+		case "mm":   return "04"
+		case "s":    return "5"
+		case "ss":   return "05"
+		case "SSS":  return ".000"
+		}
+		return ""
+	}
+
+	clamp := func(m int) int {
+		if m < 0 {
+			return 0
+		}
+		return m
+	}
+
+	final := strings.Builder{}
+	final.Grow(128)
+
+	t := time.Now()
+
+	input = strings.TrimSpace(input)
+
+	for {
+		if len(input) == 0 {
+			break
+		}
+
+		for _, c := range input {
+			if unicode.IsLetter(c) {
+				n := count_rune(input, c)
+				repeat := input[:n]
+
+				// years
+				if c == 'y' {
+					switch n {
+					case 1:
+						final.WriteString(strconv.Itoa(t.Year()))
+					case 2:
+						final.WriteString(t.Format("06"))
+					default:
+						y := strconv.Itoa(t.Year())
+						final.WriteString(strings.Repeat("0", clamp(n - len(y))))
+						final.WriteString(y)
+					}
+					input = input[n:]
+					break
+				}
+
+				// H - unpadded hour
+				if c == 'H' && n == 1 {
+					final.WriteString(strconv.Itoa(t.Hour()))
+				}
+				// MMMMM - single letter month
+				if c == 'M' && n == 5 {
+					final.WriteString(t.Month().String()[:1])
+				}
+				// EEEEE - single letter week
+				if c == 'E' && n == 5 {
+					final.WriteString(t.Weekday().String()[:1])
+				}
+				// EEEEEE - two letter week
+				if c == 'E' && n == 6 {
+					final.WriteString(t.Weekday().String()[:2])
+				}
+
+				if x := nsconvert(repeat); x != "" {
+					final.WriteString(t.Format(x))
+				} else {
+					final.WriteString(repeat)
+				}
+
+				input = input[n:]
+				break
+			}
+
+			final.WriteRune(c)
+			input = input[1:]
+		}
+	}
+
+	return final.String()
 }
