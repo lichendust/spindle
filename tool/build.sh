@@ -34,6 +34,7 @@ build() {
 build windows amd64
 build linux   amd64
 build darwin  amd64
+build darwin  arm64
 
 printf "\n[packaging]\n"
 

@@ -1,3 +1,22 @@
+/*
+	Spindle
+	A static site generator
+	Copyright (C) 2022-2023 Harley Denham
+
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 package main
 
 // filepaths
@@ -37,7 +56,7 @@ const MAIN_TEMPLATE = `/ markdown emulation
 [+] = <li>%%</li>
 
 / codeblocks
-[code] = <pre><code>%%:raw</code></pre>
+[code] = <pre><code>%%</code></pre>
 
 
 
@@ -52,7 +71,7 @@ const MAIN_TEMPLATE = `/ markdown emulation
 
 	/ this allows you to hotload pages during local development
 	if %spindle.is_server {
-		. %spindle.reload_script
+		. %spindle.RELOAD_SCRIPT
 	}
 </head>
 <body>%%</body>
@@ -74,5 +93,5 @@ tag_path   = "tag"
 
 # default settings for image linkers
 # applied to any images without inline settings
-# image_quality 90
-# image_size    1920`
+# image_quality = 90
+# image_size    = 1920`

@@ -1,8 +1,28 @@
+/*
+	Spindle
+	A static site generator
+	Copyright (C) 2022-2023 Harley Denham
+
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 package main
 
 import (
 	"time"
 	"runtime"
+	"strings"
 	"os/exec"
 	"net/http"
 	// "path/filepath"
@@ -11,7 +31,10 @@ import (
 )
 
 const SERVE_PORT     = ":3011"
-const RELOAD_ADDRESS = "/_spindle/reload"
+
+const SPINDLE_PREFIX = "/_spindle/"
+const RELOAD_ADDRESS = SPINDLE_PREFIX + "reload"
+const MANUAL_ADDRESS = SPINDLE_PREFIX + "manual/"
 
 const TIME_WRITE_WAIT  = 10 * time.Second
 const TIME_PONG_WAIT   = 60 * time.Second
@@ -120,8 +143,23 @@ func command_serve(spindle *Spindle) {
 		w.Header().Add("Cache-Control", "no-cache")
 		http.ServeFile(w, r, found_file.path)
 	})
+
+	// socket reloader
 	the_server.HandleFunc(RELOAD_ADDRESS, func(w http.ResponseWriter, r *http.Request) {
 		register_client(the_hub, w, r)
+	})
+
+	// built-in manual server
+	the_server.HandleFunc(MANUAL_ADDRESS, func(w http.ResponseWriter, r *http.Request) {
+		request := r.URL.Path[len(MANUAL_ADDRESS):]
+		content := manual_content(request)
+
+		if strings.HasSuffix(request, ".css") {
+			w.Header().Set("Content-Type", "text/css")
+		}
+
+		w.Header().Add("Cache-Control", "no-cache")
+		w.Write([]byte(content))
 	})
 
 	// start server
@@ -213,7 +251,7 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-const reload_script = `<script type='text/javascript'>function spindle_reload() {
+const RELOAD_SCRIPT = `<script type='text/javascript'>function spindle_reload() {
 	var socket = new WebSocket("ws://" + window.location.host + "` + RELOAD_ADDRESS + `");
 	socket.onclose = function(evt) {
 		setTimeout(() => spindle_reload(), 2000);

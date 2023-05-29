@@ -1,0 +1,2 @@
+- [Syntax](%{page syntax})
+- [Scripting](%{page scripting})

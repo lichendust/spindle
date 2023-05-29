@@ -1,3 +1,22 @@
+/*
+	Spindle
+	A static site generator
+	Copyright (C) 2022-2023 Harley Denham
+
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 package main
 
 import (
@@ -22,6 +41,8 @@ type Config struct {
 	image_max_size uint
 	image_format   File_Type
 
+	sitemap bool
+
 	output_path string
 
 	inline []*Regex_Entry
@@ -38,6 +59,8 @@ func load_config() (Config) {
 		Image_Quality  int                `toml:"image_quality"`
 		Image_Max_Size uint               `toml:"image_size"`
 		Image_Format   string             `toml:"image_format"`
+
+		Sitemap bool `toml:"sitemap"`
 	}
 
 	blob, ok := load_file(CONFIG_FILE_PATH)
@@ -95,7 +118,8 @@ func load_config() (Config) {
 		output.image_format = IMG_PNG
 	}
 
-	output.domain = conf.Domain
+	output.domain  = conf.Domain
+	output.sitemap = conf.Sitemap
 
 	return output
 }

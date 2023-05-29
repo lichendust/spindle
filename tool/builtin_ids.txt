@@ -4,8 +4,8 @@ IT      it
 STOP    .
 INDEX   index
 
-IS_SERVER     spindle.is_server
-RELOAD_SCRIPT spindle.reload_script
+IS_SERVER        spindle.is_server
+RELOAD_SCRIPT    spindle.reload_script
 
 PAGE_PATH        page.file_path
 PAGE_URL         page.url

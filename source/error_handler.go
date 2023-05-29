@@ -1,3 +1,22 @@
+/*
+	Spindle
+	A static site generator
+	Copyright (C) 2022-2023 Harley Denham
+
+	This program is free software: you can redistribute it and/or modify
+	it under the terms of the GNU General Public License as published by
+	the Free Software Foundation, either version 3 of the License, or
+	(at your option) any later version.
+
+	This program is distributed in the hope that it will be useful,
+	but WITHOUT ANY WARRANTY; without even the implied warranty of
+	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+	GNU General Public License for more details.
+
+	You should have received a copy of the GNU General Public License
+	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+*/
+
 package main
 
 import (
@@ -178,53 +197,11 @@ const ERROR_PAGE_NOT_FOUND = `<html>` + ERROR_HEAD + `<body>
 <br clear="all">
 </body></html>`
 
-const ERROR_STYLE = `<style type="text/css">
-	body {
-		font-family: Atkinson Hyperlegible, Helvetica, Arial, sans-serif;
-		margin: 5ex;
-		font-size: 1.2rem;
-	}
-	tt {
-		font-family: DM Mono, SF Mono, Roboto Mono, Source Code Pro, Fira Code, monospace;
-	}
-	tt, p {
-		padding: 0;
-		margin: 0;
-		margin-bottom: .5ex;
-	}
-	code {
-		background: #eee;
-		padding: .2ex .5ex;
-	}
-	ul { padding-left: 2ex }
-	a  { color: black }
-	a:hover {
-		color: white;
-		background: black;
-	}
-	main {
-		float: left;
-		width: 60ex;
-		margin-right: 2vw;
-		margin-bottom: 4vh;
-	}
-	aside {
-		float: left;
-		max-width: 24ex;
-	}
-	section:not(:first-child) {
-		margin-top: 2rem;
-	}
-</style>`
-
 const ERROR_HEAD = `<head>
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Spindle</title>` + ERROR_STYLE + reload_script + `</head>`
-
-const ERROR_MODAL = `<div>
-
-</div>`
+	<title>Spindle</title>
+	<link rel="stylesheet" type="text/css" href="/_spindle/manual/style.css"/>` + RELOAD_SCRIPT + `</head>`
 
 const ERROR_PAGE = `<!DOCTYPE html>
 <html>` + ERROR_HEAD + `<body>
