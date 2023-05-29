@@ -1,2 +1,3 @@
+- [Usage](%{page usage})
 - [Syntax](%{page syntax})
 - [Scripting](%{page scripting})

@@ -1,7 +1,6 @@
 html {
 	scroll-behavior: smooth;
 }
-
 body {
 	font-family: Atkinson Hyperlegible, Helvetica, Arial, sans-serif;
 	margin: 5ex;
@@ -13,8 +12,8 @@ body {
 	color: black !important;
 }
 
-tt {
-	font-family: DM Mono, SF Mono, Roboto Mono, Source Code Pro, Fira Code, monospace;
+tt, code, .mono {
+	font-family: DM Mono, SF Mono, Source Code Pro, Fira Code, Roboto Mono, monospace;
 }
 
 tt, p {
@@ -33,7 +32,7 @@ ul > li {
 	padding-inline-start: 1ex;
 }
 
-a  { color: black }
+a { color: black }
 
 a:hover {
 	color: white;
@@ -47,15 +46,26 @@ main {
 	margin-bottom: 4vh;
 }
 
+h2 {
+	margin-top: 2em;
+}
+
 aside {
 	float: left;
 	max-width: 24ex;
 }
 
-section:not(:first-child) {
-	margin-top: 2rem;
+aside > *:first-child {
+	margin: 0 !important;
 }
 
+main > *:first-child {
+	margin-top: 0 !important;
+}
+
+section:not(:first-child) {
+	margin-bottom: 2rem;
+}
 
 pre {
 	position: relative;
@@ -76,3 +86,22 @@ pre code {
 	letter-spacing: 0;
 	color: white;
 }
+
+.copy {
+	user-select: none;
+	cursor: pointer;
+	position: absolute;
+	right: 20px;
+	top: 20px;
+	padding: 1px 4px;
+	background: white;
+	border: none;
+}
+
+.copy:hover  { background: mediumaquamarine }
+.copy:active { background: white }
+
+/*pre:hover > .copy {
+	opacity: 1;
+	transition: opacity .1s;
+}*/

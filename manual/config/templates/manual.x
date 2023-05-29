@@ -31,6 +31,7 @@
 	<br clear="all">
 }
 
+[tt] = <tt>%%</tt>
 
 
 <!DOCTYPE html>
@@ -39,26 +40,23 @@
 	<meta charset="utf-8">
 	<title>Spindle — %title</title>
 	<link rel="stylesheet" type="text/css" href="%{static style.css}"/>
+	<script type="text/javascript" src="%{static copy.js}" defer></script>
 
-	/ this allows you to hotload pages during local development
 	if %spindle.is_server {
 		. %spindle.reload_script
 	}
 </head>
 <body>
-	<main>
-		if %index {
-			<tt><a href="%{page index}">Manual</a></tt>
-		} else {
-			<tt><a href="%{page index}">Spindle %VERSION Manual</a></tt>
-		}
+	if %index tt {
+		. [Your Site](/) | [Manual](%{page index})
+	} else tt {
+		. [Spindle %VERSION Manual](%{page index})
+	}
 
-		<h1>%title</h1>
+	<h1>%title</h1>
+	<main>%%</main>
 
-		. %%
-	</main>
-
-	if ! %index aside {
+	if !%index aside {
 		> sidebar
 	}
 </body>

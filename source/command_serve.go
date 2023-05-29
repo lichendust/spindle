@@ -154,8 +154,12 @@ func command_serve(spindle *Spindle) {
 		request := r.URL.Path[len(MANUAL_ADDRESS):]
 		content := manual_content(request)
 
+		// manually set MIME types for the manual
+		// because ServeFile isn't here to save us
 		if strings.HasSuffix(request, ".css") {
 			w.Header().Set("Content-Type", "text/css")
+		} else if strings.HasSuffix(request, ".js") {
+			w.Header().Set("Content-Type", "text/js")
 		}
 
 		w.Header().Add("Cache-Control", "no-cache")
