@@ -191,7 +191,7 @@ func (parser *parser) parse_block(spindle *Spindle, file *File_Info, max_depth i
 				parser.next()
 				the_builtin.hash_name = new_hash(peeked.field)
 			} else {
-				spindle.errors.new_pos(PARSER_WARNING, token.position, "ambiguous token %q should be escaped", token.field)
+				spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
 				break
 			}
 
@@ -203,7 +203,7 @@ func (parser *parser) parse_block(spindle *Spindle, file *File_Info, max_depth i
 					parser.unwind = true
 				} else {
 					parser.step_backn(3)
-					spindle.errors.new_pos(PARSER_WARNING, token.position, "ambiguous token %q should be escaped", token.field)
+					spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
 				}
 				break
 			}
@@ -819,8 +819,8 @@ func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
 	return new_hash(a.field), 0, 0
 }
 
-func (parser *parser) parse_variable(spindle *Spindle, is_support bool) *ast_variable {
-	new_var := &ast_variable{}
+func (parser *parser) parse_variable(spindle *Spindle, is_support bool) *AST_Variable {
+	new_var := new(AST_Variable)
 
 	a := parser.peek()
 
@@ -885,7 +885,7 @@ func (parser *parser) parse_variable(spindle *Spindle, is_support bool) *ast_var
 				case "expand_all", "ea":
 					new_var.modifier = EXPAND_ALL*/
 				default:
-					spindle.errors.new_pos(PARSER_WARNING, b.position, "unknown variable modifier %q", b.field)
+					spindle.errors.new_pos(PARSER_FAILURE, b.position, "unknown variable modifier %q", b.field)
 				}
 			} else {
 				parser.step_back() // revert the colon

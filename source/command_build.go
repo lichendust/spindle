@@ -120,7 +120,8 @@ func command_build(spindle *Spindle) {
 	}
 
 	if spindle.errors.has_errors() {
-		eprintln(spindle.errors.render_term_errors())
+		eprintln(spindle.errors.render_errors(ERR_TERM))
+		eprint("\n")
 	}
 
 	if spindle.sitemap {

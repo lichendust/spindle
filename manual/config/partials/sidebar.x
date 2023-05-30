@@ -1,3 +1,3 @@
-- [Usage](%{page usage})
-- [Syntax](%{page syntax})
-- [Scripting](%{page scripting})
+- [Usage](%{usage})
+- [Syntax](%{syntax})
+- [Scripting](%{scripting})

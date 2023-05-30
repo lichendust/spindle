@@ -18,6 +18,10 @@ build_path = "public"
 sitemap = false
 
 [[inline]]
+pattern  = '\[\[(.+?)\]\]\((.+?)\)'
+template = '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>'
+
+[[inline]]
 pattern  = '\[(.+?)\]\((.+?)\)'
 template = '<a href="$2">$1</a>'
 

@@ -30,7 +30,7 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-const SERVE_PORT     = ":3011"
+const SERVE_PORT = ":3011"
 
 const SPINDLE_PREFIX = "/_spindle/"
 const RELOAD_ADDRESS = SPINDLE_PREFIX + "reload"
@@ -41,7 +41,7 @@ const TIME_PONG_WAIT   = 60 * time.Second
 const TIME_PING_PERIOD = (TIME_PONG_WAIT * 9) / 10
 
 func open_browser(port string) {
-	const url = "http://localhost" + SERVE_PORT
+	url := "http://localhost" + port
 
 	var err error
 
@@ -70,7 +70,7 @@ func command_serve(spindle *Spindle) {
 	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
 
 	if spindle.errors.has_errors() {
-		println(spindle.errors.render_term_errors())
+		println(spindle.errors.render_errors(ERR_TERM))
 		return
 	}
 
@@ -102,7 +102,7 @@ func command_serve(spindle *Spindle) {
 					assembled := render_syntax_tree(spindle, page)
 
 					if spindle.errors.has_errors() {
-						assembled = spindle.errors.render_html_page()
+						assembled = spindle.errors.render_errors(ERR_HTML)
 						spindle.errors.reset()
 					}
 
@@ -115,7 +115,7 @@ func command_serve(spindle *Spindle) {
 
 			w.WriteHeader(http.StatusNotFound)
 			w.Header().Add("Cache-Control", "no-cache")
-			w.Write([]byte(ERROR_PAGE_NOT_FOUND))
+			w.Write([]byte(error_page_not_found()))
 			return
 		}
 
@@ -125,7 +125,7 @@ func command_serve(spindle *Spindle) {
 				assembled := render_syntax_tree(spindle, page)
 
 				if spindle.errors.has_errors() {
-					assembled = spindle.errors.render_html_page()
+					assembled = spindle.errors.render_errors(ERR_HTML)
 					spindle.errors.reset()
 				}
 
@@ -168,13 +168,13 @@ func command_serve(spindle *Spindle) {
 
 	// start server
 	go func() {
-		err := http.ListenAndServe(SERVE_PORT, the_server)
+		err := http.ListenAndServe(spindle.port_number, the_server)
 		if err != nil {
 			panic(err)
 		}
 	}()
 
-	open_browser(SERVE_PORT)
+	open_browser(spindle.port_number)
 
 	// monitor files for changes
 	last_run := time.Now()

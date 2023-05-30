@@ -24,114 +24,89 @@ import (
 	"strings"
 )
 
-type _error interface {
-	html_string() string
-	term_string() string
-}
-
 type Error_Type uint8
 const (
-	WARNING Error_Type = iota
-	RENDER_WARNING
-	PARSER_WARNING
-
-	is_failure
-	FAILURE
+	FAILURE Error_Type = iota
 	RENDER_FAILURE
 	PARSER_FAILURE
 )
 
+const (
+	ERR_HTML uint8 = iota
+	ERR_TERM
+)
+
 func (e Error_Type) String() string {
 	switch e {
-	case WARNING:
-		return "Warning"
-	case RENDER_WARNING:
-		return "Render Warning"
-	case PARSER_WARNING:
-		return "Parser Warning"
 	case FAILURE:
-		return "Failure"
+		return "Error"
 	case RENDER_FAILURE:
-		return "Render Failure"
+		return "Render"
 	case PARSER_FAILURE:
-		return "Parser Failure"
+		return "Parser"
 	}
 	return ""
 }
 
-type Spindle_Pos_Error struct {
-	kind    Error_Type
-	pos     position
-	message string
-}
-
-func (e *Spindle_Pos_Error) html_string() string {
-	const t_error_html = `<section><p><b>%s — line %d</b></p><p class="space"><tt>%s</tt></p><p>%s</p></section>`
-
-	return fmt.Sprintf(t_error_html, e.kind, e.pos.line, e.pos.file_path, e.message)
-}
-
-func (e *Spindle_Pos_Error) term_string() string {
-	const t_error_term = "%s! %s — line %d\n    %s"
-
-	return fmt.Sprintf(t_error_term, e.kind, e.pos.file_path, e.pos.line, e.message)
-}
-
-
-
 type Spindle_Error struct {
 	kind    Error_Type
+	pos     position
+	has_pos bool
 	message string
 }
 
-func (e *Spindle_Error) html_string() string {
-	const t_error_html = `<section><p><b>%s!</b></p><p>%s</p></section>`
+func html_string(e *Spindle_Error) string {
+	if e.has_pos {
+		const t_error_html = `<section><p><b>%s</b></p><p class="space"><tt>Line %d — %s</tt></p><p>%s</p></section>`
+		return fmt.Sprintf(t_error_html, e.kind, e.pos.line, e.pos.file_path, e.message)
+	}
 
+	const t_error_html = `<section><p><b>%s!</b></p><p>%s</p></section>`
 	return fmt.Sprintf(t_error_html, e.kind, e.message)
 }
 
-func (e *Spindle_Error) term_string() string {
-	const t_error_term = "%s!\n    %s"
+func term_string(e *Spindle_Error) string {
+	if e.has_pos {
+		const t_error_term = "[%s] Line %d — %s\n    %s"
+		return fmt.Sprintf(t_error_term, e.kind, e.pos.line, e.pos.file_path, e.message)
+	}
 
+	const t_error_term = "[%s]\n    %s"
 	return fmt.Sprintf(t_error_term, e.kind, e.message)
 }
 
-
 func new_error_handler() *Error_Handler {
-	e := Error_Handler{}
+	e := new(Error_Handler)
 	e.reset()
-	return &e
+	return e
 }
 
 type Error_Handler struct {
 	has_failures bool
-	all_errors   []_error
+	all_errors   []*Spindle_Error
 }
 
 func (e *Error_Handler) reset() {
 	e.has_failures = false
-	e.all_errors   = make([]_error, 0, 8)
+	e.all_errors   = make([]*Spindle_Error, 0, 8)
 }
 
 func (e *Error_Handler) new_pos(kind Error_Type, pos position, message string, subst ...any) {
-	if kind > is_failure {
-		e.has_failures = true
-	}
-
-	e.all_errors = append(e.all_errors, &Spindle_Pos_Error{
+	e.has_failures = true
+	e.all_errors = append(e.all_errors, &Spindle_Error{
 		kind,
 		pos,
+		true,
 		fmt.Sprintf(message, subst...),
 	})
 }
 
 func (e *Error_Handler) new(kind Error_Type, message string, subst ...any) {
-	if kind > is_failure {
-		e.has_failures = true
-	}
-
-	e.all_errors = append(e.all_errors, &Spindle_Error {
+	e.has_failures = true
+	e.all_errors = append(e.all_errors, &Spindle_Error{
 		kind,
+		position{},
+		false,
 		fmt.Sprintf(message, subst...),
 	})
 }
@@ -140,71 +115,51 @@ func (e *Error_Handler) has_errors() bool {
 	return len(e.all_errors) > 0
 }
 
-/*
-	@todo right now we just render all error
-	types together — warnings will become a
-	modal, while failures will be served as
-	an error page
-*/
-func (e *Error_Handler) render_html_page() string {
+func (e *Error_Handler) render_errors(error_function uint8) string {
+	dedup := make(map[uint32]bool, len(e.all_errors))
+
 	buffer := strings.Builder{}
 	buffer.Grow(len(e.all_errors) * 128)
 
 	for _, the_error := range e.all_errors {
-		buffer.WriteString(the_error.html_string())
+		var x string
+
+		switch error_function {
+		case ERR_HTML: x = html_string(the_error)
+		case ERR_TERM: x = term_string(the_error)
+		}
+
+		n := new_hash(x)
+
+		if dedup[n] {
+			continue
+		}
+
+		dedup[n] = true
+
+		write_to(&buffer, x, "\n\n")
 	}
 
-	return fmt.Sprintf(ERROR_PAGE, buffer.String())
-}
-
-/*func (e *Error_Handler) render_html_modal() string {
-	buffer := strings.Builder{}
-	buffer.Grow(len(e.all_errors) * 128)
-
-	for _, the_error := range e.all_errors {
-		buffer.WriteString(the_error.html_string())
-	}
-
-	return fmt.Sprintf(ERROR_MODAL, buffer.String())
-}*/
-
-func (e *Error_Handler) render_term_errors() string {
-	// @todo sort these by severity
-
-	buffer := strings.Builder{}
-	buffer.Grow(len(e.all_errors) * 128)
-
-	for _, the_error := range e.all_errors {
-		buffer.WriteString(the_error.term_string())
-		buffer.WriteString("\n\n")
+	if error_function == ERR_HTML {
+		return fmt.Sprintf(ERROR_PAGE, buffer.String())
 	}
 
 	return strings.TrimSpace(buffer.String())
 }
 
-const ERROR_PAGE_NOT_FOUND = `<html>` + ERROR_HEAD + `<body>
-<h1>` + SPINDLE + `</h1>
-<main>
-	<section><p><b>Page not found...</b></p></section>
-</main>
-<aside>
-	<p><b>Resources</b></p>
-	<ul>
-		<li><a href="/_spindle/manual">Manual</a></li>
-		<li><a href="https://github.com/qxoko/spindle">GitHub</a></li>
-	</ul>
-</aside>
-<br clear="all">
-</body></html>`
-
-const ERROR_HEAD = `<head>
-	<meta charset="utf-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<title>Spindle</title>
-	<link rel="stylesheet" type="text/css" href="/_spindle/manual/style.css"/>` + RELOAD_SCRIPT + `</head>`
+func error_page_not_found() string {
+	return fmt.Sprintf(ERROR_PAGE, "<section><p><b>Page not found...</b></p></section>")
+}
 
 const ERROR_PAGE = `<!DOCTYPE html>
-<html>` + ERROR_HEAD + `<body>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1">
+		<title>Spindle</title>
+		<link rel="stylesheet" type="text/css" href="/_spindle/manual/style.css"/>
+		` + RELOAD_SCRIPT + `</head>
+<body>
 	<h1>` + SPINDLE + `</h1>
 	<main>
 		%s

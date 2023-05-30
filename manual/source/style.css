@@ -47,8 +47,13 @@ main {
 	margin-bottom: 4vh;
 }
 
-h2 {
+h2, h3 {
 	margin-top: 2em;
+	scroll-margin: 30px;
+}
+
+h2 + h3 {
+	margin-top: 0 !important;
 }
 
 aside {
@@ -65,7 +70,7 @@ main > *:first-child {
 }
 
 section:not(:first-child) {
-	margin-bottom: 2rem;
+	margin-top: 2rem;
 }
 
 pre {

@@ -37,6 +37,8 @@ type Config struct {
 	skip_images     bool
 	tag_path        string
 
+	port_number string
+
 	image_quality  int
 	image_max_size uint
 	image_format   File_Type
@@ -60,7 +62,8 @@ func load_config() (Config) {
 		Image_Max_Size uint               `toml:"image_size"`
 		Image_Format   string             `toml:"image_format"`
 
-		Sitemap bool `toml:"sitemap"`
+		Sitemap bool       `toml:"sitemap"`
+		Port_Number string `toml:"port_number"`
 	}
 
 	blob, ok := load_file(CONFIG_FILE_PATH)
@@ -118,8 +121,9 @@ func load_config() (Config) {
 		output.image_format = IMG_PNG
 	}
 
-	output.domain  = conf.Domain
-	output.sitemap = conf.Sitemap
+	output.domain      = conf.Domain
+	output.sitemap     = conf.Sitemap
+	output.port_number = conf.Port_Number
 
 	return output
 }
@@ -198,6 +202,12 @@ func get_arguments() (Config, bool) {
 		case "all", "a":
 			conf.build_only_used = false
 
+		case "p", "port":
+			if b != "" {
+				conf.port_number = b
+				counter += 1
+			}
+
 		case "skip-images":
 			conf.skip_images = true
 
@@ -209,6 +219,12 @@ func get_arguments() (Config, bool) {
 				counter += 1
 			}
 		}
+	}
+
+	if conf.port_number == "" {
+		conf.port_number = SERVE_PORT
+	} else if !strings.HasPrefix(conf.port_number, ":") {
+		conf.port_number = ":" + conf.port_number
 	}
 
 	return conf, !has_errors

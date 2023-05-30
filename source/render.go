@@ -31,7 +31,7 @@ type Renderer struct {
 
 	scope_offset []int
 	scope_stack  []*AST_Declare
-	anon_stack   []*anon_entry
+	anon_stack   []*Anon_Entry
 
 	slug_tracker map[string]uint
 }
@@ -41,7 +41,7 @@ func render_syntax_tree(spindle *Spindle, page *Page) string {
 
 	r.scope_offset = []int{0}
 	r.scope_stack  = make([]*AST_Declare, 0, 64)
-	r.anon_stack   = make([]*anon_entry, 0, 4)
+	r.anon_stack   = make([]*Anon_Entry, 0, 4)
 	r.slug_tracker = make(map[string]uint, 16)
 
 	if spindle.server_mode {
@@ -71,13 +71,13 @@ func render_syntax_tree(spindle *Spindle, page *Page) string {
 	return r.render_ast(spindle, page, page.content)
 }
 
-type anon_entry struct {
+type Anon_Entry struct {
 	anon_count int
 	position   position
 	children   []AST_Data
 }
 
-func (r *Renderer) get_anon() *anon_entry {
+func (r *Renderer) get_anon() *Anon_Entry {
 	if len(r.anon_stack) > 0 {
 		return r.anon_stack[len(r.anon_stack) - 1]
 	}
@@ -91,7 +91,7 @@ func (r *Renderer) pop_anon() {
 }
 
 func (r *Renderer) push_anon(content, wrapper []AST_Data, pos position) {
-	stack_entry := &anon_entry{
+	stack_entry := &Anon_Entry{
 		anon_count: recursive_anon_count(wrapper),
 		children:   content,
 		position:   pos,
@@ -137,7 +137,7 @@ func (r *Renderer) push_to_scope(entry *AST_Declare) {
 	r.scope_offset[len(r.scope_offset) - 1] += 1
 }
 
-func (r *Renderer) push_string_to_scope(ident uint32, text string) {
+func (r *Renderer) push_string_to_scope(ident uint32, text string) *AST_Declare {
 	decl := new(AST_Declare)
 
 	decl.ast_type = DECL
@@ -151,6 +151,7 @@ func (r *Renderer) push_string_to_scope(ident uint32, text string) {
 	}
 
 	r.push_to_scope(decl)
+	return decl
 }
 
 func (r *Renderer) push_collective_to_scope(spindle *Spindle, page *Page, input []AST_Data) {
@@ -224,7 +225,7 @@ func (r *Renderer) evaluate_if(entry *AST_If) bool {
 			}
 			continue
 		case VAR:
-			_, ok := r.get_in_scope(sub.(*ast_variable).field)
+			_, ok := r.get_in_scope(sub.(*AST_Variable).field)
 			if has_not {
 				ok = !ok
 			}
@@ -346,6 +347,28 @@ func (r *Renderer) do_import_seek(spindle *Spindle, page *Page, target_hash uint
 	sort.Strings(array)
 
 	r.push_string_to_scope(_TAGINATOR_ALL, strings.Join(array, " "))
+}
+
+func (r *Renderer) traceback_position(entry AST_Data) *position {
+	pos    := entry.get_position()
+	target := entry.get_children()[0]
+
+	x := target.type_check()
+
+	if x == VAR || x == VAR_ANON || x == VAR_ENUM {
+		target := target.(*AST_Variable)
+
+		if x == VAR {
+			original, ok := r.get_in_scope(target.field)
+			if ok {
+				pos = original.get_position()
+			}
+		} else {
+			pos = &r.get_anon().position
+		}
+	}
+
+	return pos
 }
 
 /*func (r *Renderer) do_import_seek(spindle *Spindle, page *Page, data_slice []AST_Data) {
@@ -489,12 +512,8 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 			find_text := r.render_ast(spindle, page, entry.children)
 
 			found_file, ok := render_find_file(spindle, page, find_text)
-			if ok {
-				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
-					spindle.errors.new_pos(RENDER_WARNING, entry.position, "imported page %q is draft!", found_file.path)
-				}
-			} else {
-				spindle.errors.new_pos(RENDER_WARNING, entry.position, "didn't find page %q in import", find_text)
+			if !ok {
+				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in import", find_text)
 				continue
 			}
 
@@ -518,7 +537,10 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 			// rather than the _actual_ path, which is not
 			// semantically correct, but does achieve the same result
 			// for the primary use-case
-			r.push_string_to_scope(_IMPORT_PATH, find_text)
+			{
+				decl := r.push_string_to_scope(_IMPORT_PATH, find_text)
+				decl.position = entry.position // forward the position from the import call
+			}
 
 			// @todo undefined behaviour for %% in imports
 			// we should probably disallow it but we can't know until
@@ -584,7 +606,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 			}
 
 		case VAR, VAR_ENUM, VAR_ANON:
-			entry := entry.(*ast_variable)
+			entry := entry.(*AST_Variable)
 
 			text := ""
 
@@ -612,7 +634,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 
 				if n > len(args) {
 					spindle.errors.new_pos(
-						RENDER_WARNING, popped_anon.position,
+						RENDER_FAILURE, popped_anon.position,
 						"input token only supplies %d arguments\n    %s — line %d\n    needs %d arguments.",
 						len(args), entry.position.file_path, entry.position.line, n,
 					)
@@ -643,7 +665,8 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 
 			if ok {
 				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
-					spindle.errors.new_pos(RENDER_WARNING, entry.position, "%q is a draft", found_file.path)
+					pos := r.traceback_position(entry)
+					spindle.errors.new_pos(RENDER_FAILURE, *pos, "%q is a draft", found_file.path)
 				}
 
 				the_url := ""
@@ -690,7 +713,8 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 				spindle.finder_cache[find_text] = found_file
 
 			} else {
-				spindle.errors.new_pos(RENDER_WARNING, entry.position, "resource finder did not find file %q", find_text)
+				pos := r.traceback_position(entry)
+				spindle.errors.new_pos(RENDER_FAILURE, *pos, "resource finder did not find file %q", find_text)
 			}
 			continue
 
@@ -763,7 +787,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 
 				} else {
 					if entry.decl_hash != _STOP {
-						spindle.errors.new_pos(RENDER_WARNING, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
 					}
 
 					buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(spindle, page, x)))

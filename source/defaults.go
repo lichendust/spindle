@@ -91,6 +91,8 @@ path_mode  = "absolute"
 build_path = "public"
 tag_path   = "tag"
 
+port_number = ":3011"
+
 # default settings for image linkers
 # applied to any images without inline settings
 # image_quality = 90

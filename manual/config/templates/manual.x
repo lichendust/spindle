@@ -23,6 +23,7 @@
 / codeblocks
 [code] = <pre><code>%%</code></pre>
 
+/ define the aside
 [aside] = {
 	<aside>
 		## Topics
@@ -31,8 +32,10 @@
 	<br clear="all">
 }
 
+/ tt shorthand
 [tt] = <tt>%%</tt>
 
+/ quote for the quote example
 [quote] = {
 	<blockquote>
 		. %%
@@ -47,24 +50,33 @@
 <head>
 	<meta charset="utf-8">
 	<title>Spindle — %title</title>
-	<link rel="stylesheet" type="text/css" href="%{static style.css}"/>
-	<script type="text/javascript" src="%{static copy.js}" defer></script>
+	<link rel="stylesheet" type="text/css" href="%{style.css}"/>
+	<script type="text/javascript" src="%{copy.js}" defer></script>
 
 	if %spindle.is_server {
 		. %spindle.reload_script
 	}
 </head>
 <body>
-	if %index tt {
-		. [Your Site](/) | [Manual](%{page index})
+	/ different header if we're on the homepage
+	if %homepage tt {
+		. [Your Site](/) | [Manual](%{index})
 	} else tt {
-		. [Spindle %VERSION Manual](%{page index})
+		. [Your Site](/) | [Spindle %VERSION Manual](%{index})
 	}
 
 	<h1>%title</h1>
-	<main>%%</main>
+	<main>
+		. %%
 
-	if !%index aside {
+		if !%homepage tt {
+			<div style="height:100px"></div>
+			. [Your Site](/) | [Top](#)
+		}
+	</main>
+
+	/ include the sidebar if we're not on the homepage
+	if !%homepage aside {
 		> sidebar
 	}
 </body>

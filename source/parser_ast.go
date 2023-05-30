@@ -151,7 +151,7 @@ func (t *AST_Base) get_position() *position {
 
 
 
-type ast_variable struct {
+type AST_Variable struct {
 	AST_Base
 	ast_type AST_Type
 	modifier AST_Modifier
@@ -159,13 +159,13 @@ type ast_variable struct {
 	taxonomy uint32
 	subname  uint32
 }
-func (t *ast_variable) type_check() AST_Type {
+func (t *AST_Variable) type_check() AST_Type {
 	return t.ast_type
 }
-func (t *ast_variable) get_children() []AST_Data {
+func (t *AST_Variable) get_children() []AST_Data {
 	return t.children
 }
-func (t *ast_variable) get_position() *position {
+func (t *AST_Variable) get_position() *position {
 	return &t.position
 }
 
