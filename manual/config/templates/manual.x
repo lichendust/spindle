@@ -33,6 +33,14 @@
 
 [tt] = <tt>%%</tt>
 
+[quote] = {
+	<blockquote>
+		. %%
+		<cite>— <a href="%source">%person</a></cite>
+	</blockquote>
+}
+
+
 
 <!DOCTYPE html>
 <html>

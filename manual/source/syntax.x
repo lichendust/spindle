@@ -43,24 +43,24 @@ code raw {
 	}
 }
 
-Blocks will wrap their contents in an additional template, allowing for subsections to be created, like a figure and citation around this quote:
+Blocks will wrap their contents in an additional template, allowing for subsections to be created, like a blockquote and citation around this quote:
 
 code raw {
 	quote {
+		This is a quote.
+
 		source = https://apple.com
 		person = Tim Apple
-
-		This is a quote.
 	}
 }
 
-...which becomes, in the default `spindle init` template:
+...which becomes, when combined:
 
 quote {
+	This is a quote.
+
 	source = https://apple.com
 	person = Tim Apple
-
-	This is a quote.
 }
 
 # Declarations
@@ -99,10 +99,10 @@ You can also use blocks within the declarations themselves — for example, the 
 
 code raw {
 	[quote] = {
-		<figure>
+		<blockquote>
 			. %%
 			<cite>— [%person](%source)</cite>
-		</figure>
+		</blockquote>
 	}
 }
 
@@ -143,3 +143,53 @@ Normally, when something that *looks* like a token but doesn't a have a correspo
 However, the `.` token will *not* warn.  This is so it can be used to force a "raw" line, one which is not wrapped in whatever the chosen default is.
 
 The `.` can still be templated with anything you like — it's not reserved like the true builtins, it just serves a default purpose.
+
+# Resource Finders
+
+Resource Finders are used to simplify linking between pages and assets within a Spindle site:
+
+code raw {
+	%{some-page}
+	%{image.jpg}
+	%{style.css}
+}
+
+Each of these finders will search through the tree of files in the `/source/` directory (top-down and breadth-first) and will return the first match it finds.  You can, if there are several assets or pages with the same name, provide a hint by adding a bit of the leading path (or even supplying the entire path):
+
+code raw {
+	%{data/style.css}
+	%{docs/style.css}
+}
+
+Index pages are implicitly understood, however, and are simply accessed by supplying the directory path, though `dir/index` will also work.
+
+Certain asset types have additional options:
+
+## Images
+
+code raw {
+	%{image.jpg 1920x 90 webp}
+}
+
+These three arguments can be specified in any order, and reflect the following:
+
+- `1920x` the maximum size (long-edge) that image should be reduced to.  In this example, images smaller than 1920 pixels would simply be left as is.
+
+- `90` the quality that this image should be reduced or set as.  This does not apply to all formats and will be ignored in those cases.
+
+- `webp` change the output format of this file, in this case to webp.
+
+Spindle supports transforming images *to* the following formats:
+
+- WEBP (requires [cwebp](https://developers.google.com/speed/webp/download) to be installed).
+- JPEG
+- PNG
+
+It supports transforming images *from* these formats:
+
+- WEBP (does not require cwebp).
+- JPEG
+- PNG
+- TIFF
+
+Any other image formats will simply be handled normally without transformation.

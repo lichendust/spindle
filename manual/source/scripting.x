@@ -6,7 +6,7 @@ $ toc
 
 # Implicit Values and Types
 
-## `data`
+## data
 
 code raw {
 	data.line
@@ -14,7 +14,7 @@ code raw {
 
 Gives the position, in terms of line number, of this script's call location on the current page.
 
-## `script_token`
+## script_token
 
 code raw {
 	struct script_token {
@@ -26,7 +26,7 @@ code raw {
 
 (Only supplied by Spindle through other functions).
 
-## `modifier`
+## modifier
 
 code raw {
 	modifier.slug
@@ -40,7 +40,7 @@ An enum map corresponding to the Spindle variable modifiers, used for text manip
 
 # Functions
 
-## `text_modifier`
+## text_modifier
 
 code raw {
 	text_modifier(text, modifier) string
