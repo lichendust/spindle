@@ -19,10 +19,8 @@
 
 package main
 
-import (
-	"os/exec"
-	"path/filepath"
-)
+import "os/exec"
+import "path/filepath"
 
 func command_build(spindle *Spindle) {
 	if data, ok := load_file_tree(spindle); ok {
@@ -173,7 +171,13 @@ func build_pages(spindle *Spindle, file *File) bool {
 				break main_loop
 			}
 
-		case CSS, JAVASCRIPT:
+		case CSS:
+			if track_css_links(spindle, file.path) {
+				is_done = false
+			}
+			fallthrough // css gets minified below too
+
+		case JAVASCRIPT:
 			copy_minify(file, output_path)
 
 		default:

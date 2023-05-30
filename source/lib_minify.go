@@ -22,6 +22,7 @@ package main
 import (
 	"os"
 	"bufio"
+	"strings"
 
 	"github.com/tdewolff/minify/v2"
 	"github.com/tdewolff/minify/v2/js"
@@ -64,4 +65,45 @@ func copy_minify(the_file *File, output_path string) bool {
 
 	writer.Flush()
 	return true
+}
+
+// this looks for url() functions in css files and marks
+// locally linked assets as used
+func track_css_links(spindle *Spindle, text string) bool {
+	content, ok := load_file(text)
+	if !ok {
+		return false
+	}
+
+	found_any := false
+
+	for {
+		index := strings.Index(content, "url")
+
+		if index == -1 {
+			break
+		}
+
+		content = content[index + 3:]
+
+		open := strings.IndexRune(content, '(')
+		content = content[open + 1:]
+
+		close := strings.IndexRune(content, ')')
+		text := content[:close]
+		content = content[close:]
+
+		path := unquote_string(text)
+
+		if is_ext_url(path) {
+			continue
+		}
+
+		if found_file, ok := find_file(spindle.file_tree, path); ok {
+			found_any = true
+			found_file.is_used = true
+		}
+	}
+
+	return found_any
 }

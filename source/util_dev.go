@@ -41,7 +41,7 @@ func print_token_stream(array []*Lexer_Token) {
 }
 
 func (t *Lexer_Token) String() string {
-	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.AST_Type, t.field)
+	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.ast_type, t.field)
 }
 
 func print_syntax_tree(array []AST_Data, level int) {
@@ -65,7 +65,7 @@ func print_syntax_tree(array []AST_Data, level int) {
 			fmt.Print(" ", get_hash(cast.field))
 
 		case VAR, VAR_ENUM, VAR_ANON:
-			cast := entry.(*ast_variable)
+			cast := entry.(*AST_Variable)
 			fmt.Print(" ", get_hash(cast.field))
 
 		case RES_FINDER:
@@ -94,8 +94,8 @@ func print_file_tree(array []*File, level int) {
 }
 
 func (d *File) String() string {
-	// return fmt.Sprint(d.File_Type, " ", filepath.Base(d.path))
-	return fmt.Sprint(d.File_Type, " ", d.path, " ", d.is_used, " ", d.is_built)
+	// return fmt.Sprint(d.file_type, " ", filepath.Base(d.path))
+	return fmt.Sprint(d.file_type, " ", d.path, " ", d.is_used, " ", d.is_built)
 }
 
 // this is a *bad* implementation of HTML
