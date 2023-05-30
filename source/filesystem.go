@@ -60,6 +60,8 @@ const (
 
 func to_file_type(input string) File_Type {
 	switch filepath.Ext(input) {
+	case "":
+		return MARKUP // @todo this may not be guaranteed
 	case EXTENSION:
 		return MARKUP
 	case ".md":

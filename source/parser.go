@@ -646,25 +646,30 @@ func (parser *parser) parse_paragraph(spindle *Spindle, is_support bool, exit_up
 				if word.ast_type == WORD {
 					parser.next()
 
-					switch strings.ToLower(word.field) {
-					case "page":   the_finder.finder_type = _PAGE
-					case "image":  the_finder.finder_type = _IMAGE
-					case "static": the_finder.finder_type = _STATIC
+					x := strings.ToLower(word.field)
+					switch x {
+					case "page", "image", "static": // @todo remove these when we bump versions
+					default:
+						the_finder.path_type = check_path_type(x)
+
+						if the_finder.path_type == NO_PATH_TYPE {
+							parser.step_back()
+						}
 					}
 
-					if the_finder.finder_type == _NO_FINDER {
+					/*if the_finder.finder_type == _NO_FINDER {
 						parser.step_backn(2)
 						buffer.WriteRune('%')
 						continue
-					}
+					}*/
 
-					if parser.peek().ast_type == COLON {
+					/*if parser.peek().ast_type == COLON {
 						parser.next()
 						word := parser.next()
 						the_finder.path_type = check_path_type(strings.ToLower(word.field)) // @todo revert colon if not word
 					} else {
 						the_finder.path_type = NO_PATH_TYPE
-					}
+					}*/
 				}
 
 				{
@@ -679,19 +684,16 @@ func (parser *parser) parse_paragraph(spindle *Spindle, is_support bool, exit_up
 					if parser.peek().ast_type == BRACE_CLOSE {
 						parser.next()
 
-						if the_finder.finder_type == _IMAGE {
-							if x, ok := default_image_settings(spindle); ok {
-								the_finder.Image_Settings = x
-							}
+						if x, ok := default_image_settings(spindle); ok {
+							the_finder.Image_Settings = x
 						}
 					} else {
-						if the_finder.finder_type == _IMAGE {
-							the_finder.Image_Settings = parser.parse_image_settings(spindle)
+						the_finder.Image_Settings = parser.parse_image_settings(spindle)
 
-							if parser.unwind {
-								return array
-							}
+						if parser.unwind {
+							return array
 						}
+
 						if parser.peek().ast_type == BRACE_CLOSE {
 							parser.next()
 						}

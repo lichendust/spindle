@@ -640,6 +640,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 
 			// check cache
 			found_file, ok := render_find_file(spindle, page, find_text)
+
 			if ok {
 				if !spindle.server_mode && !spindle.build_drafts && found_file.is_draft {
 					spindle.errors.new_pos(RENDER_WARNING, entry.position, "%q is a draft", found_file.path)
@@ -651,13 +652,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 					entry.path_type = spindle.path_mode
 				}
 
-				switch entry.finder_type {
-				case _IMAGE:
-					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
-						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "resource finder cannot handle non-image %q", find_text)
-						r.unwind = true
-					}
-
+				if found_file.file_type > is_image && found_file.file_type < end_image {
 					if entry.Image_Settings != nil {
 						settings := *entry.Image_Settings
 						if settings.file_type == 0 {
@@ -682,22 +677,10 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 						// so we don't mark it here
 						found_file.is_used = true
 					}
-
-				case _PAGE:
-					if !(found_file.file_type > is_page && found_file.file_type < end_page) {
-						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "page resource finder cannot process non-page file %q", find_text)
-						r.unwind = true
-					}
-
+				} else if found_file.file_type > is_page && found_file.file_type < end_page {
 					the_url = make_page_url(spindle, &found_file.File_Info, entry.path_type, page.page_path)
 					found_file.is_used = true
-
-				case _STATIC:
-					if !(found_file.file_type > is_static && found_file.file_type < end_static) {
-						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "static resource finder cannot process non-static file %q", find_text)
-						r.unwind = true
-					}
-
+				} else if found_file.file_type > is_static && found_file.file_type < end_static {
 					the_url = make_general_url(spindle, found_file, entry.path_type, page.page_path)
 					found_file.is_used = true
 				}
