@@ -50,7 +50,7 @@ func sitemap(spindle *Spindle) {
 	write_to(&buffer, `<?xml version="1.0" encoding="utf-8" standalone="yes"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml">`)
 
 	for _, page_path := range ordered {
-		write_to(&buffer, `<url><loc>`, page_path, `<url></loc>`)
+		write_to(&buffer, `<url><loc>`, page_path, `</loc></url>`)
 	}
 
 	write_to(&buffer, `</urlset>`)
