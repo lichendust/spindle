@@ -651,7 +651,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 					entry.path_type = spindle.path_mode
 				}
 
-				switch entry.Finder_Type {
+				switch entry.finder_type {
 				case _IMAGE:
 					if !(found_file.file_type > is_image && found_file.file_type < end_image) {
 						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "resource finder cannot handle non-image %q", find_text)

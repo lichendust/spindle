@@ -638,20 +638,21 @@ func (parser *parser) parse_paragraph(spindle *Spindle, is_support bool, exit_up
 			if parser.peek().ast_type == BRACE_OPEN {
 				parser.next()
 
-				the_finder := &AST_Finder{}
+				the_finder := new(AST_Finder)
 				the_finder.position = token.position
 
 				word := parser.peek()
 
 				if word.ast_type == WORD {
 					parser.next()
+
 					switch strings.ToLower(word.field) {
-					case "page":   the_finder.Finder_Type = _PAGE
-					case "image":  the_finder.Finder_Type = _IMAGE
-					case "static": the_finder.Finder_Type = _STATIC
+					case "page":   the_finder.finder_type = _PAGE
+					case "image":  the_finder.finder_type = _IMAGE
+					case "static": the_finder.finder_type = _STATIC
 					}
 
-					if the_finder.Finder_Type == _NO_FINDER {
+					if the_finder.finder_type == _NO_FINDER {
 						parser.step_backn(2)
 						buffer.WriteRune('%')
 						continue
@@ -678,13 +679,13 @@ func (parser *parser) parse_paragraph(spindle *Spindle, is_support bool, exit_up
 					if parser.peek().ast_type == BRACE_CLOSE {
 						parser.next()
 
-						if the_finder.Finder_Type == _IMAGE {
+						if the_finder.finder_type == _IMAGE {
 							if x, ok := default_image_settings(spindle); ok {
 								the_finder.Image_Settings = x
 							}
 						}
 					} else {
-						if the_finder.Finder_Type == _IMAGE {
+						if the_finder.finder_type == _IMAGE {
 							the_finder.Image_Settings = parser.parse_image_settings(spindle)
 
 							if parser.unwind {

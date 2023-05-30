@@ -227,7 +227,7 @@ func (t *AST_Token) get_position() *position {
 
 type AST_Finder struct {
 	AST_Base
-	Finder_Type    Finder_Type
+	finder_type    Finder_Type
 	path_type      Path_Type
 	Image_Settings *Image_Settings
 }
