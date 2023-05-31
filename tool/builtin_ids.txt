@@ -1,8 +1,10 @@
 DEFAULT default
 BASE    %
-IT      it
 STOP    .
 INDEX   index
+
+IT   it
+LAST last
 
 IS_SERVER        spindle.is_server
 RELOAD_SCRIPT    spindle.reload_script

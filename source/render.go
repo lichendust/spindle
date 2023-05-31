@@ -885,7 +885,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 
 			the_block := entry.get_children()[0].(*AST_Block)
 
-			needs_pop := r.start_scope(immediate_decl_count(the_block.get_children()))
+			needs_pop := r.start_scope(2)
 
 			sub_buffer := strings.Builder{}
 			sub_buffer.Grow(512)
@@ -894,7 +894,7 @@ func (r *Renderer) render_ast(spindle *Spindle, page *Page, input []AST_Data) st
 				r.push_string_to_scope(_IT, t)
 
 				if i == len(array) - 1 {
-					r.push_string_to_scope(1787721130, "") // "end" @todo
+					r.push_string_to_scope(_LAST, "true") // @todo
 				}
 
 				sub_buffer.WriteString(r.render_ast(spindle, page, the_block.get_children()))
