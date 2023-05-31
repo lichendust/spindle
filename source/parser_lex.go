@@ -19,6 +19,7 @@
 
 package main
 
+import "unicode"
 import "unicode/utf8"
 
 type position struct {
@@ -126,7 +127,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 			array = append(array, &Lexer_Token{
 				ast_type: IDENT,
 				position: position{line_no, start, end, path},
-				field: ident,
+				field:    ident,
 			})
 			input = input[n:]
 			start = end
@@ -139,7 +140,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 			array = append(array, &Lexer_Token{
 				ast_type: WORD,
 				position: position{line_no, start, end, path},
-				field: word,
+				field:    word,
 			})
 			input = input[n:]
 			start = end
@@ -157,12 +158,19 @@ func lex_blob(path, input string) []*Lexer_Token{
 				the_type = ASTERISK // @todo
 			}
 
+			{
+				r, _ := utf8.DecodeRuneInString(non_word)
+				if unicode.IsSymbol(r) {
+					the_type = WORD
+				}
+			}
+
 			end += n
 
 			array = append(array, &Lexer_Token{
-				ast_type:   the_type,
+				ast_type: the_type,
 				position: position{line_no, start, end, path},
-				field:      non_word,
+				field:    non_word,
 			})
 			input = input[n:]
 			start = end
