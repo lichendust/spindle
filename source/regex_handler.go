@@ -128,7 +128,7 @@ func apply_regex_array(array []*Regex_Entry, input string) string {
 			// indexes := entry.FindAllStringSubmatchIndex(edit, -1)
 			match_groups := entry.FindAllStringSubmatch(edit, -1)
 
-			r.render_ast(spindle, page, p.content)
+			r.render_ast(page, p.content)
 
 			// @todo replace this with index call to make it _go fasta_
 			for _, match_group := range match_groups {

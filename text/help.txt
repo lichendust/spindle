@@ -1,0 +1,16 @@
+$1Usage$0
+-----
+
+    spindle command [--flags]
+
+$1Commands$0
+--------
+
+    $1init$0     start a project in the current directory
+    $1serve$0    start the local development server
+    $1build$0    render the project to a build directory
+
+$1Further Information$0
+-------------------
+
+The local development server built into Spindle serves a complete browsable manual under the path $1/_spindle/$0.

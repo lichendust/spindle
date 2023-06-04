@@ -22,13 +22,13 @@ package main
 import "os/exec"
 import "path/filepath"
 
-func command_build(spindle *Spindle) {
-	if data, ok := load_file_tree(spindle); ok {
+func command_build() {
+	if data, ok := load_file_tree(); ok {
 		spindle.file_tree = data
 	}
 
-	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
-	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
+	spindle.templates = load_support_directory(TEMPLATE, TEMPLATE_PATH)
+	spindle.partials  = load_support_directory(PARTIAL,  PARTIAL_PATH)
 
 	// if the user has requested any webp
 	// output in the templates
@@ -42,9 +42,9 @@ func command_build(spindle *Spindle) {
 
 	spindle.finder_cache = make(map[string]*File, 64)
 
-	spindle.pages        = make(map[string]*Page, 64)
-	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
-	spindle.gen_images   = make(map[uint32]*Image, 32)
+	spindle.pages      = make(map[string]*Page, 64)
+	spindle.gen_pages  = make(map[string]*Gen_Page, 32)
+	spindle.gen_images = make(map[uint32]*Image, 32)
 
 	make_dir(spindle.output_path)
 
@@ -58,7 +58,7 @@ func command_build(spindle *Spindle) {
 	}
 
 	for {
-		done := build_pages(spindle, spindle.file_tree)
+		done := build_pages(spindle.file_tree)
 
 		if spindle.errors.has_failures {
 			break
@@ -69,7 +69,7 @@ func command_build(spindle *Spindle) {
 	}
 
 	for _, gen := range spindle.gen_pages {
-		output_path := make_general_file_path(spindle, gen.file)
+		output_path := make_general_file_path(gen.file)
 
 		// @todo tag path can't distinguish between a file extension
 		// and the TLD of an index page on a domain.  This is the only
@@ -82,7 +82,7 @@ func command_build(spindle *Spindle) {
 
 		make_dir(filepath.Dir(output_path))
 
-		page, ok := load_page_from_file(spindle, gen.file)
+		page, ok := load_page_from_file(gen.file)
 		if !ok {
 			panic("failed to load page " + gen.file.path)
 		}
@@ -91,7 +91,7 @@ func command_build(spindle *Spindle) {
 		page.import_cond = gen.import_cond
 		page.import_hash = gen.import_hash
 
-		assembled := render_syntax_tree(spindle, page)
+		assembled := render_syntax_tree(page)
 
 		if !write_file(output_path, assembled) {
 			spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
@@ -105,7 +105,7 @@ func command_build(spindle *Spindle) {
 				continue
 			}
 
-			output_path := make_generated_image_path(spindle, image)
+			output_path := make_generated_image_path(image)
 			make_dir(filepath.Dir(output_path))
 
 			ok := copy_generated_image(image, output_path)
@@ -123,16 +123,16 @@ func command_build(spindle *Spindle) {
 	}
 
 	if spindle.sitemap {
-		sitemap(spindle)
+		sitemap()
 	}
 }
 
-func build_pages(spindle *Spindle, file *File) bool {
+func build_pages(file *File) bool {
 	is_done := true
 
 	main_loop: for _, file := range file.children {
 		if file.file_type == DIRECTORY {
-			done := build_pages(spindle, file)
+			done := build_pages(file)
 			if !done {
 				is_done = false
 			}
@@ -152,19 +152,19 @@ func build_pages(spindle *Spindle, file *File) bool {
 		is_done = false
 		file.is_built = true
 
-		output_path := make_general_file_path(spindle, file)
+		output_path := make_general_file_path(file)
 		make_dir(filepath.Dir(output_path))
 
 		switch file.file_type {
 		case MARKUP:
-			page, ok := load_page_from_file(spindle, file)
+			page, ok := load_page_from_file(file)
 			if !ok {
 				panic("failed to load page " + file.path)
 			}
 
 			page.file = file // @todo put in load_page
 
-			assembled := render_syntax_tree(spindle, page)
+			assembled := render_syntax_tree(page)
 
 			if !write_file(output_path, assembled) {
 				spindle.errors.new(FAILURE, "%q could not be written to disk", output_path)
@@ -172,7 +172,7 @@ func build_pages(spindle *Spindle, file *File) bool {
 			}
 
 		case CSS:
-			if track_css_links(spindle, file.path) {
+			if track_css_links(file.path) {
 				is_done = false
 			}
 			fallthrough // css gets minified below too

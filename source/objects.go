@@ -27,15 +27,16 @@ import (
 type Markup struct {
 	content   []AST_Data
 	top_scope []AST_Data
-	position  position
+	position  Position
 }
 
 type Page struct {
 	Markup
-	file         *File
-	page_path    string
-	import_hash  uint32
-	import_cond  string
+	file *File
+
+	page_path   string // @todo investigate this because i think it's being misused
+	import_hash uint32
+	import_cond string
 }
 
 type Gen_Page struct {
@@ -58,8 +59,8 @@ type Image struct {
 	settings *Image_Settings
 }
 
-func load_page_from_file(spindle *Spindle, o *File) (*Page, bool) {
-	x, ok := load_page(spindle, o.path)
+func load_page_from_file(o *File) (*Page, bool) {
+	x, ok := load_page(o.path)
 	if !ok {
 		return nil, false
 	}
@@ -67,7 +68,7 @@ func load_page_from_file(spindle *Spindle, o *File) (*Page, bool) {
 	return x, true
 }
 
-func load_page(spindle *Spindle, full_path string) (*Page, bool) {
+func load_page(full_path string) (*Page, bool) {
 	cache_path := full_path[:len(full_path) - len(filepath.Ext(full_path))]
 
 	if !spindle.server_mode {
@@ -84,12 +85,7 @@ func load_page(spindle *Spindle, full_path string) (*Page, bool) {
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	anon_info := File_Info{
-		is_draft(full_path),
-		full_path,
-	}
-
-	syntax_tree := parse_stream(spindle, &anon_info, token_stream, false)
+	syntax_tree := parse_stream(token_stream, false)
 	// print_syntax_tree(syntax_tree, 0)
 
 	p := new(Page)
@@ -97,7 +93,7 @@ func load_page(spindle *Spindle, full_path string) (*Page, bool) {
 	p.page_path = full_path
 	p.content   = syntax_tree
 	p.top_scope = arrange_top_scope(syntax_tree)
-	p.position  = position{0,0,0,full_path}
+	p.position  = Position{0,0,0,full_path}
 
 	if !spindle.server_mode {
 		spindle.pages[cache_path] = p
@@ -106,7 +102,7 @@ func load_page(spindle *Spindle, full_path string) (*Page, bool) {
 	return p, true
 }
 
-func load_support(spindle *Spindle, full_path string, support_type AST_Type) (*Support_Markup, bool) {
+func load_support(full_path string, support_type AST_Type) (*Support_Markup, bool) {
 	blob, ok := load_file(full_path)
 	if !ok {
 		return nil, false
@@ -115,18 +111,13 @@ func load_support(spindle *Spindle, full_path string, support_type AST_Type) (*S
 	token_stream := lex_blob(full_path, blob)
 	// print_token_stream(token_stream)
 
-	anon_info := File_Info{
-		is_draft(full_path),
-		full_path,
-	}
-
-	syntax_tree := parse_stream(spindle, &anon_info, token_stream, true)
+	syntax_tree := parse_stream(token_stream, true)
 	// print_syntax_tree(syntax_tree, 0)
 
 	t := Support_Markup{}
 
 	t.content  = syntax_tree
-	t.position = position{0,0,0,full_path}
+	t.position = Position{0,0,0,full_path}
 
 	// we don't bother with this for partials
 	if support_type == TEMPLATE {
@@ -137,7 +128,7 @@ func load_support(spindle *Spindle, full_path string, support_type AST_Type) (*S
 	return &t, true
 }
 
-func load_support_directory(spindle *Spindle, support_type AST_Type, root_path string) map[uint32]*Support_Markup {
+func load_support_directory(support_type AST_Type, root_path string) map[uint32]*Support_Markup {
 	the_map := make(map[uint32]*Support_Markup, 8)
 
 	err := filepath.WalkDir(root_path, func(path string, file fs.DirEntry, err error) error {
@@ -162,7 +153,7 @@ func load_support_directory(spindle *Spindle, support_type AST_Type, root_path s
 
 		name = name[:len(name) - len(ext)]
 
-		if x, ok := load_support(spindle, path, support_type); ok {
+		if x, ok := load_support(path, support_type); ok {
 			the_map[new_hash(name)] = x
 		}
 

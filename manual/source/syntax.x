@@ -10,6 +10,22 @@ Much like Markdown, Spindle uses non-alphanumeric 'tokens' at the start of a lin
 
 The difference is that Spindle's tokens can be declared, either as part of a template, or on the fly.  This also means that any token can become anything — if you don't like `#` as H1, then feel free to change it.
 
+/ code {
+	@todo x
+	this si
+	block {
+		more comment that we could be dealing with.
+	}
+}
+
+code raw {
+	this is a thing we do
+
+	# this is a comment
+}
+
+[!] = <h1>%1 %2 %2</h1>
+
 If a new project is created using `spindle init`, a simple set of 'Markdown emulations' are pre-filled in the default template to get you moving faster:
 
 code raw {
@@ -132,6 +148,22 @@ code raw {
 - `×` — Unset
 - `/` — Comments
 
+## A Note on Comments
+
+The `/` token acts as both a comment *and* a block comment.  If placed ahead of a block, the entire thing, including any children, will be ommitted.
+
+code raw {
+	/ this is a comment
+
+	/ block {
+		Everything in here is a comment.
+
+		block {
+			Even this as well.
+		}
+	}
+}
+
 # Semi-Builtins
 
 - `.` — Raw
@@ -144,31 +176,42 @@ However, the `.` token will *not* warn.  This is so it can be used to force a "r
 
 The `.` can still be templated with anything you like — it's not reserved like the true builtins, it just serves a default purpose.
 
-# Resource Finders
+# Locators
 
-Resource Finders are used to simplify linking between pages and assets within a Spindle site:
-
-code raw {
-	%{some-page}
-	%{image.jpg}
-	%{style.css}
-}
-
-Each of these finders will search through the tree of files in the `/source/` directory (top-down and breadth-first) and will return the first match it finds.  You can, if there are several assets or pages with the same name, provide a hint by adding a bit of the leading path (or even supplying the entire path):
+Locators are used to simplify linking between pages and assets within a Spindle site:
 
 code raw {
-	%{data/style.css}
-	%{docs/style.css}
+	%{find some-page}
+	%{find image.jpg}
+	%{find style.css}
 }
+
+Each of these locators will search through the tree of files in the `/source/` directory (top-down and breadth-first) and will return the first match it finds.  You can, if there are several assets or pages with the same name, provide a hint by adding a bit of the leading path (or even supplying the entire path):
+
+code raw {
+	%{find data/style.css}
+	%{find docs/style.css}
+}
+
+Links that begin with a protocol, like `http:` or `https:`, are passed through, so you can use templating to reference
 
 Index pages are implicitly understood, however, and are simply accessed by supplying the directory path, though `dir/index` will also work.
+
+By default, Locators expand to the URL-style specified in `spindle.toml`, such as `absolute`, `relative` or `root`.
+
+However, each *individual* Locator can also be overriden as a one-off.
+
+code raw {
+	%{find:abs image.jpg}
+	%{find:rel style.css}
+}
 
 Certain asset types have additional options:
 
 ## Images
 
 code raw {
-	%{image.jpg 1920x 90 webp}
+	%{find image.jpg 1920x 90 webp}
 }
 
 These three arguments can be specified in any order, and reflect the following:

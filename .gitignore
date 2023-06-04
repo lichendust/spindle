@@ -12,3 +12,6 @@ resize/
 build/
 media/
 manual/public/
+
+# @nocheckin
+.github

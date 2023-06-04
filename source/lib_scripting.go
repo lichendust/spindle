@@ -29,7 +29,7 @@ func init() {
 	the_vm.SetFieldNameMapper(goja.UncapFieldNameMapper())
 
 	the_vm.Set("console", println)
-	the_vm.Set("modifier", map[string]AST_Modifier {
+	the_vm.Set("modifier", map[string]Modifier {
 		"slug":        SLUG,
 		"unique_slug": UNIQUE_SLUG,
 		"upper":       UPPER,
@@ -40,19 +40,23 @@ func init() {
 	the_vm.Set("current_date", nsdate)
 }
 
-func (r *Renderer) script_call(spindle *Spindle, page *Page, line int, exec_blob string, args ...string) (string, bool) {
+func (r *Renderer) script_call(page *Page, line int, exec_blob string, args ...string) (string, bool) {
 	slug_tracker := make(map[string]uint, 8) // @todo shouldn't be per-call
 
-	the_vm.Set("_line", line)
+	the_vm.Set("info", struct {
+		line int
+	}{
+		line: line,
+	})
 	the_vm.Set("args", args)
 
-	the_vm.Set("text_modifier", func(text string, mod AST_Modifier) string {
+	the_vm.Set("text_modifier", func(text string, mod Modifier) string {
 		return apply_modifier(slug_tracker, text, mod)
 	})
 
 	the_vm.Set("get", func(name string) string {
 		if entry, ok := r.get_in_scope(new_hash(name)); ok && entry.ast_type == DECL {
-			return r.render_ast(spindle, page, entry.get_children())
+			return r.render_ast(page, entry.get_children())
 		}
 		return ""
 	})
@@ -62,12 +66,12 @@ func (r *Renderer) script_call(spindle *Spindle, page *Page, line int, exec_blob
 		for i, n := range match {
 			h[i] = new_hash(n)
 		}
-		return r.script_get_tokens_as_strings(spindle, page, page.content, depth, h...)
+		return r.script_get_tokens_as_strings(page, page.content, depth, h...)
 	})
 
 	the_vm.Set("get_array", func(name string) []string {
 		if entry, ok := r.get_in_scope(new_hash(name)); ok && entry.ast_type == DECL {
-			return unix_args(r.render_ast(spindle, page, entry.get_children()))
+			return unix_args(r.render_ast(page, entry.get_children()))
 		}
 		return []string{}
 	})
@@ -77,7 +81,7 @@ func (r *Renderer) script_call(spindle *Spindle, page *Page, line int, exec_blob
 		for i, n := range match {
 			h[i] = new_hash(n)
 		}
-		return r.script_has_elements(spindle, page, page.content, h...)
+		return r.script_has_elements(page, page.content, h...)
 	})
 
 	the_vm.Set("find_file", func(find_text string) string {
@@ -99,13 +103,13 @@ func (r *Renderer) script_call(spindle *Spindle, page *Page, line int, exec_blob
 			pp := page.page_path
 
 			if tc > is_page && tc < end_page {
-				return make_page_url(spindle, &found_file.File_Info, dp, pp)
+				return make_page_url(found_file, dp, pp)
 			}
 			if tc > is_image && tc < end_image {
-				return make_general_url(spindle, found_file, dp, pp)
+				return make_general_url(found_file, dp, pp)
 			}
 			if tc > is_static && tc < end_static {
-				return make_general_url(spindle, found_file, dp, pp)
+				return make_general_url(found_file, dp, pp)
 			}
 		}
 
@@ -130,7 +134,7 @@ type Script_Token struct {
 	Line  int
 }
 
-func (r *Renderer) script_get_tokens_as_strings(spindle *Spindle, page *Page, input []AST_Data, depth int, match ...uint32) []Script_Token {
+func (r *Renderer) script_get_tokens_as_strings(page *Page, input []AST_Data, depth int, match ...uint32) []Script_Token {
 	if depth == 0 {
 		return []Script_Token{}
 	}
@@ -145,7 +149,7 @@ func (r *Renderer) script_get_tokens_as_strings(spindle *Spindle, page *Page, in
 				if token.decl_hash == h {
 					array = append(array, Script_Token{
 						Token: token.orig_field,
-						Text:  r.render_ast(spindle, page, token.get_children()),
+						Text:  r.render_ast(page, token.get_children()),
 						Line:  token.position.line,
 					})
 				}
@@ -157,7 +161,7 @@ func (r *Renderer) script_get_tokens_as_strings(spindle *Spindle, page *Page, in
 			continue
 		}
 		if x := entry.get_children(); len(x) > 0 {
-			sub := r.script_get_tokens_as_strings(spindle, page, x, depth - 1, match...)
+			sub := r.script_get_tokens_as_strings(page, x, depth - 1, match...)
 			array = append(array, sub...)
 		}
 	}
@@ -165,7 +169,7 @@ func (r *Renderer) script_get_tokens_as_strings(spindle *Spindle, page *Page, in
 	return array
 }
 
-func (r *Renderer) script_has_elements(spindle *Spindle, page *Page, input []AST_Data, match ...uint32) bool {
+func (r *Renderer) script_has_elements(page *Page, input []AST_Data, match ...uint32) bool {
 	for _, entry := range input {
 		tc := entry.type_check()
 
@@ -189,7 +193,7 @@ func (r *Renderer) script_has_elements(spindle *Spindle, page *Page, input []AST
 		}
 
 		if x := entry.get_children(); len(x) > 0 {
-			if r.script_has_elements(spindle, page, x, match...) {
+			if r.script_has_elements(page, x, match...) {
 				return true
 			}
 		}

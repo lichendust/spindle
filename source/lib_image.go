@@ -95,7 +95,7 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 		// correct aspect ratio
 		settings.width, settings.height = scaling(settings.max_size, settings.max_size, x, y)
 
-		ext_cwebp(incoming_file.File_Info.path, output_path, settings)
+		ext_cwebp(incoming_file.path, output_path, settings)
 
 		return true
 	}

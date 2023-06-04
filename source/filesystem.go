@@ -114,18 +114,18 @@ func ext_for_file_type(File_Type File_Type) string {
 	return ""
 }
 
-type File_Info struct {
-	is_draft bool
-	path     string
-}
-
 type File struct {
-	File_Info
+	path      string
+
 	file_type File_Type
+	is_draft  bool
+
 	hash_name uint32
 	hash_url  uint32
+
 	is_used   bool
 	is_built  bool
+
 	parent    *File
 	children  []*File
 }
@@ -134,7 +134,7 @@ func new_file_tree() []*File {
 	return make([]*File, 0, 32)
 }
 
-func load_file_tree(spindle *Spindle) (*File, bool) {
+func load_file_tree() (*File, bool) {
 	f := new(File)
 
 	f.file_type = ROOT
@@ -142,7 +142,7 @@ func load_file_tree(spindle *Spindle) (*File, bool) {
 
 	f.path = SOURCE_PATH
 
-	children, ok := recurse_directories(spindle, f)
+	children, ok := recurse_directories(f)
 	if !ok {
 		return nil, false
 	}
@@ -162,7 +162,7 @@ func hash_base_name(file *File) uint32 {
 	return new_hash(base)
 }
 
-func recurse_directories(spindle *Spindle, parent *File) ([]*File, bool) {
+func recurse_directories(parent *File) ([]*File, bool) {
 	array := new_file_tree()
 
 	err := filepath.WalkDir(parent.path, func(path string, file fs.DirEntry, err error) error {
@@ -186,7 +186,7 @@ func recurse_directories(spindle *Spindle, parent *File) ([]*File, bool) {
 			the_file.hash_name = hash_base_name(the_file)
 			the_file.parent    = parent
 
-			if x, ok := recurse_directories(spindle, the_file); ok {
+			if x, ok := recurse_directories(the_file); ok {
 				the_file.children = x
 			}
 
@@ -206,9 +206,9 @@ func recurse_directories(spindle *Spindle, parent *File) ([]*File, bool) {
 		the_file.parent = parent
 
 		if x := the_file.file_type; x > is_page && x < end_page {
-			the_file.hash_url = new_hash(make_page_url(spindle, &the_file.File_Info, ROOTED, ""))
+			the_file.hash_url = new_hash(make_page_url(the_file, ROOTED, ""))
 		} else {
-			the_file.hash_url = new_hash(make_general_url(spindle, the_file, ROOTED, ""))
+			the_file.hash_url = new_hash(make_general_url(the_file, ROOTED, ""))
 		}
 
 		array = append(array, the_file)

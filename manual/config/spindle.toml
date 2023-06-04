@@ -2,7 +2,7 @@
 # you'd use "root" as the path mode and put the correct domain
 # in so your canonical URLs could still be correct.  Here, I
 # don't want to bother with canonical URLs and I also don't
-# want to put all my files two levels down (_spindle/manual), so
+# want to put all my files in a subfolder (_spindle), so
 # I'm using "absolute" mode — which includes the domain in
 # every link — and then putting in a fake domain that cheats
 # for me.  It's really just acting as a site-wide prefix.
@@ -10,7 +10,7 @@
 # Public-facing sites shouldn't be built like this.
 # Put your actual "https://domain.com/" in there.
 
-domain = "/_spindle/manual/"
+domain = "/_spindle/"
 
 path_mode  = "absolute"
 build_path = "public"

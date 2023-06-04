@@ -50,8 +50,8 @@
 <head>
 	<meta charset="utf-8">
 	<title>Spindle — %title</title>
-	<link rel="stylesheet" type="text/css" href="%{style.css}"/>
-	<script type="text/javascript" src="%{copy.js}" defer></script>
+	<link rel="stylesheet" type="text/css" href="%{find style.css}"/>
+	<script type="text/javascript" src="%{find copy.js}" defer></script>
 
 	if %spindle.is_server {
 		. %spindle.reload_script
@@ -60,9 +60,9 @@
 <body>
 	/ different header if we're on the homepage
 	if %homepage tt {
-		. [Your Site](/) | [Manual](%{index})
+		. [Your Site](/) | [Manual](%{find index})
 	} else tt {
-		. [Your Site](/) | [Spindle %VERSION Manual](%{index})
+		. [Your Site](/) | [Spindle %VERSION Manual](%{find index})
 	}
 
 	<h1>%title</h1>

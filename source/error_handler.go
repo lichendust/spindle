@@ -50,7 +50,7 @@ func (e Error_Type) String() string {
 
 type Spindle_Error struct {
 	kind    Error_Type
-	pos     position
+	pos     Position
 	has_pos bool
 	message string
 }
@@ -91,7 +91,7 @@ func (e *Error_Handler) reset() {
 	e.all_errors   = make([]*Spindle_Error, 0, 8)
 }
 
-func (e *Error_Handler) new_pos(kind Error_Type, pos position, message string, subst ...any) {
+func (e *Error_Handler) new_pos(kind Error_Type, pos Position, message string, subst ...any) {
 	e.has_failures = true
 	e.all_errors = append(e.all_errors, &Spindle_Error{
 		kind,
@@ -105,7 +105,7 @@ func (e *Error_Handler) new(kind Error_Type, message string, subst ...any) {
 	e.has_failures = true
 	e.all_errors = append(e.all_errors, &Spindle_Error{
 		kind,
-		position{},
+		Position{},
 		false,
 		fmt.Sprintf(message, subst...),
 	})
@@ -157,7 +157,7 @@ const ERROR_PAGE = `<!DOCTYPE html>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 		<title>Spindle</title>
-		<link rel="stylesheet" type="text/css" href="/_spindle/manual/style.css"/>
+		<link rel="stylesheet" type="text/css" href="/_spindle/style.css"/>
 		` + RELOAD_SCRIPT + `</head>
 <body>
 	<h1>` + SPINDLE + `</h1>
@@ -167,8 +167,8 @@ const ERROR_PAGE = `<!DOCTYPE html>
 	<aside>
 		<p><b>Resources</b></p>
 		<ul>
-			<li><a href="/_spindle/manual">Manual</a></li>
-			<li><a href="https://github.com/qxoko/spindle">GitHub</a></li>
+			<li><a href="/_spindle">Manual</a></li>
+			<li><a href="https://github.com/qxoko/spindle" target="_blank" rel="noopener noreferrer">GitHub</a></li>
 		</ul>
 	</aside>
 	<br clear="all">

@@ -34,7 +34,7 @@ const SERVE_PORT = ":3011"
 
 const SPINDLE_PREFIX = "/_spindle/"
 const RELOAD_ADDRESS = SPINDLE_PREFIX + "reload"
-const MANUAL_ADDRESS = SPINDLE_PREFIX + "manual/"
+const MANUAL_ADDRESS = SPINDLE_PREFIX
 
 const TIME_WRITE_WAIT  = 10 * time.Second
 const TIME_PONG_WAIT   = 60 * time.Second
@@ -59,22 +59,22 @@ func open_browser(port string) {
 	println("\n   ", url)
 }
 
-func command_serve(spindle *Spindle) {
+func command_serve() {
 	the_server := http.NewServeMux()
 
 	spindle.finder_cache = make(map[string]*File, 64)
 	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
 	spindle.gen_images   = make(map[uint32]*Image,   32)
 
-	spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
-	spindle.partials  = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
+	spindle.templates = load_support_directory(TEMPLATE, TEMPLATE_PATH)
+	spindle.partials  = load_support_directory(PARTIAL,  PARTIAL_PATH)
 
 	if spindle.errors.has_errors() {
 		println(spindle.errors.render_errors(ERR_TERM))
 		return
 	}
 
-	if data, ok := load_file_tree(spindle); ok {
+	if data, ok := load_file_tree(); ok {
 		spindle.file_tree = data
 	}
 
@@ -94,12 +94,12 @@ func command_serve(spindle *Spindle) {
 
 		if !ok {
 			if gen, ok := spindle.gen_pages[r.URL.Path]; ok {
-				if page, ok := load_page_from_file(spindle, gen.file); ok {
+				if page, ok := load_page_from_file(gen.file); ok {
 					page.file        = gen.file
 					page.import_cond = gen.import_cond
 					page.import_hash = gen.import_hash
 
-					assembled := render_syntax_tree(spindle, page)
+					assembled := render_syntax_tree(page)
 
 					if spindle.errors.has_errors() {
 						assembled = spindle.errors.render_errors(ERR_HTML)
@@ -120,9 +120,9 @@ func command_serve(spindle *Spindle) {
 		}
 
 		if found_file.file_type == MARKUP {
-			page, ok := load_page_from_file(spindle, found_file)
+			page, ok := load_page_from_file(found_file)
 			if ok {
-				assembled := render_syntax_tree(spindle, page)
+				assembled := render_syntax_tree(page)
 
 				if spindle.errors.has_errors() {
 					assembled = spindle.errors.render_errors(ERR_HTML)
@@ -181,7 +181,7 @@ func command_serve(spindle *Spindle) {
 
 	for range time.Tick(time.Second) {
 		if folder_has_changes(SOURCE_PATH, last_run) {
-			if data, ok := load_file_tree(spindle); ok {
+			if data, ok := load_file_tree(); ok {
 				spindle.file_tree = data
 
 				// @todo gen_page cache expiry in server
@@ -195,13 +195,13 @@ func command_serve(spindle *Spindle) {
 			last_run = time.Now()
 
 		} else if folder_has_changes(TEMPLATE_PATH, last_run) {
-			spindle.templates = load_support_directory(spindle, TEMPLATE, TEMPLATE_PATH)
+			spindle.templates = load_support_directory(TEMPLATE, TEMPLATE_PATH)
 			last_run = time.Now()
 
 			send_reload(the_hub)
 
 		} else if folder_has_changes(PARTIAL_PATH, last_run) {
-			spindle.partials = load_support_directory(spindle, PARTIAL,  PARTIAL_PATH)
+			spindle.partials = load_support_directory(PARTIAL,  PARTIAL_PATH)
 			last_run = time.Now()
 
 			send_reload(the_hub)

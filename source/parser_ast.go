@@ -19,7 +19,7 @@
 
 package main
 
-//go:generate stringer -type=AST_Type,AST_Modifier,File_Type -output=parser_string.go
+//go:generate stringer -type=AST_Type,Modifier,File_Type -output=parser_string.go
 
 type AST_Type uint8
 const (
@@ -106,18 +106,6 @@ const (
 	non-alphanumeric rune, like ## or &&&
 */
 
-type AST_Modifier uint8
-const (
-	NONE AST_Modifier = iota
-	SLUG
-	UNIQUE_SLUG
-	UPPER
-	LOWER
-	TITLE
-	EXPAND
-	EXPAND_ALL
-)
-
 func (t AST_Type) is(comp ...AST_Type) bool {
 	for _, c := range comp {
 		if t == c {
@@ -131,10 +119,10 @@ func (t AST_Type) is(comp ...AST_Type) bool {
 type AST_Data interface {
 	type_check()   AST_Type
 	get_children() []AST_Data
-	get_position() *position
+	get_position() Position
 }
 type AST_Base struct {
-	position position
+	position Position
 	children []AST_Data
 	ast_type AST_Type
 	field    string
@@ -145,8 +133,8 @@ func (t *AST_Base) type_check() AST_Type {
 func (t *AST_Base) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Base) get_position() *position {
-	return &t.position
+func (t *AST_Base) get_position() Position {
+	return t.position
 }
 
 
@@ -154,7 +142,7 @@ func (t *AST_Base) get_position() *position {
 type AST_Variable struct {
 	AST_Base
 	ast_type AST_Type
-	modifier AST_Modifier
+	modifier Modifier
 	field    uint32
 	taxonomy uint32
 	subname  uint32
@@ -165,8 +153,8 @@ func (t *AST_Variable) type_check() AST_Type {
 func (t *AST_Variable) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Variable) get_position() *position {
-	return &t.position
+func (t *AST_Variable) get_position() Position {
+	return t.position
 }
 
 
@@ -186,8 +174,8 @@ func (t *AST_Declare) type_check() AST_Type {
 func (t *AST_Declare) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Declare) get_position() *position {
-	return &t.position
+func (t *AST_Declare) get_position() Position {
+	return t.position
 }
 
 
@@ -202,8 +190,8 @@ func (t *AST_Block) type_check() AST_Type {
 func (t *AST_Block) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Block) get_position() *position {
-	return &t.position
+func (t *AST_Block) get_position() Position {
+	return t.position
 }
 
 
@@ -219,26 +207,27 @@ func (t *AST_Token) type_check() AST_Type {
 func (t *AST_Token) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Token) get_position() *position {
-	return &t.position
+func (t *AST_Token) get_position() Position {
+	return t.position
 }
 
 
 
-type AST_Finder struct {
+type AST_Exec struct {
 	AST_Base
-	finder_type    Finder_Type
+	exec_type      Exec_Type
+	modifier       Modifier
 	path_type      Path_Type
 	Image_Settings *Image_Settings
 }
-func (t *AST_Finder) type_check() AST_Type {
+func (t *AST_Exec) type_check() AST_Type {
 	return RES_FINDER
 }
-func (t *AST_Finder) get_children() []AST_Data {
+func (t *AST_Exec) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Finder) get_position() *position {
-	return &t.position
+func (t *AST_Exec) get_position() Position {
+	return t.position
 }
 
 
@@ -253,8 +242,8 @@ func (t *AST_For) type_check() AST_Type {
 func (t *AST_For) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_For) get_position() *position {
-	return &t.position
+func (t *AST_For) get_position() Position {
+	return t.position
 }
 
 
@@ -270,8 +259,8 @@ func (t *AST_If) type_check() AST_Type {
 func (t *AST_If) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_If) get_position() *position {
-	return &t.position
+func (t *AST_If) get_position() Position {
+	return t.position
 }
 
 
@@ -288,8 +277,8 @@ func (t *AST_Builtin) type_check() AST_Type {
 func (t *AST_Builtin) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Builtin) get_position() *position {
-	return &t.position
+func (t *AST_Builtin) get_position() Position {
+	return t.position
 }
 
 
@@ -304,18 +293,22 @@ func (t *AST_Script) type_check() AST_Type {
 func (t *AST_Script) get_children() []AST_Data {
 	return t.children
 }
-func (t *AST_Script) get_position() *position {
-	return &t.position
+func (t *AST_Script) get_position() Position {
+	return t.position
 }
 
 
 
-type Finder_Type uint8
+type Modifier uint8
 const (
-	_NO_FINDER Finder_Type = iota
-	_PAGE
-	_IMAGE
-	_STATIC
+	NONE Modifier = iota
+	SLUG
+	UNIQUE_SLUG
+	UPPER
+	LOWER
+	TITLE
+	EXPAND
+	EXPAND_ALL
 )
 
 type Path_Type uint8
@@ -326,14 +319,9 @@ const (
 	ROOTED // @todo bad name
 )
 
-func check_path_type(input string) Path_Type {
-	switch input {
-	case "abs", "absolute":
-		return ABSOLUTE
-	case "rel", "relative":
-		return RELATIVE
-	case "root", "rooted":
-		return ROOTED
-	}
-	return NO_PATH_TYPE
-}
+type Exec_Type uint8
+const (
+	_NO_EXEC Exec_Type = iota
+	_LOCATOR
+	_DATE
+)

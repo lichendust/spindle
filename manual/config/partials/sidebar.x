@@ -1,3 +1,9 @@
-- [Usage](%{usage})
-- [Syntax](%{syntax})
-- [Scripting](%{scripting})
+[-] = <li>[%%:title](%{find %%:slug})</li>
+
+- Usage
+- Syntax
+- Scripting
+
+- Implicit Variables
+- Taginator
+- Hot Reloading

@@ -11,7 +11,6 @@ rm -rf $build_dir/*
 printf "[building]\n"
 
 build() {
-	echo "$1 $2"
 	name="$1_$2"
 	ext=""
 
@@ -26,6 +25,8 @@ build() {
 	if [ $1 = 'windows' ]; then
 		ext=".exe"
 	fi
+
+	echo $name
 
 	mkdir -p "$build_dir/${name}"
 	env GOOS="$1" GOARCH="$2" go build -ldflags "-s -w" -trimpath -o "$build_dir/$name/spindle$ext" ./source

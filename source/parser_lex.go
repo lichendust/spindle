@@ -22,7 +22,7 @@ package main
 import "unicode"
 import "unicode/utf8"
 
-type position struct {
+type Position struct {
 	line       int
 	start      int
 	end        int
@@ -31,31 +31,34 @@ type position struct {
 
 type Lexer_Token struct {
 	ast_type   AST_Type
-	position   position
+	position   Position
 	field      string
 }
 
-var rune_match = map[rune]AST_Type {
-	'\n': NEWLINE,
-	'\\': ESCAPE,
-	'/':  FORWARD_SLASH,
-	'|':  PIPE,
-	'%':  PERCENT,
-	'{':  BRACE_OPEN,
-	'}':  BRACE_CLOSE,
-	'[':  BRACKET_OPEN,
-	']':  BRACKET_CLOSE,
-	'<':  ANGLE_OPEN,
-	'>':  ANGLE_CLOSE,
-	'~':  TILDE,
-	'&':  AMPERSAND,
-	'=':  EQUALS,
-	'!':  BANG,
-	'.':  STOP,
-	':':  COLON,
-	'+':  PLUS,
-	'×':  MULTIPLY,
-	'$':  DOLLAR,
+func rune_match(r rune) (AST_Type, bool) {
+	switch r {
+	case '\n': return NEWLINE,       true
+	case '\\': return ESCAPE,        true
+	case '/':  return FORWARD_SLASH, true
+	case '|':  return PIPE,          true
+	case '%':  return PERCENT,       true
+	case '{':  return BRACE_OPEN,    true
+	case '}':  return BRACE_CLOSE,   true
+	case '[':  return BRACKET_OPEN,  true
+	case ']':  return BRACKET_CLOSE, true
+	case '<':  return ANGLE_OPEN,    true
+	case '>':  return ANGLE_CLOSE,   true
+	case '~':  return TILDE,         true
+	case '&':  return AMPERSAND,     true
+	case '=':  return EQUALS,        true
+	case '!':  return BANG,          true
+	case '.':  return STOP,          true
+	case ':':  return COLON,         true
+	case '+':  return PLUS,          true
+	case '×':  return MULTIPLY,      true
+	case '$':  return DOLLAR,        true
+	}
+	return '0', false
 }
 
 func lex_blob(path, input string) []*Lexer_Token{
@@ -68,13 +71,12 @@ func lex_blob(path, input string) []*Lexer_Token{
 	for {
 		i := eat_spaces(input) // ignores newlines
 
-
 		if i > 0 {
 			end += i
 			array = append(array, &Lexer_Token{
 				ast_type: WHITESPACE,
-				position: position{line_no, start, end, path},
-				field: input[:i],
+				position: Position{line_no, start, end, path},
+				field:    input[:i],
 			})
 			input = input[i:]
 			start = end
@@ -91,11 +93,11 @@ func lex_blob(path, input string) []*Lexer_Token{
 			line_no += 1
 		}
 
-		if result, ok := rune_match[rune]; ok {
+		if result, ok := rune_match(rune); ok {
 			end += width
 			array = append(array, &Lexer_Token{
 				ast_type: result,
-				position: position{line_no, start, end, path},
+				position: Position{line_no, start, end, path},
 				field: string(rune),
 			})
 			input = input[width:]
@@ -109,8 +111,8 @@ func lex_blob(path, input string) []*Lexer_Token{
 			end += len(number)
 			array = append(array, &Lexer_Token{
 				ast_type: NUMBER,
-				position: position{line_no, start, end, path},
-				field: number,
+				position: Position{line_no, start, end, path},
+				field:    number,
 			})
 			input = input[n:]
 			start = end
@@ -126,7 +128,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 			end += n
 			array = append(array, &Lexer_Token{
 				ast_type: IDENT,
-				position: position{line_no, start, end, path},
+				position: Position{line_no, start, end, path},
 				field:    ident,
 			})
 			input = input[n:]
@@ -139,7 +141,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 			end += n
 			array = append(array, &Lexer_Token{
 				ast_type: WORD,
-				position: position{line_no, start, end, path},
+				position: Position{line_no, start, end, path},
 				field:    word,
 			})
 			input = input[n:]
@@ -169,7 +171,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 
 			array = append(array, &Lexer_Token{
 				ast_type: the_type,
-				position: position{line_no, start, end, path},
+				position: Position{line_no, start, end, path},
 				field:    non_word,
 			})
 			input = input[n:]
@@ -203,7 +205,7 @@ func lex_blob(path, input string) []*Lexer_Token{
 
 	array = append(array, &Lexer_Token{
 		ast_type: EOF,
-		position: position{line_no, start, end, path},
+		position: Position{line_no, start, end, path},
 	})
 
 	return array

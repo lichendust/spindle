@@ -25,17 +25,17 @@ import (
 	"path/filepath"
 )
 
-func sitemap(spindle *Spindle) {
+func sitemap() {
 	size := len(spindle.pages) + len(spindle.gen_pages)
 
 	ordered := make([]string, 0, size)
 
 	for _, page := range spindle.pages {
-		the_url := make_page_url(spindle, &page.file.File_Info, ABSOLUTE, "")
+		the_url := make_page_url(page.file, ABSOLUTE, "")
 		ordered = append(ordered, the_url)
 	}
 	for _, page := range spindle.gen_pages {
-		the_url := make_page_url(spindle, &page.file.File_Info, ABSOLUTE, "")
+		the_url := make_page_url(page.file, ABSOLUTE, "")
 		the_url  = tag_path(the_url, spindle.tag_path, page.import_cond)
 		ordered = append(ordered, the_url)
 	}

@@ -69,7 +69,7 @@ func copy_minify(the_file *File, output_path string) bool {
 
 // this looks for url() functions in css files and marks
 // locally linked assets as used
-func track_css_links(spindle *Spindle, text string) bool {
+func track_css_links(text string) bool {
 	content, ok := load_file(text)
 	if !ok {
 		return false

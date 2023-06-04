@@ -22,15 +22,17 @@ package main
 const VERSION = "v0.4.2"
 const SPINDLE = "Spindle " + VERSION
 
-type Spindle struct {
-	server_mode  bool
+var spindle *Spindle
 
-	errors       *Error_Handler
-	file_tree    *File
+type Spindle struct {
+	server_mode bool
+
+	errors    *Error_Handler
+	file_tree *File
 
 	Config
 
-	has_webp     bool
+	has_webp bool
 
 	finder_cache map[string]*File
 
@@ -51,6 +53,7 @@ func main() {
 	switch config.command {
 	case COMMAND_HELP:
 		println(SPINDLE)
+		println(apply_color(HELP_TEXT))
 		return
 	case COMMAND_VERSION:
 		println(SPINDLE)
@@ -60,16 +63,16 @@ func main() {
 		return
 	}
 
-	spindle := new(Spindle)
+	spindle = new(Spindle)
 
 	spindle.Config = config
 	spindle.errors = new_error_handler()
 
 	switch config.command {
 	case COMMAND_BUILD:
-		command_build(spindle)
+		command_build()
 	case COMMAND_SERVE:
 		spindle.server_mode = true
-		command_serve(spindle)
+		command_serve()
 	}
 }

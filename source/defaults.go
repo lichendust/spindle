@@ -66,12 +66,14 @@ const MAIN_TEMPLATE = `/ markdown emulation
 	<meta charset="utf-8">
 	<meta name="viewport" content="width=device-width, initial-scale=1">
 	<title>%title</title>
-	/ <script type="text/javascript" src="" defer></script>
-	/ <link rel="stylesheet" type="text/css" href=""/>
+
+	/ this is Spindle's internal style.css for its manual pages
+	/ don't use this, because it won't build; it's just a nice example
+	<script type="text/javascript" src="/_spindle/style.css" defer></script>
 
 	/ this allows you to hotload pages during local development
 	if %spindle.is_server {
-		. %spindle.RELOAD_SCRIPT
+		. %spindle.reload_script
 	}
 </head>
 <body>%%</body>
@@ -81,9 +83,14 @@ const INDEX_TEMPLATE = `& main
 
 title = Hello, World!
 
-# Welcome to your new Spindle site!
+This is the basic index page that you just created when initialising your project.
 
-The server you're currently accessing also hosts Spindle's [documentation](/_spindle/manual).`
+When using the local development server, Spindle sneakily serves an additional path, <code>/_spindle</code>, which hosts all of the documentation you need to understand it.  (Don't worry, these pages aren't added to your site.)
+
+Here's a [link](/_spindle).  It's also helpfully shown when Spindle encounters an error while hot-reloading.
+
+- [GitHub](https://github.com/qxoko/spindle)
+- [Manual](/_spindle)`
 
 const CONFIG_TEMPLATE = `domain = "https://website.com/"
 
@@ -96,4 +103,17 @@ port_number = ":3011"
 # default settings for image linkers
 # applied to any images without inline settings
 # image_quality = 90
-# image_size    = 1920`
+# image_size    = 1920
+# image_format  = "webp"
+
+[[inline]]
+pattern  = '\[(.+?)\]\((.+?)\)'
+template = '<a href="$2">$1</a>'
+
+[[inline]]
+pattern  = '\*\*(\S(.+?)\S)\*\*'
+template = '<b>$1</b>'
+
+[[inline]]
+pattern  = '\*(\S(.+?)\S)\*'
+template = '<i>$1</i>'`
