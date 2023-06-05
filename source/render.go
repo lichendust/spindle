@@ -210,25 +210,23 @@ func (r *Renderer) evaluate_if(entry *AST_If) bool {
 	result  := false
 	has_not := false
 
-	for _, sub := range entry.condition_list {
+	loop: for _, sub := range entry.condition_list {
 		switch sub.type_check() {
 		case OP_NOT:
 			has_not = true
-			continue
 		case OP_OR:
-			if result {
-				return true
+			break loop
+		case OP_AND:
+			if !result {
+				break loop
 			}
-			continue
 		case VAR:
 			_, ok := r.get_in_scope(sub.(*AST_Variable).field)
 			if has_not {
 				ok = !ok
+				has_not = false
 			}
 			result = ok
-		}
-		if has_not {
-			has_not = false
 		}
 	}
 
