@@ -1,18 +1,21 @@
 #!/bin/bash
 
-# hard-wraps the "help" command text into the
-# codebase to ensure consistency
-
 set -e
 
+# copy the version into the manual source as a template
 version=$(grep 'const VERSION' source/*.go | awk -F"[ \"]+" '/VERSION/{print $4}')
-
 echo -n "VERSION = $version" > manual/config/templates/version.x
 
+
+# build the manual using Spindle
 pushd manual > /dev/null
 spindle.exe build
 popd > /dev/null
 
+
+
+# create data_manual.go by packing the rendered
+# HTML into a switch of strings
 target=source/data_manual.go
 
 cat text/header_license.txt > $target
@@ -42,5 +45,8 @@ done
 
 printf "\t}\n}\n\n" >> $target
 
+
+
+# include the help.txt text
 data=$(fold -w 64 -s text/help.txt)
 printf "const HELP_TEXT = \`\n$data\`" >> $target

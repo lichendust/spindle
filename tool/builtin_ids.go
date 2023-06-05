@@ -14,7 +14,7 @@ func main() {
 	buffer.Grow(1024)
 
 	{
-		blob, _ := os.ReadFile("tool/header_license.txt")
+		blob, _ := os.ReadFile("text/header_license.txt")
 		buffer.WriteString(string(blob))
 		buffer.WriteString("\n\n")
 	}

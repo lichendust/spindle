@@ -11,11 +11,11 @@ RELOAD_SCRIPT    spindle.reload_script
 
 PAGE_PATH        page.file_path
 PAGE_URL         page.url
-PAGE_CANONICAL   page.url_canonical
+PAGE_CANONICAL   page.canonical_url
 
 IMPORT_PATH      import.file_path
 IMPORT_URL       import.url
-IMPORT_CANONICAL import.url_canonical
+IMPORT_CANONICAL import.canonical_url
 
 TAGINATOR        taginator
 TAGINATOR_ACTIVE taginator.active
