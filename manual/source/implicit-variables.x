@@ -21,7 +21,7 @@ code raw {
 code raw {
 	%page.file_path
 	%page.url
-	%page.url_canonical
+	%page.canonical_url
 }
 
 # Imports
@@ -29,7 +29,7 @@ code raw {
 code raw {
 	%import.file_path
 	%import.url
-	%import.url_canonical
+	%import.canonical_url
 }
 
 # Taginator
