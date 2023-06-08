@@ -111,18 +111,18 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 	case IMG_JPG:
 		output_file, err := os.Create(output_path)
 		if err != nil {
-			panic(err)
+			eprintf("failed to create image %q\n", output_path)
 		}
 
 		err = lib_jpg.Encode(output_file, output_image, &lib_jpg.Options { settings.quality })
 		if err != nil {
-			panic(err)
+			eprintf("failed to encode image %q\n", output_path)
 		}
 
 	case IMG_PNG:
 		output_file, err := os.Create(output_path)
 		if err != nil {
-			panic(err)
+			eprintf("failed to create image %q\n", output_path)
 		}
 
 		encoder := lib_png.Encoder {
@@ -131,7 +131,7 @@ func copy_generated_image(the_image *Image, output_path string) bool {
 
 		err = encoder.Encode(output_file, output_image)
 		if err != nil {
-			panic(err)
+			eprintf("failed to encode image %q\n", output_path)
 		}
 	}
 
@@ -150,7 +150,7 @@ func ext_cwebp(input_path, output_path string, settings *Image_Settings) {
 	cmd := exec.Command("cwebp", args...)
 	err := cmd.Run()
 	if err != nil {
-		panic(err) // @error
+		eprintf("failed to call cwebp for %q\n", output_path)
 	}
 }
 

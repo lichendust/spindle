@@ -40,6 +40,10 @@ func print_token_stream(array []*Lexer_Token) {
 	}
 }
 
+func (x Position) String() string {
+	return fmt.Sprintf("%-3d [%d:%d]", x.line, x.start, x.end)
+}
+
 func (t *Lexer_Token) String() string {
 	return fmt.Sprintf("%-3d [%d:%d] %s %q", t.position.line, t.position.start, t.position.end, t.ast_type, t.field)
 }

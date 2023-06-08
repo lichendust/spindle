@@ -35,7 +35,7 @@ func command_build() {
 	if spindle.has_webp {
 		_, err := exec.LookPath("cwebp")
 		if err != nil {
-			panic("cwebp not found in path") // @error
+			eprintln("cwebp executable not found: webp conversions in this project cannot be completed")
 			return
 		}
 	}
@@ -51,8 +51,10 @@ func command_build() {
 	if found_file, ok := find_file(spindle.file_tree, "index"); ok {
 		found_file.is_used = true
 	} else {
-		panic("need a root index!")
+		eprintln("connection builds need a starting root index page")
+		return
 	}
+
 	if found_file, ok := find_file(spindle.file_tree, "favicon.ico"); ok {
 		found_file.is_used = true
 	}
@@ -84,7 +86,8 @@ func command_build() {
 
 		page, ok := load_page_from_file(gen.file)
 		if !ok {
-			panic("failed to load page " + gen.file.path)
+			eprintln("failed to load original page for generated item %q... this is impossible, you should file a bug", gen.file.path)
+			return
 		}
 
 		page.file        = gen.file
@@ -159,7 +162,7 @@ func build_pages(file *File) bool {
 		case MARKUP:
 			page, ok := load_page_from_file(file)
 			if !ok {
-				panic("failed to load page " + file.path)
+				eprintf("failed to load page %q\n", file.path)
 			}
 
 			page.file = file // @todo put in load_page

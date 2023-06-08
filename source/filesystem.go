@@ -298,26 +298,6 @@ func find_file(start_location *File, target string) (*File, bool) {
 	return nil, false
 }
 
-/*func file_has_changes(path string, last_run time.Time) bool {
-	f, err := os.Open(path)
-	if err != nil {
-		panic(path)
-	}
-
-	defer f.Close()
-
-	info, err := f.Stat()
-	if err != nil {
-		panic(path)
-	}
-
-	if info.ModTime().After(last_run) {
-		return true
-	}
-
-	return false
-}*/
-
 func folder_has_changes(root_path string, last_run time.Time) bool {
 	first := false
 	has_changes := false
@@ -370,44 +350,18 @@ func make_dir(path string) bool {
 func copy_file(file *File, output_path string) {
 	source, err := os.Open(file.path)
 	if err != nil {
-		panic(err) // @error
+		eprintf("failed to open file %q\n", file.path)
 	}
 	defer source.Close()
 
 	destination, err := os.OpenFile(output_path, os.O_CREATE | os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		panic(err)
+		eprintf("failed to create file %q\n", output_path)
 	}
 	defer destination.Close()
 
 	_, err = io.Copy(destination, source)
 	if err != nil {
-		panic(err)
+		eprintf("failed to copy file %q\n", output_path)
 	}
 }
-
-/*const last_build = "config/.last_build"
-
-func read_time() time.Time {
-	content, err := os.ReadFile(last_build)
-
-	if err != nil {
-		return time.Unix(0, 0)
-	}
-
-	i, err := strconv.ParseInt(string(content), 10, 64)
-
-	if err != nil {
-		return time.Unix(0, 0)
-	}
-
-	return time.Unix(i, 0)
-}
-
-func save_time() {
-	the_time := []byte(strconv.FormatInt(time.Now().Unix(), 10))
-
-	if err := os.WriteFile(last_build, the_time, os.ModePerm); err != nil {
-		panic(err)
-	}
-}*/

@@ -239,7 +239,7 @@ func tag_path(input, sep, tag string) string {
 	if protocol != "" {
 		x, err := url.JoinPath(protocol, path, sep, tag)
 		if err != nil {
-			panic(err)
+			eprintf("failed to assemble URL from %q\n", input)
 		}
 		path = x
 

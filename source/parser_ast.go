@@ -19,8 +19,6 @@
 
 package main
 
-//go:generate stringer -type=AST_Type,Modifier,File_Type -output=parser_string.go
-
 type AST_Type uint8
 const (
 	NULL AST_Type = iota
@@ -33,7 +31,7 @@ const (
 	IMPORT
 	PARTIAL
 	TEMPLATE
-	SCOPE_UNSET
+	UNSET
 	SCRIPT
 
 	DECL

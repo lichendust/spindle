@@ -165,7 +165,7 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			case TILDE:
 				the_type = IMPORT
 			case MULTIPLY:
-				the_type = SCOPE_UNSET
+				the_type = UNSET
 			case AMPERSAND:
 				the_type = TEMPLATE
 			case ANGLE_CLOSE:
@@ -557,16 +557,16 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 }
 
 func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []AST_Data {
+	const ALLOC = 256
+
 	if parser.unwind {
 		return []AST_Data{}
 	}
 
 	array := make([]AST_Data, 0, 32)
 
-	const alloc = 256
-
 	buffer := strings.Builder{}
-	buffer.Grow(alloc)
+	buffer.Grow(ALLOC)
 
 	for {
 		token := parser.next()
@@ -585,56 +585,9 @@ func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []
 		switch token.ast_type {
 		default:
 			buffer.WriteString(token.field)
-			/*n := &AST_Base{
-				AST_Type: NORMAL,
-				field:    token.field,
-			}
-			n.position = token.position
-			array = append(array, n)*/
 
 		case WHITESPACE:
 			buffer.WriteRune(' ')
-			/*n := &AST_Base{
-				AST_Type: WHITESPACE,
-				field:    token.field,
-			}
-			n.position = token.position
-			array = append(array, n)*/
-
-		/*case ASTERISK:
-			open := parser.prev().ast_type.is(WHITESPACE, NEWLINE)
-
-			x := parser.peek()
-
-			if open && x.ast_type.is(WHITESPACE, NEWLINE, EOF) {
-				n := &AST_Base{
-					AST_Type: WHITESPACE,
-					field:    token.field,
-				}
-				n.position = token.position
-				array = append(array, n)
-				continue
-			}
-
-			the_type := is_formatter
-
-			switch len(token.field) {
-			case 1: the_type = ITALIC_OPEN
-			case 2: the_type = BOLD_OPEN
-			case 3: the_type = BOLD_ITALIC_OPEN
-			}
-
-			if !open {
-				the_type += 1
-			}
-
-			the_formatter := &AST_Base{
-				AST_Type: the_type,
-			}
-			the_formatter.position = token.position
-
-			array = append(array, the_formatter)
-			continue*/
 
 		case PERCENT:
 			if parser.peek().ast_type == BRACE_OPEN {
@@ -724,7 +677,7 @@ func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []
 					array = append(array, n)
 
 					buffer.Reset()
-					buffer.Grow(alloc)
+					buffer.Grow(ALLOC)
 				}
 
 				array = append(array, exec)
@@ -747,7 +700,7 @@ func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []
 				array = append(array, n)
 
 				buffer.Reset()
-				buffer.Grow(alloc)
+				buffer.Grow(ALLOC)
 			}
 
 			new_var.position = token.position
@@ -796,10 +749,12 @@ func (parser *parser) parse_if() []AST_Data {
 			new_var := parser.parse_variable(false)
 
 			if new_var == nil {
-				panic("bad thing in if")
+				spindle.errors.new_pos(PARSER_FAILURE, token.position, "malformed if-statement")
+				parser.unwind = true
 			}
 			if new_var.ast_type != VAR {
-				panic("bad variable in if")
+				spindle.errors.new_pos(PARSER_FAILURE, token.position, "non-variable text in if-statement")
+				parser.unwind = true
 			}
 
 			array = append(array, new_var)
@@ -852,10 +807,7 @@ func (parser *parser) parse_variable(is_support bool) *AST_Variable {
 		parser.next()
 		the_type = VAR_ENUM
 
-		n, err := strconv.ParseInt(a.field, 10, 32)
-		if err != nil {
-			panic(err)
-		}
+		n, _ := strconv.ParseInt(a.field, 10, 32)
 
 		new_var.field   = _BASE
 		new_var.subname = uint32(n)
@@ -1031,10 +983,7 @@ func (parser *parser) parse_image_settings() *Image_Settings {
 
 		switch token.ast_type {
 		case NUMBER:
-			a, err := strconv.ParseInt(token.field, 10, 64)
-			if err != nil {
-				panic(err) // somehow a number isn't a number, this is horrendously bad (programmer error)
-			}
+			a, _ := strconv.ParseInt(token.field, 10, 64)
 
 			if parser.peek().ast_type == WORD {
 				settings.max_size = uint(a)

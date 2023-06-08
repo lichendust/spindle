@@ -430,7 +430,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to execute script %q", x) // get_hash(entry.hash_name))
 			}
 
-		case SCOPE_UNSET:
+		case UNSET:
 			entry := entry.(*AST_Builtin)
 			r.delete_scope_entry(entry.hash_name)
 			r.delete_scope_entry(entry.hash_name + 1)
@@ -566,8 +566,9 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 
 			if entry.ast_type.is(VAR_ANON, VAR_ENUM) {
 				if popped_anon == nil {
-					// @error
-					panic("popped anon was missing!")
+					eprintln("fatal render error: template had no expansion available on stack")
+					r.unwind = true
+					break
 				}
 
 				popped_anon.anon_count -= 1
