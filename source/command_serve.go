@@ -21,6 +21,7 @@ package main
 
 import (
 	"time"
+	"sync"
 	"runtime"
 	"strings"
 	"os/exec"
@@ -52,7 +53,7 @@ func open_browser(port string) {
 	}
 
 	if err != nil {
-		panic(err)
+		eprintln("failed to open browser automatically")
 	}
 
 	println(SPINDLE)
@@ -62,9 +63,11 @@ func open_browser(port string) {
 func command_serve() {
 	the_server := http.NewServeMux()
 
-	spindle.finder_cache = make(map[string]*File, 64)
+	spindle.cache_lock = new(sync.WaitGroup)
+
+	spindle.finder_cache = make(map[string]*File,     64)
 	spindle.gen_pages    = make(map[string]*Gen_Page, 32)
-	spindle.gen_images   = make(map[uint32]*Image,   32)
+	spindle.gen_images   = make(map[uint32]*Image,    32)
 
 	spindle.templates = load_support_directory(TEMPLATE, TEMPLATE_PATH)
 	spindle.partials  = load_support_directory(PARTIAL,  PARTIAL_PATH)
@@ -94,6 +97,8 @@ func command_serve() {
 
 		if !ok {
 			if gen, ok := spindle.gen_pages[r.URL.Path]; ok {
+				spindle.cache_lock.Wait()
+
 				if page, ok := load_page_from_file(gen.file); ok {
 					page.file        = gen.file
 					page.import_cond = gen.import_cond
@@ -120,6 +125,8 @@ func command_serve() {
 		}
 
 		if found_file.file_type == MARKUP {
+			spindle.cache_lock.Wait()
+
 			page, ok := load_page_from_file(found_file)
 			if ok {
 				assembled := render_syntax_tree(page)
@@ -168,10 +175,7 @@ func command_serve() {
 
 	// start server
 	go func() {
-		err := http.ListenAndServe(spindle.port_number, the_server)
-		if err != nil {
-			panic(err)
-		}
+		http.ListenAndServe(spindle.port_number, the_server)
 	}()
 
 	open_browser(spindle.port_number)
@@ -181,6 +185,8 @@ func command_serve() {
 
 	for range time.Tick(time.Second) {
 		if folder_has_changes(SOURCE_PATH, last_run) {
+			spindle.cache_lock.Add(1)
+
 			if data, ok := load_file_tree(); ok {
 				spindle.file_tree = data
 
@@ -193,58 +199,28 @@ func command_serve() {
 			}
 
 			last_run = time.Now()
+			spindle.cache_lock.Done()
 
 		} else if folder_has_changes(TEMPLATE_PATH, last_run) {
+			spindle.cache_lock.Add(1)
+
 			spindle.templates = load_support_directory(TEMPLATE, TEMPLATE_PATH)
 			last_run = time.Now()
 
 			send_reload(the_hub)
+			spindle.cache_lock.Done()
 
 		} else if folder_has_changes(PARTIAL_PATH, last_run) {
+			spindle.cache_lock.Add(1)
+
 			spindle.partials = load_support_directory(PARTIAL,  PARTIAL_PATH)
 			last_run = time.Now()
 
 			send_reload(the_hub)
+			spindle.cache_lock.Done()
 		}
 	}
 }
-
-/*func serve_public(args []string) {
-	the_server := http.NewServeMux()
-
-	the_server.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path
-
-		w.Header().Add("Cache-Control", "no-cache")
-
-		if path == "/" {
-			path = filepath.Join(public_path, "index.html")
-		} else {
-			path = filepath.Join(public_path, path)
-
-			if is_dir(path) {
-				path = filepath.Join(path, "index.html")
-			} else if filepath.Ext(path) == "" {
-				path += ".html"
-			}
-		}
-
-		http.ServeFile(w, r, path)
-	})
-
-	go func() {
-		err := http.ListenAndServe(check_port, the_server)
-
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	// print_server_info(check_port)
-	open_browser("/", check_port)
-
-	for range time.Tick(time.Second * 2) {}
-}*/
 
 // it's very possible to do all this with
 // golang's own websocket, but for now this
@@ -373,9 +349,8 @@ func (c *Client) write(mt int, payload []byte) error {
 
 func register_client(the_hub *Client_Hub, w http.ResponseWriter, r *http.Request) {
 	conn, err := upgrader.Upgrade(w, r, nil)
-
 	if err != nil {
-		panic(err)
+		eprintln("failed to register new client")
 	}
 
 	the_client := &Client{
