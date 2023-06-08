@@ -439,17 +439,55 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 			entry := entry.(*AST_Builtin)
 
 			p, ok := spindle.partials[entry.hash_name]
-
 			if !ok {
-				spindle.errors.new_pos(RENDER_FAILURE, entry.position, "failed to load partial %q", get_hash(entry.hash_name))
-				r.unwind = true
-				return ""
+				found_file, ok := render_find_file(page, entry.raw_name)
+				if !ok {
+					spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in partial", entry.raw_name)
+					r.unwind = true
+					return ""
+				}
+
+				if found_file.file_type == HTML {
+					blob, ok := load_file(found_file.path)
+					if ok {
+						buffer.WriteString(blob)
+					} else {
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find file %q in partial", found_file.path)
+						r.unwind = true
+						return ""
+					}
+					continue
+				} else if found_file.file_type == MARKUP {
+					imported_page, page_success := load_page_from_file(found_file)
+					if !page_success {
+						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "didn't find page %q in partial", found_file.path)
+						r.unwind = true
+						return ""
+					}
+
+					needs_pop := r.start_scope(immediate_decl_count(imported_page.content) + 1)
+					r.push_collective_to_scope(imported_page.top_scope)
+
+					buffer.WriteString(r.render_ast(page, imported_page.content))
+
+					if needs_pop {
+						r.pop_scope()
+					}
+					continue
+				} else {
+					spindle.errors.new_pos(RENDER_FAILURE, entry.position, "can't import non-page %q in partial", found_file.path)
+					r.unwind = true
+					return ""
+				}
 			}
 
 			needs_pop := r.start_scope(immediate_decl_count(p.content))
+
 			buffer.WriteString(r.render_ast(page, p.content))
 
-			if needs_pop { r.pop_scope() }
+			if needs_pop {
+				r.pop_scope()
+			}
 
 		case IMPORT:
 			entry := entry.(*AST_Builtin)

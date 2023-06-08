@@ -192,6 +192,7 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			if peeked.ast_type.is(WORD, IDENT) {
 				parser.next()
 				the_builtin.hash_name = new_hash(peeked.field)
+				the_builtin.raw_name  = peeked.field
 			} else {
 				spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
 				break

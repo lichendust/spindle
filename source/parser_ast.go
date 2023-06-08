@@ -267,7 +267,7 @@ type AST_Builtin struct {
 	AST_Base
 	ast_type  AST_Type
 	hash_name uint32
-	// target    string
+	raw_name  string
 }
 func (t *AST_Builtin) type_check() AST_Type {
 	return t.ast_type
