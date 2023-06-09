@@ -51,6 +51,8 @@ func render_syntax_tree(page *Page) string {
 	canonical_path := make_page_url(page.file, ABSOLUTE, "")
 	url_path       := make_page_url(page.file, spindle.path_mode, "")
 
+	r.push_string_to_scope(_PAGE_PARENT, make_page_url(page.file.parent, spindle.path_mode, ""))
+
 	if page.import_hash > 0 {
 		r.push_string_to_scope(_TAGINATOR_ACTIVE, "") // just has to exist
 		r.push_string_to_scope(_TAGINATOR_TAG, page.import_cond)

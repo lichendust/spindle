@@ -139,8 +139,7 @@ func load_file_tree() (*File, bool) {
 
 	f.file_type = ROOT
 	f.is_used   = true
-
-	f.path = SOURCE_PATH
+	f.path = "/"
 
 	children, ok := recurse_directories(f)
 	if !ok {

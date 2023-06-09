@@ -13,6 +13,8 @@ PAGE_PATH        page.file_path
 PAGE_URL         page.url
 PAGE_CANONICAL   page.canonical_url
 
+PAGE_PARENT      page.parent_url
+
 IMPORT_PATH      import.file_path
 IMPORT_URL       import.url
 IMPORT_CANONICAL import.canonical_url
