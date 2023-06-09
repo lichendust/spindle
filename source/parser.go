@@ -351,6 +351,12 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			}
 
 			if x.ast_type == EQUALS {
+				if is_support && field == _TAGINATOR {
+					spindle.errors.new_pos(PARSER_FAILURE, token.position, "cannot initiate a taginator in a /config/ file")
+					parser.unwind = true
+					break main_loop
+				}
+
 				if !is_immediate {
 					parser.next()
 					parser.eat_whitespace()
@@ -491,8 +497,12 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			if isnt_valid {
 				if is_brace {
 					spindle.errors.new_pos(PARSER_FAILURE, the_decl.position, "bad type in {declaration}: %q cannot be used as a token character", inner_text.field)
+					parser.unwind = true
+					break main_loop
 				} else {
 					spindle.errors.new_pos(PARSER_FAILURE, the_decl.position, "bad type in [declaration]: %q cannot be used as a block template name", inner_text.field)
+					parser.unwind = true
+					break main_loop
 				}
 				parser.unwind = true
 				break main_loop
