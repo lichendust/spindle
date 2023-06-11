@@ -1,41 +1,37 @@
 & version
 
-/ headings
-[#]     = <h2 id="%%:unique_slug">%%</h2>
-[##]    = <h3 id="%%:unique_slug">%%</h3>
-[###]   = <h4 id="%%:unique_slug">%%</h4>
-[####]  = <h5 id="%%:unique_slug">%%</h5>
-[#####] = <h6 id="%%:unique_slug">%%</h6>
+[#]  = <h2 id="%%:unique_slug">%%</h2>
+[##] = <h3 id="%%:unique_slug">%%</h3>
 
-/ "default" means a regular line with no leading token
-[default] = <p>%%</p>
-
-/ images
 [!] = <img src="%1" alt="%2">
 
-/ lists
 {-} = <ul>%%</ul>
 [-] = <li>%%</li>
 
 {+} = <ol>%%</ol>
 [+] = <li>%%</li>
 
-/ codeblocks
-[code] = <pre><code>%%</code></pre>
+[default] = <p>%%</p>
+[code]    = <pre><code>%%</code></pre>
+[tt]      = <tt>%%</tt>
 
-/ define the aside
 [aside] = {
 	<aside>
-		## Topics
+		if !%homepage {
+			## Contents
+
+			$ toc # ##
+
+			## Other Topics
+		} else {
+			## Topics
+		}
+
 		. %%
 	</aside>
 	<br clear="all">
 }
 
-/ tt shorthand
-[tt] = <tt>%%</tt>
-
-/ quote for the quote example
 [quote] = {
 	<blockquote>
 		. %%
@@ -50,32 +46,24 @@
 <head>
 	<meta charset="utf-8">
 	<title>Spindle — %title</title>
-	<link rel="stylesheet" type="text/css" href="%{find style.css}"/>
-	<script type="text/javascript" src="%{find copy.js}" defer></script>
+	<link rel="stylesheet" type="text/css" href="%{link style.css}"/>
+	<script type="text/javascript" src="%{link copy.js}" defer></script>
 
 	if %spindle.is_server {
 		. %spindle.reload_script
 	}
 </head>
 <body>
-	/ different header if we're on the homepage
-	if %homepage tt {
-		. [Your Site](/) | [Manual](%{find index})
-	} else tt {
-		. [Your Site](/) | [Spindle %VERSION Manual](%{find index})
-	}
+	version = <a href="%{link index}">Spindle %VERSION Manual</a>
 
+	<tt><a href="/">Your Site</a> | %version</tt>
 	<h1>%title</h1>
 	<main>
 		. %%
-
-		if !%homepage tt {
-			<div style="height:100px"></div>
-			. [Your Site](/) | [Top](#)
-		}
+		<div style="height:100px"></div>
+		<tt><a href="#">Top</a> | %version</tt>
 	</main>
 
-	/ include the sidebar if we're not on the homepage
 	if !%homepage aside {
 		> sidebar
 	}

@@ -2,7 +2,7 @@
 
 title = Implicit Variables
 
-$ toc
+
 
 # Spindle
 
@@ -14,7 +14,7 @@ code raw {
 }
 
 `spindle.is_server` is only true when Spindle is running its local development server.
-`spindle.reload_script` is a chunk of Javascript that allows browser connections to [hot-reload](%{find hot-reloading}) when the Spindle server detects changes on disk.
+`spindle.reload_script` is a chunk of Javascript that allows browser connections to [hot-reload](%{link hot-reloading}) when the Spindle server detects changes on disk.
 
 # Pages
 

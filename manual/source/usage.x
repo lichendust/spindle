@@ -2,7 +2,7 @@
 
 title = Usage
 
-$ toc
+
 
 # Getting Started
 
@@ -36,7 +36,7 @@ code raw {
 
 ## Options
 
-Spindle makes use of a piece of syntax called a ['Resource Finder'](%{find syntax}#resource-finders): this streamlines the process of linking between pages — you can just put in the page's name, not its full path — and the resulting link styles can all be changed according to the needs of the site in `spindle.toml` (absolute, relative, etc.).
+Spindle makes use of a piece of syntax called a ['Resource Finder'](%{link syntax}#resource-finders): this streamlines the process of linking between pages — you can just put in the page's name, not its full path — and the resulting link styles can all be changed according to the needs of the site in `spindle.toml` (absolute, relative, etc.).
 
 You can of course still manually supply links, but it's not recommended for the second reason: Resource Finders track the usage of any given asset or page, and by default `spindle build` will only output pages that are not orphaned.  The root index is assumed to be 'live' as the starting point, and anything reachable from the subsequent tree is included.
 

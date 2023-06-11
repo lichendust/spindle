@@ -44,7 +44,7 @@ a:hover {
 main {
 	float: left;
 	width: 70ex;
-	margin-right: 2vw;
+	margin-right: 50px;
 	margin-bottom: 4vh;
 }
 
@@ -58,6 +58,8 @@ h2 + h3 {
 }
 
 aside {
+	position: sticky;
+	top: 30px;
 	float: left;
 	max-width: 24ex;
 }

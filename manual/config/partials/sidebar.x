@@ -1,4 +1,6 @@
-[-] = <li>[%%:title](%{find %%:slug})</li>
+/ This line converts the incoming text (in this case a single word) into a <li> with a link.  It converts the word by 
+
+[-] = <li>[%%:title](%{link %%:slug})</li>
 
 - Usage
 - Syntax
@@ -7,3 +9,5 @@
 - Implicit Variables
 - Taginator
 - Hot Reloading
+
+- Examples

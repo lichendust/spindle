@@ -1,8 +1,4 @@
-if (args.length === 0) {
-	var the_array = get_token(1, "#", "##")
-} else {
-	var the_array = get_token(1, ...args)
-}
+var the_array = get_token(1, ...args)
 
 let result = "<ul>"
 

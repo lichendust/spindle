@@ -2,7 +2,7 @@
 
 title = Scripting
 
-$ toc
+
 
 # Builtins
 

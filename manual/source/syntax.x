@@ -2,29 +2,15 @@
 
 title = Syntax
 
-$ toc
+
 
 # Tokens
+
+/ @todo encapsulation
 
 Much like Markdown, Spindle uses non-alphanumeric 'tokens' at the start of a line to determine how that line is rendered.
 
 The difference is that Spindle's tokens can be declared, either as part of a template, or on the fly.  This also means that any token can become anything — if you don't like `#` as H1, then feel free to change it.
-
-/ code {
-	@todo x
-	this si
-	block {
-		more comment that we could be dealing with.
-	}
-}
-
-code raw {
-	this is a thing we do
-
-	# this is a comment
-}
-
-[!] = <h1>%1 %2 %2</h1>
 
 If a new project is created using `spindle init`, a simple set of 'Markdown emulations' are pre-filled in the default template to get you moving faster:
 
@@ -181,16 +167,16 @@ The `.` can still be templated with anything you like — it's not reserved like
 Locators are used to simplify linking between pages and assets within a Spindle site:
 
 code raw {
-	%{find some-page}
-	%{find image.jpg}
-	%{find style.css}
+	%{link some-page}
+	%{link image.jpg}
+	%{link style.css}
 }
 
 Each of these locators will search through the tree of files in the `/source/` directory (top-down and breadth-first) and will return the first match it finds.  You can, if there are several assets or pages with the same name, provide a hint by adding a bit of the leading path (or even supplying the entire path):
 
 code raw {
-	%{find data/style.css}
-	%{find docs/style.css}
+	%{link data/style.css}
+	%{link docs/style.css}
 }
 
 Links that begin with a protocol, like `http:` or `https:`, are passed through, so you can use templating to reference
@@ -202,8 +188,8 @@ By default, Locators expand to the URL-style specified in `spindle.toml`, such a
 However, each *individual* Locator can also be overriden as a one-off.
 
 code raw {
-	%{find:abs image.jpg}
-	%{find:rel style.css}
+	%{link:abs image.jpg}
+	%{link:rel style.css}
 }
 
 Certain asset types have additional options:
@@ -211,7 +197,7 @@ Certain asset types have additional options:
 ## Images
 
 code raw {
-	%{find image.jpg 1920x 90 webp}
+	%{link image.jpg 1920x 90 webp}
 }
 
 These three arguments can be specified in any order, and reflect the following:

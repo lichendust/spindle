@@ -2,7 +2,7 @@
 
 title = Taginator
 
-$ toc
+
 
 The taginator is an opinionated construct that allows pages to spawn their own sub-pages based on the values of variables.
 
@@ -95,17 +95,26 @@ code raw {
 
 # Caveats
 
-You cannot create a taginator in a template.  Taginators, by design, do not pursue through templating, otherwise most websites would very quickly enter a twilight zone of bizarre omissions and inclusions.  Taginators must be specified on the spawning page itself.
+You cannot declare a taginator in a template: this will throw an error.
 
-Taginators *do* pursue through partials, but only for imports.  Blocks in partials are not considered.
+Taginators, by design, do not pursue through templating, otherwise most websites would very quickly enter a twilight zone of bizarre omissions and inclusions.  Taginators must be specified on the spawning page itself.
 
-# Utility Variables
+# Implicit Variables
 
 When a taginator is invoked, it injects a whole host of useful goodies on the spawning page *and* the sub-pages.
 
-This is includes:
+## taginator.active
 
-- `taginator.active`: this variable evaluates to true if we're currently on a sub-page and not the original.
-- `taginator.tag_name`: this variable exists only on sub-pages and provides the current tag being generated.
-- `taginator.all_tags`: this variable is available on all pages and provides an alphabetical array of all the tags found.
-- `taginator.parent_url`: always evaluates to the originating page's URL (even on the originating page itself), allowing for consistent lists or clouds to be created.
+Evaluates truthily if we're currently on a sub-page and not the initial page.
+
+## taginator.tag_name
+
+Provides the name of the current page's tag. Only available on sub-pages.
+
+## taginator.all_tags
+
+Provides an alphabetically-sorted, duplicate-free array of all the tags found or connected to the initial page. Available on initial and sub-pages.
+
+## taginator.source_url
+
+Available everywhere, this expands to the initial page's URL (conforms to the current `spindle.toml` URL scheme).  On the initial page, this will be the same as `page.url`.

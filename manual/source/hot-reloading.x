@@ -2,7 +2,9 @@
 
 title = Hot Reloading
 
-Spindle injects a number of [implicit variables](%{find implicit-variables}) for you to make use of.
+
+
+Spindle injects a number of [implicit variables](%{link implicit-variables}) for you to make use of.
 
 In regards to hot-reloading, Spindle provides two relevant values to make use of:
 
