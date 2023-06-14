@@ -56,8 +56,7 @@ func open_browser(port string) {
 		eprintln("failed to open browser automatically")
 	}
 
-	println(SPINDLE)
-	println("\n   ", url)
+	println(SPINDLE, "\n", url, "\n")
 }
 
 func command_serve() {

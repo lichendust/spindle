@@ -58,6 +58,9 @@ func command_build() {
 	if found_file, ok := find_file(spindle.file_tree, "favicon.ico"); ok {
 		found_file.is_used = true
 	}
+	if found_file, ok := find_file(spindle.file_tree, "404"); ok {
+		found_file.is_used = true
+	}
 
 	for {
 		done := build_pages(spindle.file_tree)

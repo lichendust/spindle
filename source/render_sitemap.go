@@ -31,13 +31,17 @@ func sitemap() {
 	ordered := make([]string, 0, size)
 
 	for _, page := range spindle.pages {
+		if page.file.hash_name == _404 {
+			continue // we don't put custom 404s in the sitemap
+		}
+
 		the_url := make_page_url(page.file, ABSOLUTE, "")
 		ordered = append(ordered, the_url)
 	}
 	for _, page := range spindle.gen_pages {
 		the_url := make_page_url(page.file, ABSOLUTE, "")
 		the_url  = tag_path(the_url, spindle.tag_path, page.import_cond)
-		ordered = append(ordered, the_url)
+		ordered  = append(ordered, the_url)
 	}
 
 	sort.SliceStable(ordered, func(i, j int) bool {

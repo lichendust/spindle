@@ -1,7 +1,9 @@
 DEFAULT default
 BASE    %
 STOP    .
+
 INDEX   index
+404     404
 
 IT   it
 LAST last

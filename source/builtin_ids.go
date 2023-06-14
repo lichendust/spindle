@@ -26,6 +26,7 @@ const (
 	_BASE             uint32 = 537692064
 	_STOP             uint32 = 722245873
 	_INDEX            uint32 = 151693739
+	_404              uint32 = 2922385191
 	_IT               uint32 = 1194886160
 	_LAST             uint32 = 1675745305
 	_IS_SERVER        uint32 = 3202569332
