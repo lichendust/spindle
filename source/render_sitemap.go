@@ -19,11 +19,9 @@
 
 package main
 
-import (
-	"sort"
-	"strings"
-	"path/filepath"
-)
+import "sort"
+import "strings"
+import "path/filepath"
 
 func sitemap() {
 	size := len(spindle.pages) + len(spindle.gen_pages)
@@ -40,7 +38,7 @@ func sitemap() {
 	}
 	for _, page := range spindle.gen_pages {
 		the_url := make_page_url(page.file, ABSOLUTE, "")
-		the_url  = tag_path(the_url, spindle.tag_path, page.import_cond)
+		the_url  = tag_path(the_url, page.tag_path, page.import_cond)
 		ordered  = append(ordered, the_url)
 	}
 

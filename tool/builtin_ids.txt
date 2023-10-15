@@ -16,14 +16,15 @@ PAGE_URL         page.url
 PAGE_CANONICAL   page.canonical_url
 
 PAGE_PARENT      page.parent_url
+INCOMING_LINKS   page.incoming_links
 
 IMPORT_PATH      import.file_path
 IMPORT_URL       import.url
 IMPORT_CANONICAL import.canonical_url
 
-TAGINATOR        taginator
-TAGINATOR_ACTIVE taginator.active
-TAGINATOR_TAG    taginator.tag_name
-TAGINATOR_ALL    taginator.all_tags
+TAGINATOR          taginator
+TAGINATOR_ACTIVE   taginator.active
+TAGINATOR_TAG      taginator.tag_name
+TAGINATOR_TAXONOMY taginator.taxonomy_name
 
 TAGINATOR_PARENT taginator.parent_url

@@ -19,17 +19,14 @@
 
 package main
 
-import (
-	"time"
-	"sync"
-	"runtime"
-	"strings"
-	"os/exec"
-	"net/http"
-	// "path/filepath"
+import "time"
+import "sync"
+import "runtime"
+import "strings"
+import "os/exec"
+import "net/http"
 
-	"github.com/gorilla/websocket"
-)
+import "github.com/gorilla/websocket"
 
 const SERVE_PORT = ":3011"
 
@@ -56,7 +53,8 @@ func open_browser(port string) {
 		eprintln("failed to open browser automatically")
 	}
 
-	println(SPINDLE, "\n", url, "\n")
+	println(SPINDLE, "\n")
+	println(url, "\n")
 }
 
 func command_serve() {
@@ -102,6 +100,7 @@ func command_serve() {
 					page.file        = gen.file
 					page.import_cond = gen.import_cond
 					page.import_hash = gen.import_hash
+					page.tag_path    = gen.tag_path
 
 					assembled := render_syntax_tree(page)
 
@@ -147,7 +146,7 @@ func command_serve() {
 		}
 
 		w.Header().Add("Cache-Control", "no-cache")
-		http.ServeFile(w, r, found_file.path)
+		http.ServeFile(w, r, found_file.real_path)
 	})
 
 	// socket reloader

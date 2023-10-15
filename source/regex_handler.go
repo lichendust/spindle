@@ -19,10 +19,8 @@
 
 package main
 
-import (
-	"regexp"
-	// "strings"
-)
+import "strings"
+import "regexp"
 
 /*
 	To be clear, I hate this.
@@ -69,12 +67,13 @@ import (
 type Regex_Config struct {
 	Input  string `toml:"pattern"`
 	Output string `toml:"template"`
+	Target string `toml:"target"`
 }
 
 type Regex_Entry struct {
 	regexp *regexp.Regexp
 	output []byte
-	// d_hash uint32
+	target uint32
 }
 
 func process_regex_array(array []*Regex_Config) ([]*Regex_Entry, bool) {
@@ -89,14 +88,14 @@ func process_regex_array(array []*Regex_Config) ([]*Regex_Entry, bool) {
 		output = append(output, &Regex_Entry{
 			regexp: re,
 			output: []byte(entry.Output),
-			// d_hash: new_hash(entry.Output),
+			target: new_hash(entry.Target),
 		})
 	}
 
 	return output, true
 }
 
-func apply_regex_array(array []*Regex_Entry, input string) string {
+/*func apply_regex_array(array []*Regex_Entry, input string) string {
 	if len(array) == 0 {
 		return input
 	}
@@ -108,6 +107,50 @@ func apply_regex_array(array []*Regex_Entry, input string) string {
 	}
 
 	return string(cast)
+}*/
+
+func apply_regex_array(r *Renderer, page *Page, array []*Regex_Entry, input string) string {
+	if len(array) == 0 {
+		return input
+	}
+
+	for _, entry := range array {
+		input = entry.regexp.ReplaceAllStringFunc(input, func(x string) string {
+			array := entry.regexp.FindAllStringSubmatch(x, 1)
+			if array == nil {
+				return x
+			}
+
+			array[0] = array[0][1:]
+
+			n := new(AST_Base)
+			n.ast_type = NORMAL
+
+			if len(array[0]) == 1 {
+				n.field = array[0][0]
+			} else {
+				n.field = `"` + strings.Join(array[0], `" "`) + `"`
+			}
+
+			wrapper_block, ok := r.get_in_scope(entry.target)
+			if ok {
+				children := wrapper_block.get_children()
+				did_push := r.start_scope(immediate_decl_count(children))
+
+				r.push_anon([]AST_Data{n}, children, wrapper_block.get_position()) // @todo this position is nonsense
+
+				x = r.render_ast(page, children)
+
+				if did_push {
+					r.pop_scope()
+				}
+			}
+
+			return x
+		})
+	}
+
+	return input
 }
 
 /*func _apply_regex_array(r *renderer, array []*Regex_Entry, input string) string {
@@ -121,7 +164,7 @@ func apply_regex_array(array []*Regex_Entry, input string) string {
 	// }
 
 	for _, entry := range array {
-		wrapper_block, ok := r.get_in_scope(entry.d_hash)
+		wrapper_block, ok := r.get_in_scope(entry.target)
 		if ok {
 			did_push := r.push_blank_scope(immediate_decl_count(wrapper_block.get_children()))
 

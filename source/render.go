@@ -19,11 +19,9 @@
 
 package main
 
-import (
-	"fmt"
-	"sort"
-	"strings"
-)
+import "fmt"
+import "sort"
+import "strings"
 
 type Renderer struct {
 	unwind bool
@@ -56,12 +54,22 @@ func render_syntax_tree(page *Page) string {
 	if page.import_hash > 0 {
 		r.push_string_to_scope(_TAGINATOR_ACTIVE, "") // just has to exist
 		r.push_string_to_scope(_TAGINATOR_TAG, page.import_cond)
-		r.push_string_to_scope(_PAGE_CANONICAL, tag_path(canonical_path, spindle.tag_path, page.import_cond))
-		r.push_string_to_scope(_PAGE_URL, tag_path(url_path, spindle.tag_path, page.import_cond))
+		r.push_string_to_scope(_TAGINATOR_TAXONOMY, page.tag_path)
+
+		r.push_string_to_scope(_PAGE_CANONICAL, tag_path(canonical_path, page.tag_path, page.import_cond))
+		r.push_string_to_scope(_PAGE_URL,       tag_path(url_path,       page.tag_path, page.import_cond))
 	} else {
 		r.push_string_to_scope(_PAGE_CANONICAL, canonical_path)
 		r.push_string_to_scope(_PAGE_URL, url_path)
 	}
+
+	/*{
+		copy := make([]string, 0, len(page.incoming_links))
+		for k := range page.incoming_links {
+			copy = append(copy, k)
+		}
+		r.push_string_to_scope(_INCOMING_LINKS, strings.Join(copy, " "))
+	}*/
 
 	// taginator parent url falls back to own url so it can be used regardless
 	r.push_string_to_scope(_TAGINATOR_PARENT, make_page_url(page.file, spindle.path_mode, ""))
@@ -261,7 +269,7 @@ func (r *Renderer) skip_import_condition(page *Page, data_slice []AST_Data) bool
 	return false
 }
 
-func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, target_hash uint32) map[string]bool {
+func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, target string, target_hash uint32) map[string]bool {
 	index := 0
 
 	capture := make(map[string]bool, 4)
@@ -286,7 +294,7 @@ func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, targ
 
 					capture[tag] = true
 
-					file_path := tag_path(make_page_url(page.file, NO_PATH_TYPE, ""), spindle.tag_path, tag)
+					file_path := tag_path(make_page_url(page.file, NO_PATH_TYPE, ""), target, tag)
 
 					if _, ok := spindle.gen_pages[file_path]; ok {
 						continue
@@ -302,6 +310,7 @@ func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, targ
 					copy.file        = page.file
 					copy.import_cond = tag
 					copy.import_hash = target_hash
+					copy.tag_path    = target
 
 					spindle.gen_pages[file_path] = copy
 				}
@@ -315,13 +324,13 @@ func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, targ
 			found_file, _ := render_find_file(page, find_text)
 			imported_page, _ := load_page_from_file(found_file)
 
-			res := __recurse(r, spindle, page, imported_page.top_scope, target_hash)
+			res := __recurse(r, spindle, page, imported_page.top_scope, target, target_hash)
 			for x := range res {
 				capture[x] = true
 			}
 
 		case BLOCK:
-			res := __recurse(r, spindle, page, entry.get_children(), target_hash)
+			res := __recurse(r, spindle, page, entry.get_children(), target, target_hash)
 			for x := range res {
 				capture[x] = true
 			}
@@ -331,8 +340,10 @@ func __recurse(r *Renderer, spindle *Spindle, page *Page, input []AST_Data, targ
 	return capture
 }
 
-func (r *Renderer) do_import_seek(page *Page, target_hash uint32) {
-	capture := __recurse(r, spindle, page, page.content, target_hash)
+func (r *Renderer) do_import_seek(page *Page, target string) {
+	target_hash := new_hash(target)
+
+	capture := __recurse(r, spindle, page, page.content, target, target_hash)
 
 	array := make([]string, 0, len(capture))
 
@@ -342,7 +353,7 @@ func (r *Renderer) do_import_seek(page *Page, target_hash uint32) {
 
 	sort.Strings(array)
 
-	r.push_string_to_scope(_TAGINATOR_ALL, strings.Join(array, " "))
+	r.push_string_to_scope(new_hash(target + ".all_values"), strings.Join(array, " "))
 }
 
 func (r *Renderer) traceback_position(entry AST_Data) Position {
@@ -393,7 +404,10 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 
 			// if we find a taginator in a scope
 			if tc == DECL && entry.field == _TAGINATOR {
-				r.do_import_seek(page, new_hash(r.render_ast(page, entry.children)))
+				tag_collection := unix_args(r.render_ast(page, entry.children))
+				for _, tc := range tag_collection {
+					r.do_import_seek(page, tc)
+				}
 			}
 			continue
 		}
@@ -664,6 +678,12 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 						spindle.errors.new_pos(RENDER_FAILURE, pos, "%q is a draft", found_file.path)
 					}
 
+					/*if found_file.file_type == MARKUP {
+						if sub_page, success := load_page_from_file(found_file); success {
+							sub_page.incoming_links[found_file.path] = true
+						}
+					}*/
+
 					the_url := ""
 
 					if entry.path_type == NO_PATH_TYPE {
@@ -779,7 +799,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 
 						r.push_anon(x, children, entry.get_position())
 
-						buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(page, children)))
+						buffer.WriteString(apply_regex_array(r, page, spindle.inline, r.render_ast(page, children)))
 
 						if needs_pop {
 							r.pop_scope()
@@ -792,7 +812,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 						spindle.errors.new_pos(RENDER_FAILURE, entry.position, "token %q does not have a template — output may be unexpected unless it is escaped", entry.orig_field)
 					}
 
-					buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(page, x)))
+					buffer.WriteString(apply_regex_array(r, page, spindle.inline, r.render_ast(page, x)))
 					continue
 				}
 			}
@@ -813,7 +833,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 						if sub.decl_hash == entry.decl_hash {
 							children := wrapper_block.get_children()
 							r.push_anon(sub.get_children(), children, entry.get_position())
-							sub_buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(page, children)))
+							sub_buffer.WriteString(apply_regex_array(r, page, spindle.inline, r.render_ast(page, children)))
 							index++
 							continue
 						}
@@ -838,7 +858,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 
 			children := wrapper_block.get_children()
 			r.push_anon(x, children, entry.get_position())
-			buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(page, children)))
+			buffer.WriteString(apply_regex_array(r, page, spindle.inline, r.render_ast(page, children)))
 
 			if needs_pop {
 				r.pop_scope()
@@ -930,7 +950,7 @@ func (r *Renderer) render_ast(page *Page, input []AST_Data) string {
 
 					r.push_anon(x, children, entry.get_position())
 
-					buffer.WriteString(apply_regex_array(spindle.inline, r.render_ast(page, children)))
+					buffer.WriteString(apply_regex_array(r, page, spindle.inline, r.render_ast(page, children)))
 
 					if needs_pop { r.pop_scope() }
 					continue

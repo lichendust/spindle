@@ -19,10 +19,8 @@
 
 package main
 
-import (
-	"io/fs"
-	"path/filepath"
-)
+import "io/fs"
+import "path/filepath"
 
 type Markup struct {
 	content   []AST_Data
@@ -34,15 +32,20 @@ type Page struct {
 	Markup
 	file *File
 
+	// incoming_links map[string]bool
+
 	page_path   string // @todo investigate this because i think it's being misused
 	import_hash uint32
 	import_cond string
+	tag_path    string
 }
 
 type Gen_Page struct {
 	file *File
+
 	import_hash uint32
 	import_cond string
+	tag_path    string
 }
 
 type Support_Markup struct {
@@ -60,7 +63,7 @@ type Image struct {
 }
 
 func load_page_from_file(o *File) (*Page, bool) {
-	x, ok := load_page(o.path)
+	x, ok := load_page(o.real_path)
 	if !ok {
 		return nil, false
 	}
@@ -94,6 +97,8 @@ func load_page(full_path string) (*Page, bool) {
 	p.content   = syntax_tree
 	p.top_scope = arrange_top_scope(syntax_tree)
 	p.position  = Position{0,0,0,full_path}
+
+	// p.incoming_links = make(map[string]bool, 4)
 
 	if !spindle.server_mode {
 		spindle.pages[cache_path] = p

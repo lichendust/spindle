@@ -19,14 +19,12 @@
 
 package main
 
-import (
-	"fmt"
-	"net/url"
-	"strings"
-	"unicode"
-	"unicode/utf8"
-	"path/filepath"
-)
+import "fmt"
+import "net/url"
+import "strings"
+import "unicode"
+import "unicode/utf8"
+import "path/filepath"
 
 func make_general_file_path(file *File) string {
 	output_path := ""
@@ -37,11 +35,11 @@ func make_general_file_path(file *File) string {
 	} else {
 		output_path = rewrite_ext(rewrite_root(file.path, spindle.output_path), new_ext)
 	}
-
+/*
 	if file.is_draft {
 		output_path = undraft_path(output_path)
 	}
-
+*/
 	return output_path
 }
 
@@ -68,11 +66,11 @@ func make_general_url(file *File, Path_Type Path_Type, current_location string) 
 
 	output_path := rewrite_by_path_type(Path_Type, spindle.domain, current_location, file.path)
 	output_path = rewrite_ext(output_path, ext_for_file_type(file.file_type))
-
+/*
 	if spindle.build_drafts && file.is_draft {
 		output_path = undraft_path(output_path)
 	}
-
+*/
 	return output_path
 }
 
@@ -85,11 +83,11 @@ func make_page_url(file *File, Path_Type Path_Type, current_location string) str
 
 func _make_page_url(Path_Type Path_Type, is_draft bool, path, current_location string) string {
 	output_path := rewrite_by_path_type(Path_Type, spindle.domain, current_location, path)
-
+/*
 	if spindle.build_drafts && is_draft {
 		output_path = undraft_path(output_path)
 	}
-
+*/
 	output_path = rewrite_ext(output_path, "")
 
 	if filepath.Base(output_path) == "index" {

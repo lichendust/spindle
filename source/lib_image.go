@@ -19,29 +19,25 @@
 
 package main
 
-import (
-	"image"
-	"strconv"
+import "image"
+import "strconv"
 
-	"os"
-	"os/exec"
+import "os"
+import "os/exec"
 
-	"github.com/nfnt/resize"
+import "github.com/nfnt/resize"
 
-	lib_png "image/png"
-	lib_jpg "image/jpeg"
-	lib_tif "golang.org/x/image/tiff"
-	lib_web "golang.org/x/image/webp"
-)
+import lib_png "image/png"
+import lib_jpg "image/jpeg"
+import lib_tif "golang.org/x/image/tiff"
+import lib_web "golang.org/x/image/webp"
 
 // @todo remove quality from individual
 //  images and just have one global setting?
 //  it just never seems to come up in
 //  practice
 
-const (
-	DEFAULT_QUALITY = 100
-)
+const DEFAULT_QUALITY = 100
 
 type Image_Settings struct {
 	max_size  uint

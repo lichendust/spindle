@@ -19,24 +19,22 @@
 
 package main
 
-import (
-	"strings"
-	"strconv"
-	"unicode/utf8"
-)
+import "strings"
+import "strconv"
+import "unicode/utf8"
 
-type parser struct {
+type Parser struct {
 	index  int
 	unwind bool
 	stream []*Lexer_Token
 }
 
 func parse_stream(stream []*Lexer_Token, is_support bool) []AST_Data {
-	parser := parser {stream: stream}
+	parser := Parser{stream: stream}
 	return parser.parse_block(0, is_support)
 }
 
-func (parser *parser) get_non_word(token *Lexer_Token) (string, int) {
+func (parser *Parser) get_non_word(token *Lexer_Token) (string, int) {
 	if token.ast_type == NON_WORD {
 		return token.field, 1
 	}
@@ -72,7 +70,7 @@ func (parser *parser) get_non_word(token *Lexer_Token) (string, int) {
 	return decl
 }*/
 
-func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
+func (parser *Parser) parse_block(max_depth int, is_support bool) []AST_Data {
 	if parser.unwind {
 		return []AST_Data{}
 	}
@@ -157,13 +155,38 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			array = append(array, the_script)
 			continue
 
-		case TILDE, MULTIPLY, AMPERSAND, ANGLE_CLOSE:
+		case TILDE:
+			the_builtin := new(AST_Builtin)
+			the_builtin.ast_type = IMPORT
+			the_builtin.position = token.position
+
+			parser.eat_whitespace()
+
+			if parser.peek().ast_type.is(WORD, IDENT) {
+				entry := parser.next()
+				the_builtin.hash_name = new_hash(entry.field)
+				the_builtin.raw_name  = entry.field
+			}
+
+			// @todo there's a pointer dereference error with badly
+			// resolved imports and it begins here...
+
+			parser.eat_whitespace()
+
+			x := parser.parse_paragraph(is_support)
+			if len(x) == 0 {
+				panic("no children")
+			}
+
+			the_builtin.children = x
+			array = append(array, the_builtin)
+			continue
+
+		case MULTIPLY, AMPERSAND, ANGLE_CLOSE:
 			the_builtin := new(AST_Builtin)
 			the_type    := NULL
 
 			switch token.ast_type {
-			case TILDE:
-				the_type = IMPORT
 			case MULTIPLY:
 				the_type = UNSET
 			case AMPERSAND:
@@ -176,23 +199,15 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 
 			parser.eat_whitespace()
 
-			if the_type == IMPORT {
-				x := parser.parse_paragraph(is_support, WHITESPACE)
-
-				if len(x) == 0 {
-					panic("no children")
-				}
-
-				the_builtin.children = x
-				parser.eat_whitespace()
-			}
-
 			peeked := parser.peek()
 
 			if peeked.ast_type.is(WORD, IDENT) {
 				parser.next()
 				the_builtin.hash_name = new_hash(peeked.field)
 				the_builtin.raw_name  = peeked.field
+			/*} else if the_type == UNSET {
+				the_builtin.hash_name = new_hash(peeked.field) // @todo this is not final
+				the_builtin.raw_name  = peeked.field*/
 			} else {
 				spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
 				break
@@ -201,13 +216,8 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			parser.eat_whitespace()
 
 			if !parser.peek().ast_type.is(NEWLINE, EOF) {
-				if the_type == IMPORT {
-					spindle.errors.new_pos(PARSER_FAILURE, token.position, "malformed import (or unescaped ~ at start of line)")
-					parser.unwind = true
-				} else {
-					parser.step_backn(3)
-					spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
-				}
+				parser.step_backn(3)
+				spindle.errors.new_pos(PARSER_FAILURE, token.position, "ambiguous token %q should be escaped", token.field)
 				break
 			}
 
@@ -293,14 +303,16 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 			x := parser.peek_whitespace()
 
 			needs_raw := false
+			intact_html := false
 
-			if x.ast_type == WORD && x.field == "raw" {
+			if x.ast_type == WORD && (x.field == "raw" || x.field == "html") {
 				parser.next()
 				parser.eat_whitespace()
 				parser.next()
 
 				if n := parser.peek_whitespace(); n.ast_type == BRACE_OPEN {
 					needs_raw = true
+					intact_html = x.field == "html"
 				} else {
 					parser.step_backn(2)
 				}
@@ -318,7 +330,7 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 				the_block.decl_hash = new_hash(token.field)
 
 				if needs_raw {
-					x := parser.parse_raw_block()
+					x := parser.parse_raw_block(intact_html)
 
 					the_block.children = []AST_Data{x}
 
@@ -567,7 +579,7 @@ func (parser *parser) parse_block(max_depth int, is_support bool) []AST_Data {
 	return array
 }
 
-func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []AST_Data {
+func (parser *Parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []AST_Data {
 	const ALLOC = 256
 
 	if parser.unwind {
@@ -580,18 +592,20 @@ func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []
 	buffer.Grow(ALLOC)
 
 	for {
-		token := parser.next()
+		token := parser.peek()
 
 		if token == nil {
 			return array
 		}
 		if token.ast_type.is(NEWLINE, EOF) {
+			parser.next()
 			break
 		}
 		if token.ast_type.is(exit_upon...) {
-			parser.step_back()
 			break
 		}
+
+		parser.next()
 
 		switch token.ast_type {
 		default:
@@ -733,7 +747,7 @@ func (parser *parser) parse_paragraph(is_support bool, exit_upon ...AST_Type) []
 	return array
 }
 
-func (parser *parser) parse_if() []AST_Data {
+func (parser *Parser) parse_if() []AST_Data {
 	array := make([]AST_Data, 0, 8)
 
 	for {
@@ -779,7 +793,7 @@ func (parser *parser) parse_if() []AST_Data {
 	return array
 }
 
-func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
+func (parser *Parser) parse_variable_ident() (uint32, uint32, uint32) {
 	a := parser.next()
 	b := parser.peek()
 
@@ -800,7 +814,7 @@ func (parser *parser) parse_variable_ident() (uint32, uint32, uint32) {
 	return new_hash(a.field), 0, 0
 }
 
-func (parser *parser) parse_variable(is_support bool) *AST_Variable {
+func (parser *Parser) parse_variable(is_support bool) *AST_Variable {
 	new_var := new(AST_Variable)
 
 	a := parser.peek()
@@ -859,7 +873,7 @@ func (parser *parser) parse_variable(is_support bool) *AST_Variable {
 	return new_var
 }
 
-func (parser *parser) eat_comment() {
+func (parser *Parser) eat_comment() {
 	parser.eat_whitespace()
 
 	index := 0
@@ -901,7 +915,7 @@ func (parser *parser) eat_comment() {
 	}
 }
 
-func (parser *parser) parse_raw_block() AST_Data {
+func (parser *Parser) parse_raw_block(intact_html bool) AST_Data {
 	buffer := strings.Builder{}
 	buffer.Grow(512)
 
@@ -914,25 +928,28 @@ func (parser *parser) parse_raw_block() AST_Data {
 			continue
 		}
 
-		switch token.ast_type {
-		case ANGLE_OPEN:
-			buffer.WriteString("&lt;")
-			continue
+		if !intact_html {
+			switch token.ast_type {
+			case ANGLE_OPEN:
+				buffer.WriteString("&lt;")
+				continue
 
-		case ANGLE_CLOSE:
-			buffer.WriteString("&gt;")
-			continue
+			case ANGLE_CLOSE:
+				buffer.WriteString("&gt;")
+				continue
 
-		case AMPERSAND:
-			if len(parser.stream) - 1 > parser.index + i + 1 {
-				if parser.stream[parser.index + i + 1].ast_type != WORD {
-					buffer.WriteString("&amp;")
-					continue
+			case AMPERSAND:
+				if len(parser.stream) - 1 > parser.index + i + 1 {
+					if parser.stream[parser.index + i + 1].ast_type != WORD {
+						buffer.WriteString("&amp;")
+						continue
+					}
 				}
 			}
+		}
 
+		switch token.ast_type {
 		// @todo add double + single quotes
-
 		case BRACE_OPEN:
 			if !is_escaped {
 				brace_balance += 1
@@ -985,7 +1002,7 @@ func default_image_settings() (*Image_Settings, bool) {
 	return settings, got_anything
 }
 
-func (parser *parser) parse_image_settings() *Image_Settings {
+func (parser *Parser) parse_image_settings() *Image_Settings {
 	settings, got_anything := default_image_settings()
 
 	main_loop: for {
@@ -1048,22 +1065,22 @@ func (parser *parser) parse_image_settings() *Image_Settings {
 	return nil
 }
 
-func (parser *parser) step_back() {
+func (parser *Parser) step_back() {
 	parser.index -= 1
 }
 
-func (parser *parser) step_backn(n int) {
+func (parser *Parser) step_backn(n int) {
 	parser.index -= n
 }
 
-func (parser *parser) prev() *Lexer_Token {
+func (parser *Parser) prev() *Lexer_Token {
 	if parser.index < 2 {
 		return nil
 	}
 	return parser.stream[parser.index - 2]
 }
 
-func (parser *parser) next() *Lexer_Token {
+func (parser *Parser) next() *Lexer_Token {
 	if parser.index > len(parser.stream) - 1 {
 		return nil
 	}
@@ -1072,14 +1089,14 @@ func (parser *parser) next() *Lexer_Token {
 	return t
 }
 
-func (parser *parser) peek() *Lexer_Token {
+func (parser *Parser) peek() *Lexer_Token {
 	if parser.index > len(parser.stream) - 1 {
 		return nil
 	}
 	return parser.stream[parser.index]
 }
 
-func (parser *parser) peek_whitespace() *Lexer_Token {
+func (parser *Parser) peek_whitespace() *Lexer_Token {
 	index := 0
 
 	for _, token := range parser.stream[parser.index:] {
@@ -1093,7 +1110,7 @@ func (parser *parser) peek_whitespace() *Lexer_Token {
 	return parser.stream[parser.index + index]
 }
 
-func (parser *parser) eat_whitespace() bool {
+func (parser *Parser) eat_whitespace() bool {
 	did_any := false
 
 	for _, token := range parser.stream[parser.index:] {

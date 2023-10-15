@@ -19,13 +19,11 @@
 
 package main
 
-import (
-	"os"
-	"io"
-	"io/fs"
-	"time"
-	"path/filepath"
-)
+import "os"
+import "io"
+import "io/fs"
+import "time"
+import "path/filepath"
 
 type File_Type uint8
 const (
@@ -116,6 +114,7 @@ func ext_for_file_type(File_Type File_Type) string {
 
 type File struct {
 	path      string
+	real_path string
 
 	file_type File_Type
 	is_draft  bool
@@ -179,11 +178,17 @@ func recurse_directories(parent *File) ([]*File, bool) {
 		if file.IsDir() {
 			the_file := new(File)
 
+			if is_draft(path) {
+				the_file.is_draft = true
+				the_file.path = undraft_path(path)
+			} else {
+				the_file.path = path
+			}
+
 			the_file.file_type = DIRECTORY
 			the_file.is_used   = false
-			the_file.path      = path
-			the_file.is_draft  = is_draft(path)
 			the_file.hash_name = hash_base_name(the_file)
+			the_file.real_path = path
 			the_file.parent    = parent
 
 			if x, ok := recurse_directories(the_file); ok {
@@ -196,10 +201,16 @@ func recurse_directories(parent *File) ([]*File, bool) {
 
 		the_file := new(File)
 
+		if is_draft(path) {
+			the_file.is_draft = true
+			the_file.path = undraft_path(path)
+		} else {
+			the_file.path = path
+		}
+
 		the_file.file_type = STATIC
 		the_file.is_used   = false
-		the_file.path      = path
-		the_file.is_draft  = is_draft(path)
+		the_file.real_path = path
 		the_file.file_type = to_file_type(path)
 		the_file.hash_name = hash_base_name(the_file)
 
@@ -348,7 +359,7 @@ func make_dir(path string) bool {
 }
 
 func copy_file(file *File, output_path string) {
-	source, err := os.Open(file.path)
+	source, err := os.Open(file.real_path)
 	if err != nil {
 		eprintf("failed to open file %q\n", file.path)
 	}

@@ -19,22 +19,20 @@
 
 package main
 
-import (
-	"os"
-	"bufio"
-	"strings"
+import "os"
+import "bufio"
+import "strings"
 
-	"github.com/tdewolff/minify/v2"
-	"github.com/tdewolff/minify/v2/js"
-	"github.com/tdewolff/minify/v2/css"
-)
+import "github.com/tdewolff/minify/v2"
+import "github.com/tdewolff/minify/v2/js"
+import "github.com/tdewolff/minify/v2/css"
 
 func copy_minify(the_file *File, output_path string) bool {
 	minifier := minify.New()
 	minifier.AddFunc("text/js", js.Minify)
 	minifier.AddFunc("text/css", css.Minify)
 
-	source, err := os.Open(the_file.path)
+	source, err := os.Open(the_file.real_path)
 	if err != nil {
 		return false
 	}
@@ -79,7 +77,6 @@ func track_css_links(text string) bool {
 
 	for {
 		index := strings.Index(content, "url")
-
 		if index == -1 {
 			break
 		}
@@ -93,13 +90,21 @@ func track_css_links(text string) bool {
 		text := content[:close]
 		content = content[close:]
 
-		path := unquote_string(text)
+		// unquote
+		if len(text) > 0 {
+			if text[0] == '"'  { text = text[1:] }
+			if text[0] == '\'' { text = text[1:] }
+		}
+		if len(text) > 0 {
+			if text[len(text) - 1] == '"'  { text = text[:len(text) - 1] }
+			if text[len(text) - 1] == '\'' { text = text[:len(text) - 1] }
+		}
 
-		if is_ext_url(path) {
+		if is_ext_url(text) {
 			continue
 		}
 
-		if found_file, ok := find_file(spindle.file_tree, path); ok {
+		if found_file, ok := find_file(spindle.file_tree, text); ok {
 			found_any = true
 			found_file.is_used = true
 		}

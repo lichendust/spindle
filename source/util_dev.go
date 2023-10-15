@@ -17,18 +17,13 @@
 	along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
-//go:build debug
-
 package main
 
-import (
-	"fmt"
-	"io"
-	"sort"
-	"strings"
-	"encoding/xml"
-	// "path/filepath"
-)
+import "fmt"
+import "io"
+import "sort"
+import "strings"
+import "encoding/xml"
 
 func _println(name ...any) {
 	fmt.Println(name...)

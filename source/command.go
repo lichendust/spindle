@@ -19,10 +19,8 @@
 
 package main
 
-import (
-	"os"
-	"path/filepath"
-)
+import "os"
+import "path/filepath"
 
 const (
 	COMMAND_VERSION uint8 = iota

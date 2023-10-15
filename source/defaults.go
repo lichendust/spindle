@@ -19,7 +19,6 @@
 
 package main
 
-// filepaths
 const (
 	EXTENSION = ".x"
 
@@ -96,7 +95,6 @@ const CONFIG_TEMPLATE = `domain = "https://website.com/"
 
 path_mode  = "absolute"
 build_path = "public"
-tag_path   = "tag"
 
 port_number = ":3011"
 

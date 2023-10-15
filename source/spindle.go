@@ -19,13 +19,11 @@
 
 package main
 
-import (
-	"os"
-	"sync"
-	"strings"
+import "os"
+import "sync"
+import "strings"
 
-	"github.com/BurntSushi/toml"
-)
+import "github.com/BurntSushi/toml"
 
 var spindle *Spindle
 
@@ -60,7 +58,6 @@ type Config struct {
 	build_drafts    bool
 	build_only_used bool
 	skip_images     bool
-	tag_path        string
 
 	port_number string
 
@@ -80,7 +77,6 @@ func load_config() (Config) {
 		Domain            string          `toml:"domain"`
 		Default_Path_Mode string          `toml:"path_mode"`
 		Build_Path        string          `toml:"build_path"`
-		Tag_Path          string          `toml:"tag_path"`
 		Inline            []*Regex_Config `toml:"inline"`
 
 		Image_Quality  int                `toml:"image_quality"`
@@ -125,11 +121,6 @@ func load_config() (Config) {
 		output.output_path = PUBLIC_PATH
 	} else {
 		output.output_path = conf.Build_Path
-	}
-	if conf.Tag_Path == "" {
-		output.tag_path = "tag"
-	} else {
-		output.tag_path = conf.Tag_Path
 	}
 
 	output.image_quality  = conf.Image_Quality

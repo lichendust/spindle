@@ -179,9 +179,16 @@ code raw {
 	%{link docs/style.css}
 }
 
-Links that begin with a protocol, like `http:` or `https:`, are passed through, so you can use templating to reference
+Links that begin with a protocol, like `http:` or `https:`, are passed through, so if you're hiding Locators in your templating, you can safely pass external links through them without them being mangled:
 
-Index pages are implicitly understood, however, and are simply accessed by supplying the directory path, though `dir/index` will also work.
+code raw {
+	[!] = <img src="%{link %%}">
+
+	! local_image.jpg
+	! https://cdn.website.com/image.jpg
+}
+
+Index pages are implicitly understood by Locators, and are simply accessed by supplying the directory path.  So while `dir/index` will work, you can just use `dir`.
 
 By default, Locators expand to the URL-style specified in `spindle.toml`, such as `absolute`, `relative` or `root`.
 

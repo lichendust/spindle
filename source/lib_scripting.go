@@ -76,6 +76,22 @@ func (r *Renderer) script_call(page *Page, line int, exec_blob string, args ...s
 		return []string{}
 	})
 
+	// @todo unsetting + falsiness
+	the_vm.Set("is_true", func(name string) bool {
+		entry, ok := r.get_in_scope(new_hash(name))
+		if !ok {
+			return false
+		}
+		if entry.ast_type == DECL_REJECT {
+			return false
+		}
+		if entry.ast_type != DECL {
+			return false
+		}
+
+		return true
+	})
+
 	the_vm.Set("has_elements", func(match ...string) bool {
 		h := make([]uint32, len(match))
 		for i, n := range match {

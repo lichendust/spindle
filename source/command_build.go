@@ -82,7 +82,7 @@ func command_build() {
 		{
 			ext := filepath.Ext(output_path)
 			output_path = output_path[:len(output_path) - len(ext)]
-			output_path = tag_path(output_path, spindle.tag_path, gen.import_cond) + ext
+			output_path = tag_path(output_path, gen.tag_path, gen.import_cond) + ext
 		}
 
 		make_dir(filepath.Dir(output_path))
@@ -96,6 +96,7 @@ func command_build() {
 		page.file        = gen.file
 		page.import_cond = gen.import_cond
 		page.import_hash = gen.import_hash
+		page.tag_path    = gen.tag_path
 
 		assembled := render_syntax_tree(page)
 
@@ -168,8 +169,6 @@ func build_pages(file *File) bool {
 				eprintf("failed to load page %q\n", file.path)
 			}
 
-			page.file = file // @todo put in load_page
-
 			assembled := render_syntax_tree(page)
 
 			if !write_file(output_path, assembled) {
@@ -178,10 +177,11 @@ func build_pages(file *File) bool {
 			}
 
 		case CSS:
+			copy_minify(file, output_path)
+
 			if track_css_links(file.path) {
 				is_done = false
 			}
-			fallthrough // css gets minified below too
 
 		case JAVASCRIPT:
 			copy_minify(file, output_path)

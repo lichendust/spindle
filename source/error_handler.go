@@ -19,10 +19,8 @@
 
 package main
 
-import (
-	"fmt"
-	"strings"
-)
+import "fmt"
+import "strings"
 
 type Error_Type uint8
 const (

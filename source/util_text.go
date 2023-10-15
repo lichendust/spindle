@@ -19,13 +19,11 @@
 
 package main
 
-import (
-	"time"
-	"strings"
-	"strconv"
-	"unicode"
-	"unicode/utf8"
-)
+import "time"
+import "strings"
+import "strconv"
+import "unicode"
+import "unicode/utf8"
 
 var ascii_space = [256]uint8{'\t': 1, '\v': 1, '\f': 1, '\r': 1, ' ': 1}
 
@@ -38,6 +36,7 @@ func write_to(buffer *strings.Builder, text ...string) {
 
 func make_slug(source string) string {
 	buffer := strings.Builder{}
+	buffer.Grow(len(source))
 
 	inside_element := false
 
@@ -163,8 +162,11 @@ func eat_spaces(s string) int {
 	n := 0
 
 	for _, c := range s {
-		if c >= utf8.RuneSelf && !unicode.IsSpace(c) {
-			break
+		if c >= utf8.RuneSelf {
+			if !unicode.IsSpace(c) {
+				break
+			}
+			continue
 		}
 		if ascii_space[c] == 0 {
 			break
@@ -457,25 +459,4 @@ func nsdate(input string) string {
 	}
 
 	return final.String()
-}
-
-func unquote_string(s string) string {
-	if len(s) > 0 {
-		if s[0] == '"' {
-			s = s[1:]
-		}
-		if s[0] == '\'' {
-			s = s[1:]
-		}
-	}
-	if len(s) > 0 {
-		if s[len(s) - 1] == '"' {
-			s = s[:len(s) - 1]
-		}
-		if s[len(s) - 1] == '\'' {
-			s = s[:len(s) - 1]
-		}
-	}
-
-	return s
 }

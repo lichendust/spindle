@@ -19,14 +19,12 @@
 
 package main
 
-import (
-	"os"
-	"fmt"
-	"strings"
-	"unicode/utf8"
+import "os"
+import "fmt"
+import "strings"
+import "unicode/utf8"
 
-	"github.com/mattn/go-isatty"
-)
+import "github.com/mattn/go-isatty"
 
 var running_in_term = false
 
