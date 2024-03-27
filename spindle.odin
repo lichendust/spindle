@@ -28,7 +28,7 @@ import "core:sys/windows"
 import "core:path/filepath"
 import "core:path/slashpath"
 
-import lua "vendor:lua/5.4"
+import lua "lua54"
 
 VERSION :: "v0.5.0"
 SPINDLE :: "Spindle " + VERSION
@@ -100,12 +100,14 @@ execute_spindle :: proc(args: []string) {
 	lua.createtable(ctx, 0, 16)
 	lua.setglobal(ctx, "spindle")
 
-	register_procedure(ctx, "make_slug",      lua_make_slug)
+	register_procedure(ctx, "to_slug",        lua_to_slug)
 	register_procedure(ctx, "file_exists",    lua_file_exists)
 	register_procedure(ctx, "find_file",      lua_find_file)
 	register_procedure(ctx, "copy_file",      lua_copy_file)
-	register_procedure(ctx, "quoted_split",   lua_quoted_split)
+	register_procedure(ctx, "split_fields",   lua_field_split)
+	register_procedure(ctx, "split_quoted",   lua_quoted_split)
 	register_procedure(ctx, "make_directory", lua_make_directory)
+	register_procedure(ctx, "to_title",       lua_title_case)
 
 	lua_loaded: i32
 
@@ -259,6 +261,29 @@ lua_quoted_split :: proc "c" (ctx: ^lua.State) -> i32 {
 	return 1
 }
 
+lua_field_split :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
+	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	args  := strings.fields(input, context.temp_allocator)
+	count := len(args)
+
+	if count == 0 {
+		return 0
+	}
+
+	lua.createtable(ctx, 0, i32(count))
+
+	for entry, i in args {
+		lua.pushnumber(ctx, lua.Number(i + 1))
+		lua.pushstring(ctx, strings.clone_to_cstring(entry, context.temp_allocator))
+		lua.settable(ctx, -3)
+	}
+
+	return 1
+}
+
 extract_non_space_word :: proc(x: string) -> string {
 	for c, i in x {
 		if unicode.is_space(c) {
@@ -268,7 +293,7 @@ extract_non_space_word :: proc(x: string) -> string {
 	return x
 }
 
-lua_make_slug :: proc "c" (ctx: ^lua.State) -> i32 {
+lua_to_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
@@ -303,6 +328,65 @@ lua_make_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 	return 1
 }
 
+title_case :: proc(input: string) -> string {
+	short_words :: proc(t: string) -> bool {
+		switch t {
+		case "a":   return true
+		case "an":  return true
+		case "and": return true
+		case "for": return true
+		case "in":  return true
+		case "is":  return true
+		case "nor": return true
+		case "of":  return true
+		case "on":  return true
+		case "or":  return true
+		case "the": return true
+		case "to":  return true
+		}
+		return false
+	}
+
+	input  := strings.to_lower(input, context.temp_allocator)
+	output := strings.builder_make(0, len(input), context.temp_allocator)
+
+	word_index := -1
+	for word in strings.fields_iterator(&input) {
+		word_index += 1
+		if word_index > 0 && short_words(word) {
+			strings.write_string(&output, word)
+			strings.write_rune(&output, ' ')
+			continue
+		}
+
+		set_next := false
+		for c, index in word {
+			x: rune
+			if unicode.is_letter(c) && (index == 0 || set_next) {
+				x = unicode.to_upper(c)
+			} else {
+				x = unicode.to_lower(c)
+			}
+			set_next = (c == '-' || c == '—')
+			strings.write_rune(&output, x)
+		}
+
+		// @todo this currently re-spaces the string
+		strings.write_rune(&output, ' ')
+	}
+
+	return strings.to_string(output)
+}
+
+lua_title_case :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
+	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	lua.pushstring(ctx, strings.clone_to_cstring(title_case(input), context.temp_allocator))
+	return 1
+}
+
 // @todo super naive but it'll do for now
 find_file :: proc(name: string) -> string {
 	short_list := make([dynamic]string, 0, 16, context.temp_allocator)
@@ -324,12 +408,14 @@ find_file :: proc(name: string) -> string {
 	shortest := 9999
 	for entry, i in short_list {
 		length := len(entry)
+
+		if strings.contains(entry, "index") {
+			length -= 5
+		}
+
 		if length < shortest {
 			shortest = length
 			index    = i
-		}
-		if strings.contains(entry, "index") {
-			return entry // @todo noooooooooooo
 		}
 	}
 
@@ -368,8 +454,11 @@ load_project_dir :: proc() {
 		if info.name[0] == '.' {
 			return 0, info.is_dir
 		}
-		if info.is_dir && info.name[0] == '_' {
-			return 0, true
+		if info.is_dir {
+			if info.name[0] == '_' {
+				return 0, true
+			}
+			return 0, false
 		}
 
 		// these *are* permanent allocations

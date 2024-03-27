@@ -20,13 +20,14 @@
 -- 'spindle' is a globally initialised table created by the spindle
 -- backing executable; you can just start accessing it right away
 
-spindle.handlers  = {} -- file types
-spindle.tokens    = {} -- line-level tokens; headings, images, etc.
-spindle.inlines   = {} -- inline syntax; links, bold, etc.
-spindle.modifiers = {} -- %variable:modifiers
-spindle.all_pages = {}
-spindle.all_files = {}
-spindle.lock_file = {} -- temp map for 'other' files @todo
+spindle.handlers     = {} -- file types
+spindle.tokens       = {} -- line-level tokens; headings, images, etc.
+spindle.inlines      = {} -- inline syntax; links, bold, etc.
+spindle.modifiers    = {} -- %variable:modifiers
+spindle.all_pages    = {}
+spindle.all_files    = {}
+spindle.lock_file    = {} -- temp map for 'other' files @todo
+spindle.markup_cache = {}
 
 spindle.output_path = "_site/"
 
@@ -37,18 +38,18 @@ spindle.handlers[".x"] = function(file_path)
 end
 
 spindle.tokens[">"] = function(page, arg)
+	spindle.parse_markup = spindle.__parse_markup
 	local part = spindle.load_markup("_data/" .. arg .. ".x")
 	return spindle.render(page, part.syntax_tree)
 end
 
+-- @todo make this safe my goodness
 spindle.tokens["~"] = function(page, arg)
-	local args = spindle.quoted_split(arg)
+	spindle.parse_markup = spindle.__parse_markup
+	local args = spindle.split_quoted(arg)
 	local part = spindle.load_markup("_data/" .. args[1] .. ".x")
-
 	local path = spindle.find_file(args[2])
-	local impt = spindle.load_page(path)
-
-	return spindle.render(impt, part.syntax_tree)
+	return spindle.render(spindle.load_page(path), part.syntax_tree)
 end
 
 spindle.tokens["#"]   = '<h1 id="%0:slug">%0</h1>'
@@ -63,39 +64,28 @@ spindle.tokens["!"] = function(page, arg)
 	return spindle.template_expand('<img src="%0">', url)
 end
 
-spindle.tokens.default = '<p>%0</p>'
+spindle.tokens.block_default = '%0'
+spindle.tokens.default       = '<p>%0</p>'
 
 -- @hack to ensure these exist
 -- but skip the typecheck
 spindle.tokens["$"]  = 0
 spindle.tokens["$$"] = 0
 
-
-
-spindle.modifiers.slug  = spindle.make_slug
-spindle.modifiers.upper = string.upper
-spindle.modifiers.lower = string.lower
-spindle.modifiers.quote = function(arg)
+spindle.to_upper = string.upper
+spindle.to_lower = string.lower
+spindle.to_quote = function(arg)
 	return string.format("%q", arg)
 end
 
-
+spindle.modifiers.slug  = spindle.to_slug
+spindle.modifiers.title = spindle.to_title
+spindle.modifiers.upper = spindle.to_upper
+spindle.modifiers.lower = spindle.to_lower
+spindle.modifiers.quote = spindle.to_quote
 
 table.insert(spindle.inlines, function(page, line)
-	return line:gsub("%[(.-)%]%((.-)%)", function(label, path)
-		if spindle.has_protocol(path) then
-			return string.format('<a href="%s">%s</a>', path, label)
-		end
-
-		if path:sub(1, 1) == '#' then
-			return string.format('<a href="%s">%s</a>', path, label)
-		end
-
-		-- @todo support trailing fragments
-
-		local _, url = spindle.process_any_file(path)
-		return string.format('<a href="%s">%s</a>', url, label)
-	end)
+	return line:gsub("%[(.-)%]%((.-)%)", spindle.make_anchor_tag)
 end)
 
 table.insert(spindle.inlines, function(page, line)
@@ -107,13 +97,33 @@ end)
 
 
 
+function spindle.make_anchor_tag(label, path)
+	if spindle.has_protocol(path) then
+		return string.format('<a href="%s">%s</a>', path, label)
+	end
+
+	if path:sub(1, 1) == '#' then
+		return string.format('<a href="%s">%s</a>', path, label)
+	end
+
+	local frag = path:match("#.+$")
+	if frag == nil then
+		frag = ""
+	else
+		path = path:gsub("#.+$", "")
+	end
+
+	local _, url = spindle.process_any_file(path)
+	return string.format('<a href="%s%s">%s</a>', url, frag, label)
+end
+
 -- [[STRING UTILS]]
 function spindle.has_protocol(text)
 	return text:match("^%a+://") ~= nil
 end
 
 function spindle.url_from_path(path)
-	return (spindle.domain .. path):gsub("/index.*$", ""):gsub("%.x$", ""):gsub("%.s$", ""):gsub("%.html$", "") -- @todo hard-coded
+	return (spindle.domain .. path):gsub("/index.*$", ""):gsub("%.x$", ""):gsub("%.html$", "") -- @todo hard-coded
 end
 
 function spindle.short_ext(text)
@@ -122,6 +132,10 @@ end
 
 function spindle.long_ext(text)
 	return text:match("%.[^/]+$")
+end
+
+function spindle.dir(text)
+	return text:gsub("(.*/)(.*)", "%1")
 end
 
 function spindle.basename(text)
@@ -189,7 +203,14 @@ function spindle.load_markup(file_path)
 		page[k] = v
 	end
 
-	page.syntax_tree = spindle.parse_markup(page, file_path)
+	if spindle.markup_cache[file_path] then
+		page.syntax_tree = spindle.markup_cache[file_path]
+	else
+		local m = spindle.parse_markup(page, file_path)
+		spindle.markup_cache[file_path] = m
+		page.syntax_tree = m
+	end
+
 	return page
 end
 
@@ -212,12 +233,16 @@ function spindle.load_page(file_path)
 	page.canonical_url = curl
 	page._source_path  = file_path
 	page._output_path  = spindle.output_path .. file_path:gsub("%..+$", ".html")
-	page._can_build    = true
 
 	-- must be cached before pre-render to avoid loops
 	spindle.all_pages[file_path] = page
 
-	page.content = spindle.render(page, page.syntax_tree) -- @todo
+	page.content = spindle.render(page, page.syntax_tree)
+	if page.template then
+		spindle.parse_markup = spindle.__parse_markup
+		local template = spindle.load_markup("_data/" .. page.template .. ".x")
+		spindle.render(page, template.syntax_tree)
+	end
 
 	return page
 end
@@ -236,11 +261,14 @@ end
 function spindle.expand(template, page)
 	-- variables: %var:modifiers
 	local result = template:gsub("%%([%a_]+):([%a_]+)", function (x, y)
-		x = page[x]
-		if spindle.modifiers[y] then
-			return spindle.modifiers[y](x)
+		local z = page[x]
+		if z == nil then
+			return x
 		end
-		return x
+		if spindle.modifiers[y] then
+			return spindle.modifiers[y](z)
+		end
+		return z
 	end)
 
 	-- variables: %var
@@ -257,12 +285,13 @@ function spindle.expand(template, page)
 end
 
 function spindle.template_expand(template, value)
+	-- %placeholder:modifier
 	local result = template:gsub("%%(%d+):([%w_]+)", function(x, y)
 		local n = x + 0
 		if n == 0 then
 			x = value
 		else
-			x = spindle.quoted_split(value)[n]
+			x = spindle.split_quoted(value)[n]
 		end
 		if spindle.modifiers[y] then
 			return spindle.modifiers[y](x)
@@ -270,12 +299,13 @@ function spindle.template_expand(template, value)
 		return x
 	end)
 
+	-- %placeholder
 	result = result:gsub("%%(%d+)", function(x)
 		local n = x + 0
 		if n == 0 then
 			return value
 		end
-		return spindle.quoted_split(value)[n]
+		return spindle.split_quoted(value)[n]
 	end)
 
 	return result
@@ -385,18 +415,41 @@ function spindle.parse_markup(page, file_path)
 			else
 				active[x] = y
 			end
+			goto next_line
+		end
 
+		local ifs = line:match('^%s*if%s+%%(.-)%s+.-{$')
+		if ifs then
+			local block_id = line:match("%s+([%w_]+)%s+{$")
+			local new_block = {
+				token  = block_id or 'block_default',
+				ifstmt = ifs,
+				block  = true,
+			}
+
+			active[#active + 1] = new_block
+			stack[#stack + 1]   = new_block
 			goto next_line
 		end
 
 		-- open block
+		local is_block = line:match('^%s*{$')
+		if is_block then
+			local new_block = {
+				token = 'block_default',
+				block = true
+			}
+			active[#active + 1] = new_block
+			stack[#stack + 1]   = new_block
+			goto next_line
+		end
+
 		local label = line:match('^%s*(.-)%s+{$')
 		if label then
 			local new_block = {
 				token = label,
 				block = true
 			}
-
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
 			goto next_line
@@ -458,6 +511,17 @@ function spindle.render(page, active_block)
 		end
 
 		if entry.block and entry.token and page[entry.token] then
+			if entry.ifstmt then
+				if not page[entry.ifstmt] then
+					if index < #active_block and active_block[index + 1].elsestmt then
+						entry = active_block[index + 1]
+						index = index + 1
+					else
+						goto render_continue
+					end
+				end
+			end
+
 			local t = page[entry.token]
 			local x = type(t)
 
@@ -493,7 +557,7 @@ function spindle.render(page, active_block)
 					if entry.raw then
 						sub_content = sub_content .. spindle.template_expand(t.main, entry.text)
 					else
-						sub_content = sub_content .. spindle.expand(spindle.template_expand(t.main, spindle.expand(entry.text, page)), page)
+						sub_content = sub_content .. spindle.expand(spindle.template_expand(t.main, entry.text), page)
 					end
 					count = count + 1
 
@@ -507,7 +571,7 @@ function spindle.render(page, active_block)
 					if entry.raw then
 						content = content .. spindle.template_expand(t.wrap, sub_content)
 					else
-						content = content .. spindle.expand(spindle.template_expand(spindle.expand(t.wrap, page), sub_content), page)
+						content = content .. spindle.expand(spindle.template_expand(t.wrap, sub_content), page)
 					end
 				else
 					content = content .. sub_content
@@ -519,7 +583,7 @@ function spindle.render(page, active_block)
 				if entry.raw then
 					content = content .. spindle.template_expand(t, entry.text)
 				else
-					content = content .. spindle.expand(spindle.template_expand(t, spindle.expand(entry.text, page)), page)
+					content = content .. spindle.expand(spindle.template_expand(t, entry.text), page)
 				end
 				goto render_continue
 
@@ -564,7 +628,7 @@ function spindle.render(page, active_block)
 	return content
 end
 
-function spindle.output_file(path)
+function spindle.export_file(path)
 	local file_path = spindle.find_file(path)
 	if file_path == nil then
 		return false
@@ -602,15 +666,6 @@ function spindle.process_any_file(path)
 	return nil, path
 end
 
-function spindle.has_run(path)
-	if spindle.lock_file[path] == true then
-		return true
-	end
-
-	spindle.lock_file[path] = true
-	return false
-end
-
 function spindle.default_handler(file_path)
 	local new_path = spindle.output_path .. file_path
 	local file = {
@@ -620,6 +675,15 @@ function spindle.default_handler(file_path)
 	}
 	spindle.all_files[file._output_path] = file
 	return file._output_path, file.canonical_url
+end
+
+function spindle.has_run(path)
+	if spindle.lock_file[path] == true then
+		return true
+	end
+
+	spindle.lock_file[path] = true
+	return false
 end
 
 function spindle.generate_sitemap(file_list)
@@ -637,7 +701,7 @@ function spindle.make_page_list()
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
-		if page._can_build and not page._source_path:match("^404") then
+		if not page._source_path:match("^404") then
 			table.insert(file_list, page.canonical_url)
 		end
 	end
@@ -663,19 +727,17 @@ function main(starting_file)
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
-		if page._can_build then
-			page.content = spindle.render(page, page.syntax_tree)
+		page.content = spindle.render(page, page.syntax_tree)
 
-			-- @todo wrong place
-			if page.template then
-				local template = spindle.load_markup("_data/" .. page.template .. ".x")
-				spindle.write_file(page._output_path, spindle.render(page, template.syntax_tree))
-			else
-				spindle.write_file(page._output_path, page.content)
-			end
-
-			table.insert(file_list, page._source_path)
+		if page.template then
+			spindle.parse_markup = spindle.__parse_markup
+			local template = spindle.load_markup("_data/" .. page.template .. ".x")
+			spindle.write_file(page._output_path, spindle.render(page, template.syntax_tree))
+		else
+			spindle.write_file(page._output_path, page.content)
 		end
+
+		table.insert(file_list, page._source_path)
 	end
 
 	for i, file in pairs(spindle.all_files) do
