@@ -1,24 +1,11 @@
 --[[
-	Spindle
-	A static site generator
-	Copyright (C) 2022-2023 Harley Denham
-
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+	MIT License
+	Spindle: a static site generator
+	Copyright (C) 2019-2024 Harley Denham
 ]]
 
--- 'spindle' is a globally initialised table created by the spindle
--- backing executable; you can just start accessing it right away
+-- note: the base 'spindle' table is
+-- declared by the spindle host executable
 
 spindle.handlers     = {} -- file types
 spindle.tokens       = {} -- line-level tokens; headings, images, etc.
@@ -37,19 +24,19 @@ spindle.handlers[".x"] = function(file_path)
 	return page._output_path, page.canonical_url
 end
 
-spindle.tokens[">"] = function(page, arg)
+spindle.tokens[">"] = function(page, scope, arg)
 	spindle.parse_markup = spindle.__parse_markup
 	local part = spindle.load_markup("_data/" .. arg .. ".x")
-	return spindle.render(page, part.syntax_tree)
+	return spindle.render_internal(page, scope, part.syntax_tree)
 end
 
 -- @todo make this safe my goodness
-spindle.tokens["~"] = function(page, arg)
+spindle.tokens["~"] = function(page, scope, arg)
 	spindle.parse_markup = spindle.__parse_markup
 	local args = spindle.split_quoted(arg)
 	local part = spindle.load_markup("_data/" .. args[1] .. ".x")
 	local path = spindle.find_file(args[2])
-	return spindle.render(spindle.load_page(path), part.syntax_tree)
+	return spindle.render_internal(spindle.load_page(path), scope, part.syntax_tree)
 end
 
 spindle.tokens["#"]   = '<h1 id="%0:slug">%0</h1>'
@@ -59,9 +46,9 @@ spindle.tokens["###"] = '<h3 id="%0:slug">%0</h3>'
 spindle.tokens["-"] = { main = '<li>%0</li>', wrap = '<ul>%0</ul>' }
 spindle.tokens["+"] = { main = '<li>%0</li>', wrap = '<ol>%0</ol>' }
 
-spindle.tokens["!"] = function(page, arg)
+spindle.tokens["!"] = function(page, scope, arg)
 	local _, url = spindle.process_any_file(arg)
-	return spindle.template_expand('<img src="%0">', url)
+	return spindle.template_expand(page, '<img src="%0">', url)
 end
 
 spindle.tokens.block_default = '%0'
@@ -79,6 +66,7 @@ spindle.to_quote = function(arg)
 end
 
 spindle.modifiers.slug  = spindle.to_slug
+spindle.modifiers.uslug = spindle.to_slug
 spindle.modifiers.title = spindle.to_title
 spindle.modifiers.upper = spindle.to_upper
 spindle.modifiers.lower = spindle.to_lower
@@ -182,6 +170,23 @@ function spindle.replace_escaped(template, level_one, level_two, replace)
 	end)
 end
 
+function spindle.iterate_lines(str)
+	if str:sub(-1) ~= "\n" then
+		str = str .. "\n"
+	end
+	return str:gmatch("(.-)\n")
+end
+
+local function scope_search(scope, term)
+	for i = #scope, 1, -1 do
+		local v = scope[i].decl
+		if v and v == term then
+			return scope[i].value
+		end
+	end
+	return nil
+end
+
 function spindle.write_file(path, content)
 	spindle.make_directory(path)
 	local file = io.open(path, 'w')
@@ -199,14 +204,12 @@ function spindle.load_markup(file_path)
 	end
 
 	local page = {}
-	for k, v in pairs(spindle.tokens) do
-		page[k] = v
-	end
+	page._slugs = {}
 
 	if spindle.markup_cache[file_path] then
 		page.syntax_tree = spindle.markup_cache[file_path]
 	else
-		local m = spindle.parse_markup(page, file_path)
+		local m = spindle.parse_markup(page, spindle.load_file(file_path))
 		spindle.markup_cache[file_path] = m
 		page.syntax_tree = m
 	end
@@ -258,15 +261,30 @@ function spindle.load_file(file_path)
 	return s
 end
 
-function spindle.expand(template, page)
+local function uslug_expand(page, slug)
+	if page._slugs[slug] then
+		local n = page._slugs[slug]
+		slug = string.format("%s-%d", slug, n)
+		page._slugs[slug] = n + 1
+	else
+		page._slugs[slug] = 1
+	end
+	return slug
+end
+
+function spindle.expand(page, scope, template)
 	-- variables: %var:modifiers
 	local result = template:gsub("%%([%a_]+):([%a_]+)", function (x, y)
-		local z = page[x]
+		local z = scope_search(scope, x)
 		if z == nil then
 			return x
 		end
 		if spindle.modifiers[y] then
-			return spindle.modifiers[y](z)
+			local s = spindle.modifiers[y](z)
+			if y == "uslug" then
+				return uslug_expand(page, s)
+			end
+			return s
 		end
 		return z
 	end)
@@ -284,7 +302,7 @@ function spindle.expand(template, page)
 	return result
 end
 
-function spindle.template_expand(template, value)
+function spindle.template_expand(page, template, value)
 	-- %placeholder:modifier
 	local result = template:gsub("%%(%d+):([%w_]+)", function(x, y)
 		local n = x + 0
@@ -294,7 +312,11 @@ function spindle.template_expand(template, value)
 			x = spindle.split_quoted(value)[n]
 		end
 		if spindle.modifiers[y] then
-			return spindle.modifiers[y](x)
+			local s = spindle.modifiers[y](x)
+			if y == "uslug" then
+				return uslug_expand(page, s)
+			end
+			return s
 		end
 		return x
 	end)
@@ -313,7 +335,7 @@ end
 
 --[[function print_syntax_tree(level, syntax_tree)
 	for i, entry in ipairs(syntax_tree) do
-		print(level, i, entry.token or entry.block, entry.text or '')
+		print(level, i, entry.token, entry.block, entry.ifstmt or entry.elsestmt, entry.text or '')
 		if entry.token and entry.block then
 			print("    ", entry.token, entry.block)
 		end
@@ -346,7 +368,7 @@ function spindle.find_tokens(block, ...)
 	return t
 end
 
-function spindle.parse_markup(page, file_path)
+function spindle.parse_markup(page, blob)
 	local syntax_tree = {}
 	local active = syntax_tree
 	local stack = {syntax_tree}
@@ -354,7 +376,7 @@ function spindle.parse_markup(page, file_path)
 	local is_block_comment = false
 	local is_block_raw     = false
 
-	for line in io.lines(file_path) do
+	for line in spindle.iterate_lines(blob) do
 		local active = stack[#stack]
 
 		if line == "" then
@@ -372,6 +394,19 @@ function spindle.parse_markup(page, file_path)
 			end
 			if is_block_comment then is_block_comment = false end
 			if is_block_raw     then is_block_raw     = false end
+
+			if line:match("%s+else%s+") then
+				local block_id = line:match("%s+([%w_]+)%s+{$")
+				local new_block = {
+					token    = block_id == "else" and 'block_default' or block_id,
+					elsestmt = true,
+					block    = true,
+				}
+
+				active = stack[#stack]
+				active[#active + 1] = new_block
+				stack[#stack + 1]   = new_block
+			end
 			goto next_line
 		end
 
@@ -398,7 +433,7 @@ function spindle.parse_markup(page, file_path)
 			if line:match("{$") then
 				y = spindle.trim(y:sub(1, -2))
 
-				new_block = {}
+				local new_block = {}
 				new_block.token = x
 				new_block.block = y
 
@@ -412,9 +447,12 @@ function spindle.parse_markup(page, file_path)
 
 			if #stack == 1 then
 				page[x] = y
-			else
-				active[x] = y
 			end
+
+			active[#active + 1] = {
+				decl = x,
+				value = y
+			}
 			goto next_line
 		end
 
@@ -457,8 +495,7 @@ function spindle.parse_markup(page, file_path)
 
 		-- check for token/value pair
 		local x, y = line:match('^%s*(%S+)%s+(.-)$')
-
-		if page[x] then
+		if x ~= nil and not x:match('%w') then
 			active[#active + 1] = {
 				token = x,
 				text  = spindle.trim(y)
@@ -469,7 +506,6 @@ function spindle.parse_markup(page, file_path)
 		line = spindle.trim(line)
 
 		local char = string.sub(line, 1, 1)
-
 		if char == '<' then
 			active[#active + 1] = {
 				token = 'html',
@@ -490,8 +526,21 @@ end
 spindle.__parse_markup = spindle.parse_markup -- here to assist with hacking
 
 function spindle.render(page, active_block)
+	local scope = {}
+	for k, v in pairs(spindle.tokens) do
+		scope[#scope + 1] = {
+			decl  = k,
+			value = v
+		}
+	end
+	return spindle.render_internal(page, scope, active_block)
+end
+
+function spindle.render_internal(page, scope, active_block)
 	local content = ""
 	local index   = 0
+
+	local scope_frame = 0
 
 	while true do
 		index = index + 1
@@ -501,45 +550,84 @@ function spindle.render(page, active_block)
 
 		local entry = active_block[index]
 
+		if entry.decl then
+			scope[#scope + 1] = entry
+			scope_frame = scope_frame + 1
+			goto render_continue
+		end
+
 		if entry.token == "ws" then
 			goto render_continue
 		end
 
 		if entry.token == "html" then
-			content = content .. spindle.expand(entry.text, page)
+			content = content .. spindle.expand(page, scope, entry.text)
 			goto render_continue
 		end
 
-		if entry.block and entry.token and page[entry.token] then
+		if entry.block and entry.token then
 			if entry.ifstmt then
-				if not page[entry.ifstmt] then
-					if index < #active_block and active_block[index + 1].elsestmt then
-						entry = active_block[index + 1]
-						index = index + 1
+				local has_else = false
+
+				if index < #active_block and active_block[index + 1].elsestmt then
+					index = index + 1
+					has_else = true
+				end
+
+				if not scope_search(scope, entry.ifstmt) then
+					if has_else then
+						entry = active_block[index]
 					else
 						goto render_continue
 					end
 				end
 			end
 
-			local t = page[entry.token]
+			local t = scope_search(scope, entry.token)
 			local x = type(t)
 
 			if x == 'string' then
-				local w = spindle.expand(page[entry.token], page)
-				content = content .. spindle.template_expand(w, spindle.render(page, entry))
+				local w = spindle.expand(page, scope, t)
+				content = content .. spindle.template_expand(page, w, spindle.render_internal(page, scope, entry))
+
 			elseif x == 'function' then
-				local v = t(page, spindle.render(page, entry))
+				local v = t(page, scope, spindle.render_internal(page, scope, entry))
 				if v ~= nil then
-					content = content .. (entry.raw and v or spindle.expand(v, page))
+					content = content .. (entry.raw and v or spindle.expand(page, scope, v))
 				end
 			end
 
 			goto render_continue
 		end
 
-		if entry.token and page[entry.token] then
-			local t = page[entry.token]
+		if entry.token then
+			if entry.token == '$' then
+				local args = spindle.split_quoted(entry.text)
+				if _ENV[args[1]] then
+					local v = _ENV[entry.text](page, args)
+					if v ~= nil then
+						content = content .. v
+					end
+				end
+				goto render_continue
+			elseif entry.token == '$$' then
+				local x = "local page = select(1, ...); " .. entry.text
+				local v = load(x)(page)
+				if v ~= nil then
+					content = content .. spindle.expand(page, scope, v)
+				end
+				goto render_continue
+			end
+		end
+
+		if entry.token then
+			local t = scope_search(scope, entry.token)
+
+			if t == nil then
+				content = string.format("%s<p>%s %s</p>", content, entry.token, entry.text) -- @todo hard-coded <p>
+				goto render_continue
+			end
+
 			local x = type(t)
 
 			if x == 'table' then
@@ -555,9 +643,9 @@ function spindle.render(page, active_block)
 					end
 
 					if entry.raw then
-						sub_content = sub_content .. spindle.template_expand(t.main, entry.text)
+						sub_content = sub_content .. spindle.template_expand(page, t.main, entry.text)
 					else
-						sub_content = sub_content .. spindle.expand(spindle.template_expand(t.main, entry.text), page)
+						sub_content = sub_content .. spindle.expand(page, scope, spindle.template_expand(page, t.main, entry.text))
 					end
 					count = count + 1
 
@@ -569,9 +657,9 @@ function spindle.render(page, active_block)
 
 				if (not t.minimum) or t.minimum <= count then
 					if entry.raw then
-						content = content .. spindle.template_expand(t.wrap, sub_content)
+						content = content .. spindle.template_expand(page, t.wrap, sub_content)
 					else
-						content = content .. spindle.expand(spindle.template_expand(t.wrap, sub_content), page)
+						content = content .. spindle.expand(page, scope, spindle.template_expand(page, t.wrap, sub_content))
 					end
 				else
 					content = content .. sub_content
@@ -581,48 +669,32 @@ function spindle.render(page, active_block)
 
 			elseif x == 'string' then
 				if entry.raw then
-					content = content .. spindle.template_expand(t, entry.text)
+					content = content .. spindle.template_expand(page, t, entry.text)
 				else
-					content = content .. spindle.expand(spindle.template_expand(t, entry.text), page)
+					content = content .. spindle.expand(page, scope, spindle.template_expand(page, t, entry.text))
 				end
 				goto render_continue
 
 			elseif x == 'function' then
-				local v = t(page, entry.raw and entry.text or spindle.expand(entry.text, page))
+				local v = t(page, scope, entry.raw and entry.text or spindle.expand(page, scope, entry.text))
 				if v ~= nil then
-					content = content .. (entry.raw and v or spindle.expand(v, page))
+					content = content .. (entry.raw and v or spindle.expand(page, scope, v))
 				end
 				goto render_continue
-			end
-
-			if entry.token == '$' then
-				if _ENV[entry.text] then
-					local v = _ENV[entry.text](page)
-					if v ~= nil then
-						content = content .. v
-					end
-					goto render_continue
-				end
-
-				local f = spindle.load_file("_data/" .. entry.text .. ".lua")
-				local x = "local page = select(1, ...); " .. f
-				local v = load(x)(page)
-				if v ~= nil then
-					content = content .. v
-				end
-				goto render_continue
-			end
-
-			if entry.token == '$$' then
-				local x = "local page = select(1, ...); " .. entry.text
-				local v = load(x)(page)
-				if v ~= nil then
-					content = content .. spindle.expand(v, page)
-				end
 			end
 		end
 
 		::render_continue::
+	end
+
+	if scope_frame > 0 then
+		for i = #scope, 1, -1 do
+			scope[i] = nil
+			scope_frame = scope_frame - 1
+			if scope_frame == 0 then
+				break
+			end
+		end
 	end
 
 	return content
@@ -655,7 +727,6 @@ function spindle.process_any_file(path)
 		end
 
 		local ext = spindle.long_ext(file_path)
-
 		if spindle.handlers[ext] then
 			return spindle.handlers[ext](file_path)
 		else
@@ -717,9 +788,17 @@ function spindle.make_page_list()
 	return file_list
 end
 
+function spindle.safe_import(file_name)
+	if spindle.file_exists(file_name) then
+		dofile(file_name)
+	end
+end
+
 function main(starting_file)
-	if spindle.file_exists("_data/config.lua") then
-		dofile("_data/config.lua")
+	spindle.safe_import("_data/config.lua")
+
+	if not spindle.production then
+		spindle.domain = '/'
 	end
 
 	spindle.process_any_file(starting_file)
@@ -727,6 +806,7 @@ function main(starting_file)
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
+		page._slugs  = {}
 		page.content = spindle.render(page, page.syntax_tree)
 
 		if page.template then

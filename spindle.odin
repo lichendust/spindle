@@ -1,20 +1,7 @@
 /*
-	Spindle
-	A static site generator
-	Copyright (C) 2022-2023 Harley Denham
-
-	This program is free software: you can redistribute it and/or modify
-	it under the terms of the GNU General Public License as published by
-	the Free Software Foundation, either version 3 of the License, or
-	(at your option) any later version.
-
-	This program is distributed in the hope that it will be useful,
-	but WITHOUT ANY WARRANTY; without even the implied warranty of
-	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-	GNU General Public License for more details.
-
-	You should have received a copy of the GNU General Public License
-	along with this program.  If not, see <https://www.gnu.org/licenses/>.
+	MIT License
+	Spindle: a static site generator
+	Copyright (C) 2019-2024 Harley Denham
 */
 
 package main
@@ -58,7 +45,9 @@ main :: proc() {
 	case "init":
 		init_project(args[1:])
 	case "build":
-		execute_spindle(args[1:])
+		execute_spindle(args[1:], false)
+	case "prod":
+		execute_spindle(args[1:], true)
 	case:
 		fmt.println(USAGE)
 	}
@@ -91,7 +80,7 @@ get_script_location :: proc() -> (cstring, bool) {
 	return "", false
 }
 
-execute_spindle :: proc(args: []string) {
+execute_spindle :: proc(args: []string, is_prod: bool) {
 	load_project_dir()
 
 	ctx := lua.L_newstate()
@@ -100,14 +89,23 @@ execute_spindle :: proc(args: []string) {
 	lua.createtable(ctx, 0, 16)
 	lua.setglobal(ctx, "spindle")
 
-	register_procedure(ctx, "to_slug",        lua_to_slug)
-	register_procedure(ctx, "file_exists",    lua_file_exists)
-	register_procedure(ctx, "find_file",      lua_find_file)
-	register_procedure(ctx, "copy_file",      lua_copy_file)
-	register_procedure(ctx, "split_fields",   lua_field_split)
-	register_procedure(ctx, "split_quoted",   lua_quoted_split)
-	register_procedure(ctx, "make_directory", lua_make_directory)
-	register_procedure(ctx, "to_title",       lua_title_case)
+	register_procedure(ctx, "to_slug",           lua_to_slug)
+	register_procedure(ctx, "file_exists",       lua_file_exists)
+	register_procedure(ctx, "find_file",         lua_find_file)
+	register_procedure(ctx, "find_file_pattern", lua_find_file_pattern)
+	register_procedure(ctx, "copy_file",         lua_copy_file)
+	register_procedure(ctx, "split_fields",      lua_field_split)
+	register_procedure(ctx, "split_quoted",      lua_quoted_split)
+	register_procedure(ctx, "make_directory",    lua_make_directory)
+	register_procedure(ctx, "to_title",          lua_title_case)
+
+	{
+		lua.getglobal(ctx, "spindle")
+		lua.pushstring(ctx, "production")
+		lua.pushboolean(ctx, b32(is_prod))
+		lua.settable(ctx, -3)
+		lua.pop(ctx, 1)
+	}
 
 	lua_loaded: i32
 
@@ -434,6 +432,42 @@ lua_find_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	}
 
 	lua.pushstring(ctx, strings.clone_to_cstring(path, context.temp_allocator))
+	return 1
+}
+
+find_file_pattern :: proc(pattern: string) -> []string {
+	short_list := make([dynamic]string, 0, len(file_array), context.temp_allocator)
+	pattern := strings.to_lower(pattern, context.temp_allocator)
+
+	for entry in file_array {
+		a := strings.to_lower(entry, context.temp_allocator)
+		if strings.contains(a, pattern) {
+			append(&short_list, entry)
+		}
+	}
+
+	return short_list[:]
+}
+
+lua_find_file_pattern :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
+	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+
+	search := find_file_pattern(file_name)
+	if len(search) == 0 {
+		return 0
+	}
+
+	lua.createtable(ctx, 0, i32(len(search)))
+
+	for entry, i in search {
+		lua.pushnumber(ctx, lua.Number(i + 1))
+		lua.pushstring(ctx, strings.clone_to_cstring(entry, context.temp_allocator))
+		lua.settable(ctx, -3)
+	}
+
 	return 1
 }
 
