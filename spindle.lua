@@ -21,7 +21,7 @@ spindle.output_path = "_site/"
 spindle.handlers[".x"] = function(file_path)
 	spindle.parse_markup = spindle.__parse_markup
 	local page = spindle.load_page(file_path)
-	return page._output_path, page.canonical_url
+	return page.output_path, page.canonical_url
 end
 
 spindle.tokens[">"] = function(page, scope, arg)
@@ -204,7 +204,8 @@ function spindle.load_markup(file_path)
 	end
 
 	local page = {}
-	page._slugs = {}
+	page.vars  = {}
+	page.slugs = {}
 
 	if spindle.markup_cache[file_path] then
 		page.syntax_tree = spindle.markup_cache[file_path]
@@ -234,8 +235,8 @@ function spindle.load_page(file_path)
 	local page = spindle.load_markup(file_path)
 
 	page.canonical_url = curl
-	page._source_path  = file_path
-	page._output_path  = spindle.output_path .. file_path:gsub("%..+$", ".html")
+	page.source_path  = file_path
+	page.output_path  = spindle.output_path .. file_path:gsub("%..+$", ".html")
 
 	-- must be cached before pre-render to avoid loops
 	spindle.all_pages[file_path] = page
@@ -262,12 +263,12 @@ function spindle.load_file(file_path)
 end
 
 local function uslug_expand(page, slug)
-	if page._slugs[slug] then
-		local n = page._slugs[slug]
+	if page.slugs[slug] then
+		local n = page.slugs[slug]
 		slug = string.format("%s-%d", slug, n)
-		page._slugs[slug] = n + 1
+		page.slugs[slug] = n + 1
 	else
-		page._slugs[slug] = 1
+		page.slugs[slug] = 1
 	end
 	return slug
 end
@@ -275,7 +276,7 @@ end
 function spindle.expand(page, scope, template)
 	-- variables: %var:modifiers
 	local result = template:gsub("%%([%a_]+):([%a_]+)", function (x, y)
-		local z = scope_search(scope, x)
+		local z = scope_search(scope, x) or page.vars[x]
 		if z == nil then
 			return x
 		end
@@ -291,7 +292,7 @@ function spindle.expand(page, scope, template)
 
 	-- variables: %var
 	result = result:gsub("%%([%a_]+)", function (x)
-		return page[x]
+		return scope_search(scope, x) or page.vars[x]
 	end)
 
 	-- spindle.inlines, like [links](#) or **bolded**
@@ -446,7 +447,7 @@ function spindle.parse_markup(page, blob)
 			if y == 'true'  then y = true end
 
 			if #stack == 1 then
-				page[x] = y
+				page.vars[x] = y
 			end
 
 			active[#active + 1] = {
@@ -574,7 +575,7 @@ function spindle.render_internal(page, scope, active_block)
 					has_else = true
 				end
 
-				if not scope_search(scope, entry.ifstmt) then
+				if not (scope_search(scope, entry.ifstmt) or page.vars[entry.ifstmt]) then
 					if has_else then
 						entry = active_block[index]
 					else
@@ -583,7 +584,7 @@ function spindle.render_internal(page, scope, active_block)
 				end
 			end
 
-			local t = scope_search(scope, entry.token)
+			local t = scope_search(scope, entry.token) or page.vars[entry.token]
 			local x = type(t)
 
 			if x == 'string' then
@@ -621,7 +622,7 @@ function spindle.render_internal(page, scope, active_block)
 		end
 
 		if entry.token then
-			local t = scope_search(scope, entry.token)
+			local t = scope_search(scope, entry.token) or page.vars[entry.token]
 
 			if t == nil then
 				content = string.format("%s<p>%s %s</p>", content, entry.token, entry.text) -- @todo hard-coded <p>
@@ -740,12 +741,12 @@ end
 function spindle.default_handler(file_path)
 	local new_path = spindle.output_path .. file_path
 	local file = {
-		_source_path  = file_path,
-		_output_path  = new_path,
+		source_path  = file_path,
+		output_path  = new_path,
 		canonical_url = spindle.url_from_path(file_path)
 	}
-	spindle.all_files[file._output_path] = file
-	return file._output_path, file.canonical_url
+	spindle.all_files[file.output_path] = file
+	return file.output_path, file.canonical_url
 end
 
 function spindle.has_run(path)
@@ -772,13 +773,13 @@ function spindle.make_page_list()
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
-		if not page._source_path:match("^404") then
+		if not page.source_path:match("^404") then
 			table.insert(file_list, page.canonical_url)
 		end
 	end
 
 	for i, file in pairs(spindle.all_files) do
-		if spindle.long_ext(file._output_path) == ".html" then
+		if spindle.long_ext(file.output_path) == ".html" then
 			table.insert(file_list, file.canonical_url)
 		end
 	end
@@ -797,36 +798,32 @@ end
 function main(starting_file)
 	spindle.safe_import("_data/config.lua")
 
-	if not spindle.production then
-		spindle.domain = '/'
-	end
-
 	spindle.process_any_file(starting_file)
 
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
-		page._slugs  = {}
+		page.slugs = {}
 		page.content = spindle.render(page, page.syntax_tree)
 
 		if page.template then
 			spindle.parse_markup = spindle.__parse_markup
 			local template = spindle.load_markup("_data/" .. page.template .. ".x")
-			spindle.write_file(page._output_path, spindle.render(page, template.syntax_tree))
+			spindle.write_file(page.output_path, spindle.render(page, template.syntax_tree))
 		else
-			spindle.write_file(page._output_path, page.content)
+			spindle.write_file(page.output_path, page.content)
 		end
 
-		table.insert(file_list, page._source_path)
+		table.insert(file_list, page.source_path)
 	end
 
 	for i, file in pairs(spindle.all_files) do
-		spindle.make_directory(file._output_path)
-		if not spindle.copy_file(file._source_path, file._output_path) then
-			print("failed to copy", file._source_path)
+		spindle.make_directory(file.output_path)
+		if not spindle.copy_file(file.source_path, file.output_path) then
+			print("failed to copy", file.source_path)
 		end
 
-		table.insert(file_list, file._source_path)
+		table.insert(file_list, file.source_path)
 	end
 
 	spindle.write_file(spindle.output_path .. "sitemap.xml", spindle.generate_sitemap(spindle.make_page_list()))
