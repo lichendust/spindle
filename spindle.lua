@@ -234,17 +234,22 @@ function spindle.load_page(file_path)
 	local curl = spindle.url_from_path(file_path)
 	local page = spindle.load_markup(file_path)
 
-	page.canonical_url = curl
-	page.source_path  = file_path
-	page.output_path  = spindle.output_path .. file_path:gsub("%..+$", ".html")
+	page.canonical_url      = curl
+	page.vars.canonical_url = curl
+
+	page.source_path = file_path
+	page.output_path = spindle.output_path .. file_path:gsub("%..+$", ".html")
+
+	page.vars.source_path = file_path
+	page.vars.output_path = page.output_path
 
 	-- must be cached before pre-render to avoid loops
 	spindle.all_pages[file_path] = page
 
-	page.content = spindle.render(page, page.syntax_tree)
-	if page.template then
+	page.vars.content = spindle.render(page, page.syntax_tree)
+	if page.vars.template then
 		spindle.parse_markup = spindle.__parse_markup
-		local template = spindle.load_markup("_data/" .. page.template .. ".x")
+		local template = spindle.load_markup("_data/" .. page.vars.template .. ".x")
 		spindle.render(page, template.syntax_tree)
 	end
 
@@ -427,17 +432,14 @@ function spindle.parse_markup(page, blob)
 		end
 
 		-- check for variables
-		local x = line:match('^%s*([%w_]+)%s*=')
+		local x = line:match('^%s*([%w_]+)%s*=') or line:match('^%s*%[([%W]+)%]%s*=')
 		if x then
 			local y = line:match("=%s*(.+)")
 
 			if line:match("{$") then
 				y = spindle.trim(y:sub(1, -2))
 
-				local new_block = {}
-				new_block.token = x
-				new_block.block = y
-
+				local new_block = { token = x, block = y }
 				active[#active + 1] = new_block
 				stack[#stack + 1]   = new_block
 				goto next_line
@@ -450,10 +452,7 @@ function spindle.parse_markup(page, blob)
 				page.vars[x] = y
 			end
 
-			active[#active + 1] = {
-				decl = x,
-				value = y
-			}
+			active[#active + 1] = { decl = x, value = y }
 			goto next_line
 		end
 
@@ -474,10 +473,7 @@ function spindle.parse_markup(page, blob)
 		-- open block
 		local is_block = line:match('^%s*{$')
 		if is_block then
-			local new_block = {
-				token = 'block_default',
-				block = true
-			}
+			local new_block = { token = 'block_default', block = true }
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
 			goto next_line
@@ -485,10 +481,7 @@ function spindle.parse_markup(page, blob)
 
 		local label = line:match('^%s*(.-)%s+{$')
 		if label then
-			local new_block = {
-				token = label,
-				block = true
-			}
+			local new_block = { token = label, block = true }
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
 			goto next_line
@@ -497,10 +490,7 @@ function spindle.parse_markup(page, blob)
 		-- check for token/value pair
 		local x, y = line:match('^%s*(%S+)%s+(.-)$')
 		if x ~= nil and not x:match('%w') then
-			active[#active + 1] = {
-				token = x,
-				text  = spindle.trim(y)
-			}
+			active[#active + 1] = { token = x, text = spindle.trim(y) }
 			goto next_line
 		end
 
@@ -508,15 +498,9 @@ function spindle.parse_markup(page, blob)
 
 		local char = string.sub(line, 1, 1)
 		if char == '<' then
-			active[#active + 1] = {
-				token = 'html',
-				text  = line
-			}
+			active[#active + 1] = { token = 'html',    text = line }
 		else
-			active[#active + 1] = {
-				token = 'default',
-				text  = line
-			}
+			active[#active + 1] = { token = 'default', text = line }
 		end
 
 		::next_line::
@@ -529,10 +513,7 @@ spindle.__parse_markup = spindle.parse_markup -- here to assist with hacking
 function spindle.render(page, active_block)
 	local scope = {}
 	for k, v in pairs(spindle.tokens) do
-		scope[#scope + 1] = {
-			decl  = k,
-			value = v
-		}
+		scope[#scope + 1] = { decl = k, value = v }
 	end
 	return spindle.render_internal(page, scope, active_block)
 end
@@ -791,8 +772,9 @@ end
 
 function spindle.safe_import(file_name)
 	if spindle.file_exists(file_name) then
-		dofile(file_name)
+		return dofile(file_name)
 	end
+	return nil
 end
 
 function main(starting_file)
@@ -804,14 +786,14 @@ function main(starting_file)
 
 	for i, page in pairs(spindle.all_pages) do
 		page.slugs = {}
-		page.content = spindle.render(page, page.syntax_tree)
+		page.vars.content = spindle.render(page, page.syntax_tree)
 
-		if page.template then
+		if page.vars.template then
 			spindle.parse_markup = spindle.__parse_markup
-			local template = spindle.load_markup("_data/" .. page.template .. ".x")
+			local template = spindle.load_markup("_data/" .. page.vars.template .. ".x")
 			spindle.write_file(page.output_path, spindle.render(page, template.syntax_tree))
 		else
-			spindle.write_file(page.output_path, page.content)
+			spindle.write_file(page.output_path, page.vars.content)
 		end
 
 		table.insert(file_list, page.source_path)
