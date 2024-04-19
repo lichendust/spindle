@@ -187,13 +187,6 @@ local function scope_search(scope, term)
 	return nil
 end
 
-function spindle.write_file(path, content)
-	spindle.make_directory(path)
-	local file = io.open(path, 'w')
-	file:write(content)
-	file:close()
-end
-
 function spindle.register_inline(func)
 	table.insert(spindle.inlines, func)
 end
@@ -395,11 +388,21 @@ function spindle.parse_markup(page, blob)
 		end
 
 		if line:match('^%s*}') then
-			if not is_block_comment and not is_block_raw then
+			if is_block_raw then
+				if active.parens > 0 then
+					active.text = active.text .. '\n' .. line
+					active.parens = active.parens + spindle._balance_parens(line)
+				else
+					stack[#stack] = nil
+					is_block_raw = false
+				end
+				goto next_line
+			end
+
+			if not is_block_comment then
 				stack[#stack] = nil
 			end
 			if is_block_comment then is_block_comment = false end
-			if is_block_raw     then is_block_raw     = false end
 
 			if line:match("%s+else%s+") then
 				local block_id = line:match("%s+([%w_]+)%s+{$")
@@ -420,7 +423,12 @@ function spindle.parse_markup(page, blob)
 			goto next_line
 		end
 		if is_block_raw then
-			active.text = active.text .. '\n' .. line
+			if #active.text > 0 then
+				active.text = active.text .. '\n' .. line
+			else
+				active.text = active.text .. line
+			end
+			active.parens = active.parens + spindle._balance_parens(line)
 			goto next_line
 		end
 
@@ -481,9 +489,21 @@ function spindle.parse_markup(page, blob)
 
 		local label = line:match('^%s*(.-)%s+{$')
 		if label then
-			local new_block = { token = label, block = true }
+			label = spindle.split_fields(label)
+
+			local new_block = { token = label[1] }
+
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
+
+			if #label > 1 and label[2] == 'raw' then
+				is_block_raw = true
+				new_block.raw = true
+				new_block.text = ""
+				new_block.parens = 0
+			else
+				new_block.block = true
+			end
 			goto next_line
 		end
 

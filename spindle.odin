@@ -97,7 +97,9 @@ execute_spindle :: proc(args: []string, is_prod: bool) {
 	register_procedure(ctx, "split_fields",      lua_field_split)
 	register_procedure(ctx, "split_quoted",      lua_quoted_split)
 	register_procedure(ctx, "make_directory",    lua_make_directory)
+	register_procedure(ctx, "write_file",        lua_write_file)
 	register_procedure(ctx, "to_title",          lua_title_case)
+	register_procedure(ctx, "_balance_parens",   lua_balance_parentheses)
 
 	{
 		lua.getglobal(ctx, "spindle")
@@ -263,6 +265,9 @@ lua_field_split :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
+	// @todo just check for whitespace instead of always calling fields
+	// then we can run a fields_iterator and save the fields allocation
+
 	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
 	args  := strings.fields(input, context.temp_allocator)
 	count := len(args)
@@ -325,6 +330,16 @@ lua_to_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 	lua.pushstring(ctx, strings.clone_to_cstring(strings.to_string(buffer), context.temp_allocator))
 	return 1
 }
+
+/*lua_thousand_sep :: proc "c" (ctx: ^lua.State) -> i32 {
+	@todo
+
+	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
+	arg1 := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	arg2 := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
+}*/
 
 title_case :: proc(input: string) -> string {
 	short_words :: proc(t: string) -> bool {
@@ -471,15 +486,27 @@ lua_find_file_pattern :: proc "c" (ctx: ^lua.State) -> i32 {
 	return 1
 }
 
+make_directory :: #force_inline proc(file_name: string) {
+	if slashpath.ext(file_name) != "" {
+		os.make_directory(slashpath.dir(file_name, context.temp_allocator))
+	}
+	os.make_directory(file_name)
+}
+
 lua_make_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	make_directory(file_name)
+	return 0
+}
 
-	if slashpath.ext(file_name) != "" {
-		file_name = slashpath.dir(file_name, context.temp_allocator)
-	}
+lua_write_file :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file_blob := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
 
-	os.make_directory(file_name)
+	make_directory(file_name)
+	os.write_entire_file(file_name, transmute([]u8) file_blob)
 	return 0
 }
 
@@ -505,6 +532,22 @@ load_project_dir :: proc() {
 
 	file_array = make([dynamic]string, 0, 64)
 	filepath.walk(".", walk_proc, nil)
+}
+
+lua_balance_parentheses :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
+	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	count := 0
+
+	for c in input {
+		if c == '{' do count += 1
+		if c == '}' do count -= 1
+	}
+
+	lua.pushnumber(ctx, lua.Number(count))
+	return 1
 }
 
 USAGE :: SPINDLE + `
