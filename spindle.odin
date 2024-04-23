@@ -15,7 +15,7 @@ import "core:sys/windows"
 import "core:path/filepath"
 import "core:path/slashpath"
 
-import lua "lua54"
+import lua "lua/5.4"
 
 VERSION :: "v0.5.0"
 SPINDLE :: "Spindle " + VERSION
