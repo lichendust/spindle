@@ -489,6 +489,7 @@ lua_find_file_pattern :: proc "c" (ctx: ^lua.State) -> i32 {
 make_directory :: #force_inline proc(file_name: string) {
 	if slashpath.ext(file_name) != "" {
 		os.make_directory(slashpath.dir(file_name, context.temp_allocator))
+		return
 	}
 	os.make_directory(file_name)
 }
