@@ -1,0 +1,59 @@
+name: Build
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+jobs:
+  build_linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Odin
+        uses: laytan/setup-odin@v2.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          build-type: release
+      - name: Compile
+        run: odin build spindle.odin -file -out:spindle
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: spindle_linux_x64
+          path: spindle
+
+  build_macos:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Odin
+        uses: laytan/setup-odin@v2.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          build-type: release
+      - name: Compile
+        run: odin build spindle.odin -file -out:spindle
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: spindle_macos_silicon
+          path: spindle
+
+  build_windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Odin
+        uses: laytan/setup-odin@v2.3.0
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          build-type: release
+      - name: Compile
+        run: odin build spindle.odin -file -out:spindle.exe
+      - name: Upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: spindle_windows_x64
+          path: spindle.exe
