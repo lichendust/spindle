@@ -486,6 +486,7 @@ lua_find_file_pattern :: proc "c" (ctx: ^lua.State) -> i32 {
 	return 1
 }
 
+// @todo this does not function like mkdir -p -- nested directories aren't created
 make_directory :: #force_inline proc(file_name: string) {
 	if slashpath.ext(file_name) != "" {
 		os.make_directory(slashpath.dir(file_name, context.temp_allocator))

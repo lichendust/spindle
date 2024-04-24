@@ -83,13 +83,10 @@ table.insert(spindle.inlines, function(page, line)
 	end)
 end)
 
-
-
 function spindle.make_anchor_tag(label, path)
 	if spindle.has_protocol(path) then
 		return string.format('<a href="%s">%s</a>', path, label)
 	end
-
 	if path:sub(1, 1) == '#' then
 		return string.format('<a href="%s">%s</a>', path, label)
 	end
@@ -606,7 +603,7 @@ function spindle.render_internal(page, scope, active_block)
 			if entry.token == '$' then
 				local args = spindle.split_quoted(entry.text)
 				if _ENV[args[1]] then
-					local v = _ENV[entry.text](page, args)
+					local v = _ENV[args[1]](page, args)
 					if v ~= nil then
 						content = content .. v
 					end
@@ -740,10 +737,9 @@ function spindle.process_any_file(path)
 end
 
 function spindle.default_handler(file_path)
-	local new_path = spindle.output_path .. file_path
 	local file = {
-		source_path  = file_path,
-		output_path  = new_path,
+		source_path   = file_path,
+		output_path   = spindle.output_path .. file_path,
 		canonical_url = spindle.url_from_path(file_path)
 	}
 	spindle.all_files[file.output_path] = file
