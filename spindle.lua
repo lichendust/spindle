@@ -6,7 +6,6 @@
 
 -- note: the base 'spindle' table is
 -- declared by the spindle host executable
-
 spindle.handlers     = {} -- file types
 spindle.tokens       = {} -- line-level tokens; headings, images, etc.
 spindle.inlines      = {} -- inline syntax; links, bold, etc.
@@ -15,6 +14,11 @@ spindle.all_pages    = {}
 spindle.all_files    = {}
 spindle.lock_file    = {} -- temp map for 'other' files @todo
 spindle.markup_cache = {}
+
+local defer_list = {}
+function spindle.defer(f)
+	defer_list[#defer_list + 1] = f
+end
 
 spindle.output_path = "_site/"
 
@@ -38,6 +42,21 @@ spindle.tokens["~"] = function(page, scope, arg)
 	local path = spindle.find_file(args[2])
 	return spindle.render_internal(spindle.load_page(path), scope, part.syntax_tree)
 end
+
+--[[spindle.tokens["~"] = function(page, scope, arg)
+	spindle.parse_markup = spindle.__parse_markup
+	local args = spindle.split_quoted(arg)
+	-- local data = "_data/" .. args[1] .. ".x"
+	-- local part = spindle.load_markup("_data/" .. args[1] .. ".x")
+
+	local temp = spindle.find_in_scope(scope, args[1])
+	if temp == nil then
+		-- xx
+	end
+
+	local path = spindle.find_file(args[2])
+	return spindle.render_internal(spindle.load_page(path), scope, part.syntax_tree)
+end]]
 
 spindle.tokens["#"]   = '<h1 id="%0:slug">%0</h1>'
 spindle.tokens["##"]  = '<h2 id="%0:slug">%0</h2>'
@@ -174,7 +193,7 @@ function spindle.iterate_lines(str)
 	return str:gmatch("(.-)\n")
 end
 
-local function scope_search(scope, term)
+function spindle.find_in_scope(scope, term)
 	for i = #scope, 1, -1 do
 		local v = scope[i].decl
 		if v and v == term then
@@ -200,7 +219,7 @@ function spindle.load_markup(file_path)
 	if spindle.markup_cache[file_path] then
 		page.syntax_tree = spindle.markup_cache[file_path]
 	else
-		local m = spindle.parse_markup(page, spindle.load_file(file_path))
+		local m = spindle.parse_markup(page, spindle.load_file(file_path)) -- @todo unsafe
 		spindle.markup_cache[file_path] = m
 		page.syntax_tree = m
 	end
@@ -271,7 +290,7 @@ end
 function spindle.expand(page, scope, template)
 	-- variables: %var:modifiers
 	local result = template:gsub("%%([%a_]+):([%a_]+)", function (x, y)
-		local z = scope_search(scope, x) or page.vars[x]
+		local z = spindle.find_in_scope(scope, x) or page.vars[x]
 		if z == nil then
 			return x
 		end
@@ -287,7 +306,7 @@ function spindle.expand(page, scope, template)
 
 	-- variables: %var
 	result = result:gsub("%%([%a_]+)", function (x)
-		return scope_search(scope, x) or page.vars[x]
+		return spindle.find_in_scope(scope, x) or page.vars[x]
 	end)
 
 	-- spindle.inlines, like [links](#) or **bolded**
@@ -573,7 +592,7 @@ function spindle.render_internal(page, scope, active_block)
 					has_else = true
 				end
 
-				if not (scope_search(scope, entry.ifstmt) or page.vars[entry.ifstmt]) then
+				if not (spindle.find_in_scope(scope, entry.ifstmt) or page.vars[entry.ifstmt]) then
 					if has_else then
 						entry = active_block[index]
 					else
@@ -582,7 +601,7 @@ function spindle.render_internal(page, scope, active_block)
 				end
 			end
 
-			local t = scope_search(scope, entry.token) or page.vars[entry.token]
+			local t = spindle.find_in_scope(scope, entry.token) or page.vars[entry.token]
 			local x = type(t)
 
 			if x == 'string' then
@@ -620,7 +639,7 @@ function spindle.render_internal(page, scope, active_block)
 		end
 
 		if entry.token then
-			local t = scope_search(scope, entry.token) or page.vars[entry.token]
+			local t = spindle.find_in_scope(scope, entry.token) or page.vars[entry.token]
 
 			if t == nil then
 				content = string.format("%s<p>%s %s</p>", content, entry.token, entry.text) -- @todo hard-coded <p>
@@ -824,11 +843,19 @@ function main(starting_file)
 		table.insert(file_list, file.source_path)
 	end
 
-	spindle.write_file(spindle.output_path .. "sitemap.xml", spindle.generate_sitemap(spindle.make_page_list()))
-	table.insert(file_list, "sitemap.xml")
+	if spindle.do_sitemap then
+		spindle.write_file(spindle.output_path .. "sitemap.xml", spindle.generate_sitemap(spindle.make_page_list()))
+		table.insert(file_list, "sitemap.xml")
+	end
 
 	table.sort(file_list)
 	for _, item in ipairs(file_list) do
 		print(item)
+	end
+
+	if #defer_list > 0 then
+		for _, f in ipairs(defer_list) do
+			f()
+		end
 	end
 end

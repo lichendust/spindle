@@ -6,11 +6,12 @@
 
 package main
 
+import "base:runtime"
+
 import "core:os"
 import "core:fmt"
 import "core:strings"
 import "core:unicode"
-import "core:runtime"
 import "core:sys/windows"
 import "core:path/filepath"
 import "core:path/slashpath"
@@ -20,8 +21,11 @@ import lua "lua/5.4"
 VERSION :: "v0.5.0"
 SPINDLE :: "Spindle " + VERSION
 
-SCRIPT_PATH :: "_data"
+OUTPUT_PATH :: "_site"
+CONFIG_PATH :: "_data"
+CONFIG_NAME :: "config.lua"
 SCRIPT_NAME :: "spindle.lua"
+CONFIG_TEXT :: #load(CONFIG_NAME)
 SCRIPT_TEXT :: #load(SCRIPT_NAME)
 
 current_dir: string
@@ -54,16 +58,21 @@ main :: proc() {
 }
 
 init_project :: proc(args: []string) {
-	os.make_directory("_data")
-	os.make_directory("_site")
+	os.make_directory(CONFIG_PATH)
+	os.make_directory(OUTPUT_PATH)
 
 	if len(args) > 0 && args[0] == "--local" {
-		os.write_entire_file(SCRIPT_PATH + "/" + SCRIPT_NAME, SCRIPT_TEXT)
+		os.write_entire_file(CONFIG_PATH + "/" + SCRIPT_NAME, SCRIPT_TEXT)
+	}
+
+	CONF :: CONFIG_PATH + "/" + CONFIG_NAME
+	if !os.exists(CONF) {
+		os.write_entire_file(CONF, CONFIG_TEXT)
 	}
 }
 
 get_script_location :: proc() -> (cstring, bool) {
-	DATA_PATH :: SCRIPT_PATH + "/" + SCRIPT_NAME
+	DATA_PATH :: CONFIG_PATH + "/" + SCRIPT_NAME
 	if os.exists(DATA_PATH) {
 		return DATA_PATH, true
 	}
@@ -99,6 +108,11 @@ execute_spindle :: proc(args: []string, is_prod: bool) {
 	register_procedure(ctx, "make_directory",    lua_make_directory)
 	register_procedure(ctx, "write_file",        lua_write_file)
 	register_procedure(ctx, "to_title",          lua_title_case)
+
+	register_procedure(ctx, "set_working_directory", lua_set_working_directory)
+	register_procedure(ctx, "get_working_directory", lua_get_working_directory)
+
+	// @note what is this? who put this here? I know it was me but why??
 	register_procedure(ctx, "_balance_parens",   lua_balance_parentheses)
 
 	{
@@ -164,14 +178,6 @@ lua_file_exists :: proc "c" (ctx: ^lua.State) -> i32 {
 
 	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
 	lua.pushboolean(ctx, b32(os.exists(file_name)))
-	return 1
-}
-
-lua_current_dir :: proc "c" (ctx: ^lua.State) -> i32 {
-	context = runtime.default_context()
-	defer free_all(context.temp_allocator)
-
-	lua.pushstring(ctx, strings.clone_to_cstring(current_dir, context.temp_allocator))
 	return 1
 }
 
@@ -342,6 +348,8 @@ lua_to_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 }*/
 
 title_case :: proc(input: string) -> string {
+
+	// @todo this is not an exhaustive list
 	short_words :: proc(t: string) -> bool {
 		switch t {
 		case "a":   return true
@@ -398,6 +406,33 @@ lua_title_case :: proc "c" (ctx: ^lua.State) -> i32 {
 	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
 	lua.pushstring(ctx, strings.clone_to_cstring(title_case(input), context.temp_allocator))
 	return 1
+}
+
+load_project_dir :: proc() {
+	walk_proc :: proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (os.Errno, bool) {
+		if info.name[0] == '.' {
+			return 0, info.is_dir
+		}
+		if info.is_dir {
+			if info.name[0] == '_' {
+				return 0, true
+			}
+			return 0, false
+		}
+
+		// this *is* a permanent allocation
+		path, _ := filepath.rel(current_dir, info.fullpath, context.allocator)
+		str, did_alloc := filepath.to_slash(path, context.allocator)
+		if did_alloc {
+			delete(path)
+		}
+
+		append(&file_array, str)
+		return 0, false
+	}
+
+	file_array = make([dynamic]string, 0, 64)
+	filepath.walk(".", walk_proc, nil)
 }
 
 // @todo super naive but it'll do for now
@@ -497,6 +532,8 @@ make_directory :: #force_inline proc(file_name: string) {
 
 lua_make_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
 	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
 	make_directory(file_name)
 	return 0
@@ -504,36 +541,14 @@ lua_make_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 
 lua_write_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
+	defer free_all(context.temp_allocator)
+
 	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
 	file_blob := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
 
 	make_directory(file_name)
 	os.write_entire_file(file_name, transmute([]u8) file_blob)
 	return 0
-}
-
-load_project_dir :: proc() {
-	walk_proc :: proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (os.Errno, bool) {
-		if info.name[0] == '.' {
-			return 0, info.is_dir
-		}
-		if info.is_dir {
-			if info.name[0] == '_' {
-				return 0, true
-			}
-			return 0, false
-		}
-
-		// these *are* permanent allocations
-		path, _ := filepath.rel(current_dir, info.fullpath, context.allocator)
-		str,  _ := filepath.to_slash(path, context.allocator)
-
-		append(&file_array, str)
-		return 0, false
-	}
-
-	file_array = make([dynamic]string, 0, 64)
-	filepath.walk(".", walk_proc, nil)
 }
 
 lua_balance_parentheses :: proc "c" (ctx: ^lua.State) -> i32 {
@@ -549,6 +564,24 @@ lua_balance_parentheses :: proc "c" (ctx: ^lua.State) -> i32 {
 	}
 
 	lua.pushnumber(ctx, lua.Number(count))
+	return 1
+}
+
+lua_set_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+
+	file  := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	errno := os.set_current_directory(file)
+
+	lua.pushboolean(ctx, errno == 0)
+	return 1
+}
+
+lua_get_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+
+	str := os.get_current_directory(context.temp_allocator)
+	lua.pushstring(ctx, strings.clone_to_cstring(str, context.temp_allocator))
 	return 1
 }
 
