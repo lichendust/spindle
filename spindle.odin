@@ -578,10 +578,15 @@ lua_set_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 }
 
 lua_get_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
+	// @note turns out Odin's `get_current_directory` procedure
+	// accepts an allocator on Windows, but not on Darwin or
+	// Linux, so we need to just set the allocator to temp for
+	// the scope.
 	context = runtime.default_context()
+	context.allocator = context.temp_allocator
 
-	str := os.get_current_directory(context.temp_allocator)
-	lua.pushstring(ctx, strings.clone_to_cstring(str, context.temp_allocator))
+	str := os.get_current_directory()
+	lua.pushstring(ctx, strings.clone_to_cstring(str))
 	return 1
 }
 
