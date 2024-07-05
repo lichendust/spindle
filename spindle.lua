@@ -247,7 +247,7 @@ function spindle.load_page(file_path)
 	page.vars.canonical_url = curl
 
 	page.source_path = file_path
-	page.output_path = spindle.output_path .. file_path:gsub("%..+$", ".html")
+	page.output_path = spindle.output_path .. file_path:gsub("%.x$", ".html")
 
 	page.vars.source_path = file_path
 	page.vars.output_path = page.output_path
@@ -622,6 +622,14 @@ function spindle.render_internal(page, scope, active_block)
 			if entry.token == '$' then
 				local args = spindle.split_quoted(entry.text)
 				if _ENV[args[1]] then
+					-- we pre-expand here because functions because inside imports
+					-- a function call essentially sanitises the scope and we lose
+					-- track of where we're supposed to be.
+
+					for k, v in ipairs(args) do
+						args[k] = spindle.expand(page, scope, v)
+					end
+
 					local v = _ENV[args[1]](page, args)
 					if v ~= nil then
 						content = content .. v
