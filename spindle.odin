@@ -111,6 +111,7 @@ execute_spindle :: proc(args: []string, is_prod: bool) {
 
 	register_procedure(ctx, "set_working_directory", lua_set_working_directory)
 	register_procedure(ctx, "get_working_directory", lua_get_working_directory)
+	register_procedure(ctx, "size_of_file",          lua_size_of_file)
 
 	// @note what is this? who put this here? I know it was me but why??
 	register_procedure(ctx, "_balance_parens",   lua_balance_parentheses)
@@ -587,6 +588,16 @@ lua_get_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 
 	str := os.get_current_directory()
 	lua.pushstring(ctx, strings.clone_to_cstring(str))
+	return 1
+}
+
+lua_size_of_file :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+
+	file := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	size := os.file_size_from_path(file)
+
+	lua.pushinteger(ctx, cast(lua.Integer) size)
 	return 1
 }
 
