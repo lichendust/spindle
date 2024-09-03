@@ -33,7 +33,7 @@ file_array:  [dynamic]string
 
 main :: proc() {
 	when ODIN_OS == .Windows {
-		windows.SetConsoleOutputCP(windows.CP_UTF8)
+		windows.SetConsoleOutputCP(.UTF8)
 	}
 
 	args := os.args[1:]
@@ -177,7 +177,7 @@ lua_file_exists :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file_name := read_nth_string(ctx, 1)
 	lua.pushboolean(ctx, b32(os.exists(file_name)))
 	return 1
 }
@@ -187,8 +187,8 @@ lua_copy_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	defer free_all(context.temp_allocator)
 
 	// @todo handle argument errors here
-	source_path := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
-	output_path := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
+	source_path := read_nth_string(ctx, 1)
+	output_path := read_nth_string(ctx, 2)
 
 	blob, success := os.read_entire_file_from_filename(source_path, context.temp_allocator)
 	if success {
@@ -250,7 +250,7 @@ lua_quoted_split :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	input := read_nth_string(ctx, 1)
 	args  := quoted_split(input, context.temp_allocator)
 
 	if args == nil {
@@ -275,7 +275,7 @@ lua_field_split :: proc "c" (ctx: ^lua.State) -> i32 {
 	// @todo just check for whitespace instead of always calling fields
 	// then we can run a fields_iterator and save the fields allocation
 
-	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	input := read_nth_string(ctx, 1)
 	args  := strings.fields(input, context.temp_allocator)
 	count := len(args)
 
@@ -307,7 +307,7 @@ lua_to_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	input  := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	input  := read_nth_string(ctx, 1)
 	buffer := strings.builder_make_len_cap(0, len(input), context.temp_allocator)
 
 	inside_element := false
@@ -344,7 +344,7 @@ lua_to_slug :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	arg1 := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	arg1 := read_nth_string(ctx, 1)
 	arg2 := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
 }*/
 
@@ -404,7 +404,7 @@ lua_title_case :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	input := read_nth_string(ctx, 1)
 	lua.pushstring(ctx, strings.clone_to_cstring(title_case(input), context.temp_allocator))
 	return 1
 }
@@ -475,7 +475,7 @@ lua_find_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file_name := read_nth_string(ctx, 1)
 
 	path := find_file(file_name)
 	if len(path) == 0 {
@@ -504,7 +504,7 @@ lua_find_file_pattern :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file_name := read_nth_string(ctx, 1)
 
 	search := find_file_pattern(file_name)
 	if len(search) == 0 {
@@ -535,7 +535,7 @@ lua_make_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file_name := read_nth_string(ctx, 1)
 	make_directory(file_name)
 	return 0
 }
@@ -544,8 +544,8 @@ lua_write_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	file_name := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
-	file_blob := strings.clone_from_cstring(lua.L_checkstring(ctx, 2), context.temp_allocator)
+	file_name := read_nth_string(ctx, 1)
+	file_blob := read_nth_string(ctx, 2)
 
 	make_directory(file_name)
 	os.write_entire_file(file_name, transmute([]u8) file_blob)
@@ -556,7 +556,7 @@ lua_balance_parentheses :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 	defer free_all(context.temp_allocator)
 
-	input := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	input := read_nth_string(ctx, 1)
 	count := 0
 
 	for c in input {
@@ -571,7 +571,7 @@ lua_balance_parentheses :: proc "c" (ctx: ^lua.State) -> i32 {
 lua_set_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 
-	file  := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file  := read_nth_string(ctx, 1)
 	errno := os.set_current_directory(file)
 
 	lua.pushboolean(ctx, errno == 0)
@@ -594,11 +594,15 @@ lua_get_working_directory :: proc "c" (ctx: ^lua.State) -> i32 {
 lua_size_of_file :: proc "c" (ctx: ^lua.State) -> i32 {
 	context = runtime.default_context()
 
-	file := strings.clone_from_cstring(lua.L_checkstring(ctx, 1), context.temp_allocator)
+	file := read_nth_string(ctx, 1)
 	size := os.file_size_from_path(file)
 
 	lua.pushinteger(ctx, cast(lua.Integer) size)
 	return 1
+}
+
+read_nth_string :: #force_inline proc(ctx: ^lua.State, n: int) -> string {
+	return strings.clone_from_cstring(lua.L_checkstring(ctx, cast(i32) n), context.temp_allocator)
 }
 
 USAGE :: SPINDLE + `
