@@ -601,19 +601,7 @@ function spindle.render_internal(page, scope, active_block)
 				end
 			end
 
-			local t = spindle.find_in_scope(scope, entry.token) or page.vars[entry.token]
-			local x = type(t)
-
-			if x == 'string' then
-				local w = spindle.expand(page, scope, t)
-				content = content .. spindle.template_expand(page, w, spindle.render_internal(page, scope, entry))
-
-			elseif x == 'function' then
-				local v = t(page, scope, spindle.render_internal(page, scope, entry))
-				if v ~= nil then
-					content = content .. (entry.raw and v or spindle.expand(page, scope, v))
-				end
-			end
+			content = content .. spindle.render_internal(page, scope, entry)
 
 			goto render_continue
 		end
@@ -711,6 +699,22 @@ function spindle.render_internal(page, scope, active_block)
 		end
 
 		::render_continue::
+	end
+
+	if active_block.block then
+		local t = spindle.find_in_scope(scope, active_block.token) or page.vars[active_block.token]
+		local x = type(t)
+
+		if x == 'string' then
+			local w = spindle.expand(page, scope, t)
+			content = spindle.template_expand(page, w, content)
+
+		elseif x == 'function' then
+			local v = t(page, scope, content)
+			if v ~= nil then
+				content = active_block.raw and v or spindle.expand(page, scope, v)
+			end
+		end
 	end
 
 	if scope_frame > 0 then
