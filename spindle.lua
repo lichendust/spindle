@@ -4,8 +4,6 @@
 	Copyright (C) 2019-2024 Harley Denham
 ]]
 
--- note: the base 'spindle' table is
--- declared by the spindle host executable
 spindle.handlers     = {} -- file types
 spindle.tokens       = {} -- line-level tokens; headings, images, etc.
 spindle.inlines      = {} -- inline syntax; links, bold, etc.
@@ -177,6 +175,11 @@ function string:split(delimiter)
 	return t
 end
 
+-- @todo we should back out the :split/:gsplit
+-- methods in favour of an Odin-based splitter
+-- there's too much cross-pollinated logic that
+-- should be operating in the same space/basis
+
 -- this is a workaround hack for Lua's lack of non-inclusive negative matches
 -- essentially, you define the escaped condition *and* the correct condition
 -- and it will return either the now-unescaped correct text or the full replacement
@@ -216,6 +219,8 @@ function spindle.load_markup(file_path)
 	page.vars  = {}
 	page.slugs = {}
 
+	page.source_path = file_path
+
 	if spindle.markup_cache[file_path] then
 		page.syntax_tree = spindle.markup_cache[file_path]
 	else
@@ -246,7 +251,7 @@ function spindle.load_page(file_path)
 	page.canonical_url      = curl
 	page.vars.canonical_url = curl
 
-	page.source_path = file_path
+	-- source_path is set in parse_markup
 	page.output_path = spindle.output_path .. file_path:gsub("%.x$", ".html")
 
 	page.vars.source_path = file_path
@@ -388,10 +393,10 @@ function spindle.parse_markup(page, blob)
 	local active = syntax_tree
 	local stack = {syntax_tree}
 
-	local is_block_comment = false
-	local is_block_raw     = false
+	local is_block_raw = false
 
 	for line in spindle.iterate_lines(blob) do
+		local is_comment = false
 		local active = stack[#stack]
 
 		if line == "" then
@@ -415,10 +420,7 @@ function spindle.parse_markup(page, blob)
 				goto next_line
 			end
 
-			if not is_block_comment then
-				stack[#stack] = nil
-			end
-			if is_block_comment then is_block_comment = false end
+			stack[#stack] = nil
 
 			if line:match("%s+else%s+") then
 				local block_id = line:match("%s+([%w_]+)%s+{$")
@@ -435,9 +437,6 @@ function spindle.parse_markup(page, blob)
 			goto next_line
 		end
 
-		if is_block_comment then
-			goto next_line
-		end
 		if is_block_raw then
 			if #active.text > 0 then
 				active.text = active.text .. '\n' .. line
@@ -449,15 +448,16 @@ function spindle.parse_markup(page, blob)
 		end
 
 		if line:match('^%s*/%s+') then
-			if line:match('{$') then
-				is_block_comment = true
-			end
-			goto next_line
+			is_comment = true
+			line = line:gsub("^%s*/", "") -- remove the comment
 		end
 
 		-- check for variables
 		local x = line:match('^%s*([%w_]+)%s*=') or line:match('^%s*%[([%W]+)%]%s*=')
 		if x then
+			if is_comment then
+				goto next_line
+			end
 			local y = line:match("=%s*(.+)")
 
 			if line:match("{$") then
@@ -484,9 +484,10 @@ function spindle.parse_markup(page, blob)
 		if ifs then
 			local block_id = line:match("%s+([%w_]+)%s+{$")
 			local new_block = {
-				token  = block_id or 'block_default',
-				ifstmt = ifs,
-				block  = true,
+				token      = block_id or 'block_default',
+				ifstmt     = ifs,
+				block      = true,
+				is_comment = is_comment,
 			}
 
 			active[#active + 1] = new_block
@@ -497,7 +498,7 @@ function spindle.parse_markup(page, blob)
 		-- open block
 		local is_block = line:match('^%s*{$')
 		if is_block then
-			local new_block = { token = 'block_default', block = true }
+			local new_block = { token = 'block_default', block = true, is_comment = is_comment }
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
 			goto next_line
@@ -507,7 +508,7 @@ function spindle.parse_markup(page, blob)
 		if label then
 			label = spindle.split_fields(label)
 
-			local new_block = { token = label[1] }
+			local new_block = { token = label[1], is_comment = is_comment }
 
 			active[#active + 1] = new_block
 			stack[#stack + 1]   = new_block
@@ -520,6 +521,10 @@ function spindle.parse_markup(page, blob)
 			else
 				new_block.block = true
 			end
+			goto next_line
+		end
+
+		if is_comment then
 			goto next_line
 		end
 
@@ -569,6 +574,13 @@ function spindle.render_internal(page, scope, active_block)
 		local entry = active_block[index]
 
 		if entry.decl then
+			if page.vars.taxonomy_variable and page.vars.taxonomy_category then
+				if entry.decl == page.vars.taxonomy_variable and not string.lower(entry.value):match(string.lower(page.vars.taxonomy_category)) then
+					spindle.clear_scope_frame(scope, scope_frame)
+					return ""
+				end
+			end
+
 			scope[#scope + 1] = entry
 			scope_frame = scope_frame + 1
 			goto render_continue
@@ -584,6 +596,10 @@ function spindle.render_internal(page, scope, active_block)
 		end
 
 		if entry.block and entry.token then
+			if entry.is_comment then
+				goto render_continue
+			end
+
 			if entry.ifstmt then
 				local has_else = false
 
@@ -607,18 +623,26 @@ function spindle.render_internal(page, scope, active_block)
 		end
 
 		if entry.token then
+			-- @todo function calls should *not* pass an arg0 function name
+			-- it's a waste of time and it's already more confusing than it
+			-- needs to be with Lua's off-by-one arrays
 			if entry.token == '$' then
 				local args = spindle.split_quoted(entry.text)
+
 				if _ENV[args[1]] then
-					-- we pre-expand here because functions because inside imports
-					-- a function call essentially sanitises the scope and we lose
-					-- track of where we're supposed to be.
+					-- we pre-expand here because inside imports
+					-- a function call essentially sanitises the
+					-- scope and we lose track of where we're
+					-- supposed to be.
+
+					local func = table.remove(args, 1)
 
 					for k, v in ipairs(args) do
 						args[k] = spindle.expand(page, scope, v)
 					end
 
-					local v = _ENV[args[1]](page, args)
+					-- we only, deliberately, accept the first return
+					local v = _ENV[func](page, args)
 					if v ~= nil then
 						content = content .. v
 					end
@@ -717,6 +741,12 @@ function spindle.render_internal(page, scope, active_block)
 		end
 	end
 
+	spindle.clear_scope_frame(scope, scope_frame)
+
+	return content
+end
+
+function spindle.clear_scope_frame(scope, scope_frame)
 	if scope_frame > 0 then
 		for i = #scope, 1, -1 do
 			scope[i] = nil
@@ -726,8 +756,6 @@ function spindle.render_internal(page, scope, active_block)
 			end
 		end
 	end
-
-	return content
 end
 
 function spindle.export_file(path)
@@ -797,11 +825,11 @@ function spindle.generate_sitemap(file_list)
 	return sitemap .. table.concat(file_list, "") .. [[</urlset>]]
 end
 
-function spindle.make_page_list()
+function spindle.make_page_list(reveal_hidden)
 	local file_list = {}
 
 	for i, page in pairs(spindle.all_pages) do
-		if not page.source_path:match("^404") then
+		if reveal_hidden or not page.vars.spindle_hide_page then -- @docs
 			table.insert(file_list, page.canonical_url)
 		end
 	end

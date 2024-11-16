@@ -113,8 +113,7 @@ execute_spindle :: proc(args: []string, is_prod: bool) {
 	register_procedure(ctx, "get_working_directory", lua_get_working_directory)
 	register_procedure(ctx, "size_of_file",          lua_size_of_file)
 
-	// @note what is this? who put this here? I know it was me but why??
-	register_procedure(ctx, "_balance_parens",   lua_balance_parentheses)
+	register_procedure(ctx, "_balance_parens", lua_balance_parentheses) // @todo rename this
 
 	{
 		lua.getglobal(ctx, "spindle")
