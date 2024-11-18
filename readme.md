@@ -1,5 +1,7 @@
 # 🧵 Spindle
 
+![](https://stuff.lichendust.com/media/spindle.webp)
+
 Spindle is a self-contained static-site generator.
 
 It emerged from the desire for a kind of self-editing Markdown — what if you could redefine what `#` did on the fly? Spindle executes on this idea, with templating and content being defined in the same space and markup language, rather than several distinct spaces and structural paradigms.

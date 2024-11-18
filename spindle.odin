@@ -50,7 +50,7 @@ main :: proc() {
 		init_project(args[1:])
 	case "build":
 		execute_spindle(args[1:], false)
-	case "prod":
+	case "prod", "production":
 		execute_spindle(args[1:], true)
 	case:
 		fmt.println(USAGE)
@@ -623,9 +623,10 @@ init
 	--local    makes a local copy of the
 			   spindle.lua file
 
-    You can safely run this on an existing
-    project if you wish to 'upgrade' it to
-    a local copy during development.
+    You can safely run --local on an
+    existing project if you wish to
+    'upgrade' it to a local copy during
+    development.
 
 build
 -----
