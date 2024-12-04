@@ -113,6 +113,8 @@ execute_spindle :: proc(args: []string, is_prod: bool) {
 	register_procedure(ctx, "get_working_directory", lua_get_working_directory)
 	register_procedure(ctx, "size_of_file",          lua_size_of_file)
 
+	register_procedure(ctx, "format_thousand_separators", lua_format_thousand_separators)
+
 	register_procedure(ctx, "_balance_parens", lua_balance_parentheses) // @todo rename this
 
 	{
@@ -602,6 +604,42 @@ lua_size_of_file :: proc "c" (ctx: ^lua.State) -> i32 {
 
 read_nth_string :: #force_inline proc(ctx: ^lua.State, n: int) -> string {
 	return strings.clone_from_cstring(lua.L_checkstring(ctx, cast(i32) n), context.temp_allocator)
+}
+
+format_thousand_separators :: proc(t: string, sep: rune = ',', allocator := context.allocator) -> string {
+	count := strings.rune_count(t)
+	if count < 4 {
+		return t
+	}
+
+	remainder  := count % 3
+	final_size := count + (count / 3) + remainder - 1
+
+	builder: strings.Builder
+	strings.builder_init(&builder, 0, final_size)
+
+	if remainder > 0 {
+		strings.write_string(&builder, t[:remainder])
+	}
+
+	for i := remainder; i < len(t); i += 3 {
+		if i > 0 {
+			strings.write_rune(&builder, sep)
+		}
+		strings.write_string(&builder, t[i:i + 3])
+	}
+
+	return strings.to_string(builder)
+}
+
+lua_format_thousand_separators :: proc "c" (ctx: ^lua.State) -> i32 {
+	context = runtime.default_context()
+
+	text := read_nth_string(ctx, 1)
+	post := format_thousand_separators(text, ',', context.temp_allocator)
+
+	lua.pushstring(ctx, strings.clone_to_cstring(post, context.temp_allocator))
+	return 1
 }
 
 USAGE :: SPINDLE + `

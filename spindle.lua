@@ -82,12 +82,13 @@ spindle.to_quote = function(arg)
 	return string.format("%q", arg)
 end
 
-spindle.modifiers.slug  = spindle.to_slug
-spindle.modifiers.uslug = spindle.to_slug
-spindle.modifiers.title = spindle.to_title
-spindle.modifiers.upper = spindle.to_upper
-spindle.modifiers.lower = spindle.to_lower
-spindle.modifiers.quote = spindle.to_quote
+spindle.modifiers.slug      = spindle.to_slug
+spindle.modifiers.uslug     = spindle.to_slug
+spindle.modifiers.title     = spindle.to_title
+spindle.modifiers.upper     = spindle.to_upper
+spindle.modifiers.lower     = spindle.to_lower
+spindle.modifiers.quote     = spindle.to_quote
+spindle.modifiers.thousands = spindle.format_thousand_separators
 
 table.insert(spindle.inlines, function(page, line)
 	return line:gsub("%[(.-)%]%((.-)%)", spindle.make_anchor_tag)
