@@ -616,7 +616,7 @@ format_thousand_separators :: proc(t: string, sep: rune = ',', allocator := cont
 	final_size := count + (count / 3) + remainder - 1
 
 	builder: strings.Builder
-	strings.builder_init(&builder, 0, final_size)
+	strings.builder_init(&builder, 0, final_size, allocator)
 
 	if remainder > 0 {
 		strings.write_string(&builder, t[:remainder])
