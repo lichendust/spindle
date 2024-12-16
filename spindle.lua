@@ -41,6 +41,13 @@ spindle.tokens["~"] = function(page, scope, arg)
 	return spindle.render_internal(spindle.load_page(path), scope, part.syntax_tree)
 end
 
+-- @todo needs full testing
+spindle.tokens["%"] = function(page, scope, arg)
+	local args = spindle.split_quoted(arg)
+	spindle.replace_inline(arg[1], arg[2])
+	return ""
+end
+
 --[[spindle.tokens["~"] = function(page, scope, arg)
 	spindle.parse_markup = spindle.__parse_markup
 	local args = spindle.split_quoted(arg)
@@ -89,17 +96,6 @@ spindle.modifiers.upper     = spindle.to_upper
 spindle.modifiers.lower     = spindle.to_lower
 spindle.modifiers.quote     = spindle.to_quote
 spindle.modifiers.thousands = spindle.format_thousand_separators
-
-table.insert(spindle.inlines, function(page, line)
-	return line:gsub("%[(.-)%]%((.-)%)", spindle.make_anchor_tag)
-end)
-
-table.insert(spindle.inlines, function(page, line)
-	return line:gsub("%%{(.-)}", function(x)
-		local _, url = spindle.process_any_file(x)
-		return url
-	end)
-end)
 
 function spindle.make_anchor_tag(label, path)
 	if spindle.has_protocol(path) then
@@ -207,9 +203,36 @@ function spindle.find_in_scope(scope, term)
 	return nil
 end
 
-function spindle.register_inline(func)
-	table.insert(spindle.inlines, func)
+function spindle.register_inline(name, func)
+	if func == nil and _ENV[name] then
+		table.insert(spindle.inlines, {name = name, exec = _ENV[name]})
+	else
+		table.insert(spindle.inlines, {name = name, exec = func})
+	end
 end
+
+function spindle.replace_inline(name, func)
+	for i, inline in ipairs(spindle.inlines) do
+		if inline.name == name then
+			if type(func) == 'string' then
+				inline.exec = _ENV[func]
+			else
+				inline.exec = func
+			end
+		end
+	end
+end
+
+spindle.register_inline("link", function(page, line)
+	return line:gsub("%[(.-)%]%((.-)%)", spindle.make_anchor_tag)
+end)
+
+spindle.register_inline("find", function(page, line)
+	return line:gsub("%%{(.-)}", function(x)
+		local _, url = spindle.process_any_file(x)
+		return url
+	end)
+end)
 
 function spindle.load_markup(file_path)
 	if file_path == nil then
@@ -294,8 +317,14 @@ local function uslug_expand(page, slug)
 end
 
 function spindle.expand(page, scope, template)
+	-- @hack see template section in main
+	local was_content_expansion = false
+
 	-- variables: %var:modifiers
-	local result = template:gsub("%%([%a_]+):([%a_]+)", function (x, y)
+	local result = template:gsub("%%([%a_]+):([%a_]+)", function(x, y)
+		if x == "content" then
+			was_content_expansion = true
+		end
 		local z = spindle.find_in_scope(scope, x) or page.vars[x]
 		if z == nil then
 			return x
@@ -311,13 +340,20 @@ function spindle.expand(page, scope, template)
 	end)
 
 	-- variables: %var
-	result = result:gsub("%%([%a_]+)", function (x)
+	result = result:gsub("%%([%a_]+)", function(x)
+		if x == "content" then
+			was_content_expansion = true
+		end
 		return spindle.find_in_scope(scope, x) or page.vars[x]
 	end)
 
+	if was_content_expansion then
+		return result
+	end
+
 	-- spindle.inlines, like [links](#) or **bolded**
-	for i, inline_exec in ipairs(spindle.inlines) do
-		result = inline_exec(page, result)
+	for i, inline in ipairs(spindle.inlines) do
+		result = inline.exec(page, result)
 	end
 
 	return result
@@ -619,7 +655,6 @@ function spindle.render_internal(page, scope, active_block)
 			end
 
 			content = content .. spindle.render_internal(page, scope, entry)
-
 			goto render_continue
 		end
 
@@ -657,9 +692,7 @@ function spindle.render_internal(page, scope, active_block)
 				end
 				goto render_continue
 			end
-		end
 
-		if entry.token then
 			local t = spindle.find_in_scope(scope, entry.token) or page.vars[entry.token]
 
 			if t == nil then
@@ -743,7 +776,6 @@ function spindle.render_internal(page, scope, active_block)
 	end
 
 	spindle.clear_scope_frame(scope, scope_frame)
-
 	return content
 end
 
@@ -864,6 +896,9 @@ function main(starting_file)
 		page.slugs = {}
 		page.vars.content = spindle.render(page, page.syntax_tree)
 
+		-- @todo make some line-level syntax we can quickly parse to set the content anchor
+		-- without making it a native variable -- this lets us take the 'content' specific
+		-- hook out of spindle.expand and avoid all the double-expansion mess
 		if page.vars.template then
 			spindle.parse_markup = spindle.__parse_markup
 			local template = spindle.load_markup("_data/" .. page.vars.template .. ".x")
